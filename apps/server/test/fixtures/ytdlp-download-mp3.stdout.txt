@@ -1,0 +1,3 @@
+STI_INFO {"title": "Me at the zoo", "duration": 19, "extractor_key": "Youtube", "webpage_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw", "format_id": "140", "vcodec": "none", "acodec": "mp4a.40.2"}
+STI_PROGRESS downloading|1024|309288|NA|NA|NA
+STI_PROGRESS finished|309288|309288|NA|8265094.425485011|NA

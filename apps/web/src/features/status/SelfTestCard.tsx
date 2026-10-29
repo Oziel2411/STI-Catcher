@@ -4,12 +4,11 @@ import {
   jobResponseSchema,
   listJobsResponseSchema,
 } from '@sti-catcher/shared';
-import type { Job } from '@sti-catcher/shared';
 import { useEffect, useState } from 'react';
 import { apiGet, apiPost } from '../../api/client.ts';
-import { subscribeToJobEvents } from '../../api/events.ts';
-import { formatBytes, formatEta, formatSpeedRatio } from '../../lib/format.ts';
-import { applyJobEvent, PHASE_LABELS, STATUS_LABELS } from '../../lib/jobs.ts';
+import { JobProgress } from '../../components/JobProgress.tsx';
+import { useTrackedJob } from '../../hooks/useTrackedJob.ts';
+import { formatBytes } from '../../lib/format.ts';
 
 const DURATIONS = [10, 60, 120] as const;
 
@@ -23,11 +22,10 @@ const errorMessage = (error: unknown) =>
  */
 export function SelfTestCard({ onJobUpdated }: { onJobUpdated: () => void }) {
   const [trackedId, setTrackedId] = useState<string | null>(null);
-  const [job, setJob] = useState<Job | null>(null);
   const [duration, setDuration] = useState<number>(60);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [connected, setConnected] = useState(true);
+  const { job, connected } = useTrackedJob(trackedId, onJobUpdated);
 
   // Si ya hay una prueba en curso (otra pestaña, o se recargó la página), se retoma.
   useEffect(() => {
@@ -38,11 +36,7 @@ export function SelfTestCard({ onJobUpdated }: { onJobUpdated: () => void }) {
       controller.signal,
     )
       .then(({ jobs }) => {
-        const active = jobs[0];
-        if (active) {
-          setJob(active);
-          setTrackedId(active.id);
-        }
+        if (jobs[0]) setTrackedId(jobs[0].id);
       })
       .catch(() => {
         // Sin esto la tarjeta igual funciona: se puede lanzar una prueba nueva.
@@ -52,23 +46,6 @@ export function SelfTestCard({ onJobUpdated }: { onJobUpdated: () => void }) {
     };
   }, []);
 
-  // Progreso en vivo. El stream manda primero el estado actual del job.
-  useEffect(() => {
-    if (trackedId === null) return;
-    const close = subscribeToJobEvents(trackedId, {
-      onEvent: (event) => {
-        setJob((current) => applyJobEvent(current ?? null, event));
-        if (event.type === 'job.updated') {
-          onJobUpdated();
-          // El server cierra el stream al terminar; cerrarlo acá evita que EventSource reconecte.
-          if (!isActiveStatus(event.job.status)) close();
-        }
-      },
-      onConnectionChange: setConnected,
-    });
-    return close;
-  }, [trackedId, onJobUpdated]);
-
   const isActive = job !== null && isActiveStatus(job.status);
 
   const start = () => {
@@ -76,8 +53,6 @@ export function SelfTestCard({ onJobUpdated }: { onJobUpdated: () => void }) {
     setError(null);
     apiPost('/api/jobs/selftest', createJobResponseSchema, { durationSeconds: duration })
       .then(({ jobId }) => {
-        setJob(null);
-        setConnected(true);
         setTrackedId(jobId);
       })
       .catch((e: unknown) => {
@@ -146,65 +121,18 @@ export function SelfTestCard({ onJobUpdated }: { onJobUpdated: () => void }) {
       )}
 
       {trackedId !== null && job === null && <p className="muted small">Conectando…</p>}
-      {job && <JobProgressView job={job} connected={connected} />}
-    </div>
-  );
-}
-
-function JobProgressView({ job, connected }: { job: Job; connected: boolean }) {
-  const progress = job.progress;
-  const percent = progress?.percent ?? null;
-  const statusClass =
-    job.status === 'done' ? 'badge-ok' : job.status === 'failed' ? 'badge-error' : 'badge-muted';
-
-  return (
-    <div className="job" aria-live="polite">
-      <div className="job-header">
-        <span className={`badge ${statusClass}`}>{STATUS_LABELS[job.status]}</span>
-        <span className="muted small">{job.title}</span>
-      </div>
-
-      {job.status === 'running' && (
-        <>
-          <div
-            className="meter"
-            role="progressbar"
-            aria-label="Progreso"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            {...(percent !== null ? { 'aria-valuenow': Math.round(percent) } : {})}
-          >
-            <div className="meter-fill" style={{ width: `${String(percent ?? 0)}%` }} />
-          </div>
-          <p className="small">
-            {progress ? PHASE_LABELS[progress.phase] : 'Iniciando'}
-            {percent !== null && ` · ${percent.toFixed(0)} %`}
-            {/* En los primeros segundos ffmpeg todavía no avanzó: "0x" confunde más de lo que informa. */}
-            {progress?.speedRatio != null &&
-              progress.speedRatio > 0 &&
-              ` · velocidad ${formatSpeedRatio(progress.speedRatio)}`}
-            {progress?.etaSeconds != null && ` · faltan ${formatEta(progress.etaSeconds)}`}
-          </p>
-          {!connected && (
-            <p className="small text-warn">Se perdió la conexión con el servidor. Reintentando…</p>
-          )}
-        </>
+      {job && (
+        <JobProgress
+          job={job}
+          connected={connected}
+          doneContent={
+            <p className="small">
+              Funciona: se generó un video de {formatBytes(job.sizeBytes ?? 0)} y se borró al
+              terminar.
+            </p>
+          }
+        />
       )}
-
-      {job.status === 'queued' && (
-        <p className="small muted">Esperando a que termine otro trabajo.</p>
-      )}
-      {job.status === 'done' && (
-        <p className="small">
-          Funciona: se generó un video de {formatBytes(job.sizeBytes ?? 0)} y se borró al terminar.
-        </p>
-      )}
-      {job.status === 'cancelled' && (
-        <p className="small">
-          Cancelado: el proceso se detuvo y se borraron los archivos parciales.
-        </p>
-      )}
-      {job.status === 'failed' && job.error && <p className="small text-error">{job.error}</p>}
     </div>
   );
 }

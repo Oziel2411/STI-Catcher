@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatEta, formatSpeedRatio, formatUptime } from './format.ts';
+import {
+  formatBytes,
+  formatDuration,
+  formatEta,
+  formatSpeedRatio,
+  formatUptime,
+} from './format.ts';
 
 describe('formatEta', () => {
   it('usa la unidad más grande con dos dígitos en la menor', () => {
@@ -12,6 +18,15 @@ describe('formatEta', () => {
   it('devuelve un guion si no se conoce', () => {
     expect(formatEta(null)).toBe('—');
     expect(formatEta(-3)).toBe('—');
+  });
+});
+
+describe('formatDuration', () => {
+  it('formato reloj', () => {
+    expect(formatDuration(19)).toBe('0:19');
+    expect(formatDuration(635)).toBe('10:35');
+    expect(formatDuration(3725)).toBe('1:02:05');
+    expect(formatDuration(null)).toBe('—');
   });
 });
 

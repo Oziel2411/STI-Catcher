@@ -120,6 +120,10 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
     error: record.error,
     sizeBytes: record.sizeBytes,
     durationSeconds: record.durationSeconds,
+    format: record.format,
+    resolution: record.resolution,
+    videoCodec: record.videoCodec,
+    audioCodec: record.audioCodec,
     parentJobId: record.parentJobId,
     progress: record.status === 'running' ? (progress.get(record.id) ?? null) : null,
   });
@@ -176,13 +180,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
   // --- Ejecución --------------------------------------------------------------
 
   const completeOutput = async (id: string, result: JobResult): Promise<JobFinish> => {
-    const finish: JobFinish = {
-      status: 'done',
-      finishedAt: '',
-      title: result.metadata?.title ?? null,
-      sizeBytes: result.metadata?.sizeBytes ?? null,
-      durationSeconds: result.metadata?.durationSeconds ?? null,
-    };
+    const finish: JobFinish = { ...result.metadata, status: 'done', finishedAt: '' };
     if (result.output) {
       const { tempPath, extension } = result.output;
       if (!EXTENSION_PATTERN.test(extension)) {

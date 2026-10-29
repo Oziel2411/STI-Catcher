@@ -31,6 +31,16 @@ export function formatEta(totalSeconds: number | null): string {
   return `${String(rest)} s`;
 }
 
+/** Duración de un video: 65 → "1:05", 3725 → "1:02:05". */
+export function formatDuration(totalSeconds: number | null): string {
+  if (totalSeconds === null || !Number.isFinite(totalSeconds) || totalSeconds < 0) return '—';
+  const seconds = Math.round(totalSeconds);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = String(seconds % 60).padStart(2, '0');
+  return h > 0 ? `${String(h)}:${String(m).padStart(2, '0')}:${s}` : `${String(m)}:${s}`;
+}
+
 /** Velocidad de ffmpeg relativa al tiempo real: 1.013 → "1,0x". */
 export function formatSpeedRatio(ratio: number | null): string {
   if (ratio === null || !Number.isFinite(ratio) || ratio < 0) return '—';

@@ -21,6 +21,8 @@ export type RunCommandOptions = {
   timeoutMs: number;
   /** Máximo de caracteres que se guardan de cada salida (el resto se descarta). */
   maxOutputChars?: number;
+  /** Variables de entorno del proceso hijo (por defecto, las del server). */
+  env?: NodeJS.ProcessEnv;
 };
 
 export type CommandRunner = (
@@ -58,9 +60,13 @@ const appendCapped = (current: string, chunk: string, max: number) =>
   current.length >= max ? current : (current + chunk).slice(0, max);
 
 /** Ejecuta un comando corto (p. ej. `--version`) y junta su salida. */
-export const runCommand: CommandRunner = (file, args, { timeoutMs, maxOutputChars = 64_000 }) =>
+export const runCommand: CommandRunner = (
+  file,
+  args,
+  { timeoutMs, maxOutputChars = 64_000, env },
+) =>
   new Promise((resolve, reject) => {
-    const child = spawn(file, args, { shell: false, windowsHide: true });
+    const child = spawn(file, args, { shell: false, windowsHide: true, env: env ?? process.env });
     let stdout = '';
     let stderr = '';
     let timedOut = false;

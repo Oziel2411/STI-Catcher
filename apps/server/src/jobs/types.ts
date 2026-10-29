@@ -31,15 +31,23 @@ export type NewJob = Pick<JobRecord, 'id' | 'type' | 'params' | 'createdAt'> &
 
 export type FinalStatus = Extract<JobStatus, 'done' | 'failed' | 'cancelled'>;
 
+/** Datos técnicos del resultado (de ffprobe). Todos opcionales: no todo job produce un archivo. */
+export type JobMediaMetadata = {
+  title?: string | null;
+  sizeBytes?: number | null;
+  durationSeconds?: number | null;
+  format?: string | null;
+  resolution?: string | null;
+  videoCodec?: string | null;
+  audioCodec?: string | null;
+};
+
 /** Datos que se guardan al terminar un job. */
-export type JobFinish = {
+export type JobFinish = JobMediaMetadata & {
   status: FinalStatus;
   finishedAt: string;
   error?: string | null;
   filePath?: string | null;
-  sizeBytes?: number | null;
-  durationSeconds?: number | null;
-  title?: string | null;
 };
 
 export type ListJobsFilter = {
@@ -70,11 +78,7 @@ export type JobResult = {
    * `STORAGE_DIR/files/<id><extension>`. null si el job no produce archivo.
    */
   output: { tempPath: string; extension: string } | null;
-  metadata?: {
-    title?: string | null;
-    sizeBytes?: number | null;
-    durationSeconds?: number | null;
-  };
+  metadata?: JobMediaMetadata;
 };
 
 export type JobContext = {

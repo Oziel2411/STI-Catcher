@@ -94,23 +94,32 @@ export function createJobsRepository(db: Db): JobsRepository {
   const markRunningStmt = db.prepare<[string, string]>(
     "UPDATE jobs SET status = 'running', started_at = ? WHERE id = ? AND status = 'queued'",
   );
+  // Parámetros con nombre: con tantas columnas, los posicionales son fáciles de desordenar.
   const finishStmt = db.prepare<
     [
-      string,
-      string,
-      string | null,
-      string | null,
-      number | null,
-      number | null,
-      string | null,
-      string,
+      {
+        id: string;
+        status: string;
+        finishedAt: string;
+        error: string | null;
+        filePath: string | null;
+        sizeBytes: number | null;
+        durationSeconds: number | null;
+        title: string | null;
+        format: string | null;
+        resolution: string | null;
+        videoCodec: string | null;
+        audioCodec: string | null;
+      },
     ]
   >(`
     UPDATE jobs
-       SET status = ?, finished_at = ?, error = ?,
-           file_path = ?, size_bytes = ?, duration_seconds = ?,
-           title = COALESCE(?, title)
-     WHERE id = ? AND status IN ('queued', 'running')
+       SET status = @status, finished_at = @finishedAt, error = @error,
+           file_path = @filePath, size_bytes = @sizeBytes, duration_seconds = @durationSeconds,
+           title = COALESCE(@title, title),
+           format = @format, resolution = @resolution,
+           video_codec = @videoCodec, audio_codec = @audioCodec
+     WHERE id = @id AND status IN ('queued', 'running')
   `);
   const runningIdsStmt = db.prepare<[], { id: string }>(
     "SELECT id FROM jobs WHERE status = 'running' ORDER BY created_at, rowid",
@@ -177,16 +186,20 @@ export function createJobsRepository(db: Db): JobsRepository {
     },
 
     finish(id, patch: JobFinish) {
-      const result = finishStmt.run(
-        patch.status,
-        patch.finishedAt,
-        patch.error ?? null,
-        patch.filePath ?? null,
-        patch.sizeBytes ?? null,
-        patch.durationSeconds ?? null,
-        patch.title ?? null,
+      const result = finishStmt.run({
         id,
-      );
+        status: patch.status,
+        finishedAt: patch.finishedAt,
+        error: patch.error ?? null,
+        filePath: patch.filePath ?? null,
+        sizeBytes: patch.sizeBytes ?? null,
+        durationSeconds: patch.durationSeconds ?? null,
+        title: patch.title ?? null,
+        format: patch.format ?? null,
+        resolution: patch.resolution ?? null,
+        videoCodec: patch.videoCodec ?? null,
+        audioCodec: patch.audioCodec ?? null,
+      });
       return result.changes === 1;
     },
 

@@ -46,6 +46,7 @@ Windows PowerShell 5.1 (el que trae Windows 10) interpreta los `.ps1` sin BOM co
 - Excepción: `STI_ENV_FILE` indica dónde está el `.env`, para que en el servidor viva fuera del código.
 - Las rutas relativas se resuelven contra la carpeta del `.env`, no contra el directorio de trabajo: el servicio funciona igual sin importar desde dónde lo lance WinSW.
 - `parseConfig` es una función pura (recibe las variables y la carpeta base) y está testeada.
+- **La misma regla vale para `vite.config.ts`** (Fase 3). Antes usaba `loadEnv` de Vite, que también toma las variables del sistema. La herramienta de preview define `PORT=5173` para el propio Vite, y el proxy de `/api` terminó apuntando a sí mismo: todas las llamadas daban 502 (medido). Ahora lee el `.env` con `util.parseEnv`, igual que el server.
 
 ### D-011 — Sin HTTPS solo se escucha en localhost · Fase 1 · Vigente
 
@@ -196,6 +197,47 @@ El extractor `generic` acepta cualquier URL y descarga lo que encuentre en la p�
 
 El bloqueo de URLs a IPs privadas/localhost queda como **segunda capa**. Es parcial: yt-dlp sigue redirecciones por su cuenta, y eso no se puede controlar desde afuera.
 
+**Implementación (Fase 3):**
+
+- `--use-extractors=default,-generic` va como **un solo argumento** con `=`: si el valor empezara con `-`, yt-dlp lo leería como otra opción.
+- Segunda capa (`BLOCK_PRIVATE_URLS`, activada por defecto): se resuelve el host y se rechaza si **alguna** de sus IPs es interna (loopback, RFC 1918, link-local, CGNAT, multicast, reservadas; IPv4 dentro de IPv6 incluida). Usa `net.BlockList` de Node, sin rangos calculados a mano. Se verifica al analizar, al crear el job y de nuevo al ejecutarlo (el DNS pudo cambiar en el medio).
+- Medido con yt-dlp real: `https://example.com/video.mp4` → "No suitable extractor found" → "El sitio no está soportado".
+
+### D-044 — Selección de formatos: `bv+ba`, H.264 primero, estéreo · Fase 3 · Vigente
+
+Cada punto se midió con descargas reales:
+
+- **Sin `-S` explícito, yt-dlp elige AV1 + Opus** ("Me at the zoo": `395+251`). Por eso existe el modo compatibilidad.
+- **`bv` y no `bv*`**: `bv*` acepta formatos que ya traen audio. Como se prefiere AAC, el combinado `18` (240p H.264+AAC) le ganaba al video solo, incluso en "Máxima calidad". Con `bv[height<=H]+ba/b[height<=H]/bv+ba/b`, el combinado `b` queda solo como respaldo para sitios que no separan video y audio.
+- **compat**: `-S vcodec:h264,res:H,channels:2,acodec:aac` → la mejor H.264 que no supere la altura.
+- **quality**: `-S res:H,acodec:aac` → el orden por defecto de yt-dlp (AV1 > VP9 > H.264).
+- **Estéreo (`channels:2`) en compat, MP3 y M4A**: sin esto, Big Buck Bunny en 360p bajaba AAC **5.1 de 384 kbps** (47 MB en lugar de 27,5 MB), que algunos reproductores y editores manejan mal. Además, MP3 no admite más de 2 canales. "Máxima calidad" conserva el mejor audio, 5.1 incluido.
+- `--merge-output-format mp4` (video + audio separados) y `--remux-video mp4` (sitios que dan un solo `.webm`).
+- Resultado verificado con ffprobe: H.264 Main yuv420p + AAC-LC estéreo, con `moov` al principio (abre en el reproductor de Windows y se puede adelantar).
+
+### D-045 — "Recodificar a H.264" lo hace ffmpeg, no yt-dlp · Fase 3 · Vigente
+
+yt-dlp puede recodificar (`--recode-video`), pero no informa el progreso de esa etapa, que es justamente la más lenta. El runner descarga con la selección de "Máxima calidad" y después recodifica con nuestro ffmpeg, con progreso real (`-progress`, D-037). Usa CRF 20, preset medium, yuv420p, AAC 192 kbps estéreo y `+faststart`.
+
+### D-046 — El análisis no es un job, pero tiene límite · Fase 3 · Vigente
+
+`POST /api/media/probe` responde en el mismo request (yt-dlp `-J` tarda 5–12 s, medido) porque el usuario lo espera para elegir opciones. Para que nadie lo sature sin login, hay como máximo 4 análisis simultáneos; el quinto recibe **429** con un mensaje para reintentar. Timeout de 90 s.
+
+### D-047 — Progreso de yt-dlp con plantilla propia · Fase 3 · Vigente
+
+- `--progress-template` con campos separados por `|` (`STI_PROGRESS status|bajado|total|estimado|velocidad|eta`). yt-dlp escribe `NA` cuando no tiene el dato.
+- `--print before_dl:STI_INFO {título, formato, …}`: el `format_id` (`133+140`) dice cuántos streams se van a bajar.
+- **Medido:** el progreso de descarga sale por stdout y el de postproceso (Merger, ExtractAudio) **por stderr**. Se leen los dos.
+- Con video + audio, el video pesa el 90 % de la barra y el audio el 10 %. Repartir 50/50 hacía que la barra llegara a la mitad enseguida y se quedara quieta.
+- Los postprocesos no informan porcentaje: la UI muestra la fase ("Uniendo audio y video") con una barra animada.
+
+### D-048 — Archivo final: datos de ffprobe y descarga con RFC 5987 · Fase 3 · Vigente
+
+- Al terminar, ffprobe sobre el archivo real: duración, resolución y codecs que se guardan en el job (no lo que dijo el sitio).
+- `GET /api/jobs/:id/file`: se pide por jobId, la ruta sale de la base y se verifica que esté dentro de `STORAGE_DIR\files`. `reply.download` de `@fastify/static` arma `Content-Disposition` según RFC 5987 (verificado: "Canción del ñandú 🎵" llega intacto) y soporta Range (206). 409 si el job no terminó, **410** si el archivo ya no está.
+- El nombre de descarga es el título sin caracteres prohibidos en Windows, sin nombres reservados (CON, NUL…), hasta 150 caracteres sin partir emojis, normalizado a NFC.
+- Se adelantó de la Fase 4 porque el criterio de la Fase 3 pide abrir el MP4. La Fase 4 agrega el historial y el reproductor.
+
 ### D-041 — Cookie `clientId` con `httpOnly` · Fase 4 · Vigente
 
 La UI no necesita leer la cookie: cada job llega con `isMine` calculado en el server. La vista "Todos" no muestra IPs (quedan en la DB y el log).
@@ -210,6 +252,15 @@ Windows no permite reemplazar ni borrar un `.exe` en ejecución, pero **sí reno
 4. renombra `yt-dlp.exe` → `yt-dlp.old.exe` y `yt-dlp.new.exe` → `yt-dlp.exe`.
 
 No se bloquea por jobs activos: los que están corriendo siguen con el ejecutable viejo (ya cargado en memoria) y los nuevos usan el nuevo.
+
+**Implementación (Fase 3):**
+
+- Si un `yt-dlp.old.exe` anterior sigue en uso (un job muy largo), no se puede borrar ni pisar: el actual se renombra a `yt-dlp.old.<fecha>.exe`, y la próxima corrida borra todos los `yt-dlp.old*.exe`.
+- Si el segundo renombre falla, se deshace el primero: nunca queda el sistema sin `yt-dlp.exe`.
+- `-Force` reinstala aunque sea la misma versión (para reparar un ejecutable dañado).
+- Las funciones compartidas con `setup.ps1` (leer el `.env`, descarga con SHA-256) están en `scripts/common.ps1`.
+- Verificado: la actualización completa contra GitHub (renombre + versión nueva), y en Windows 10 que un `.exe` en ejecución **no se puede borrar pero sí renombrar**, y que el proceso sigue corriendo después.
+- **Medido:** en PowerShell 5.1, `& exe --version | Select-Object -First 1` corta el proceso y deja `$LASTEXITCODE` en -1. Por eso se captura toda la salida antes de mirarla.
 
 ### D-043 — GIF con recorte y topes · Fase 5 · Vigente
 

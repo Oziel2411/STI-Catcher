@@ -1,0 +1,6 @@
+STI_POSTPROCESS started|FixupM4a
+STI_POSTPROCESS finished|FixupM4a
+STI_POSTPROCESS started|ExtractAudio
+STI_POSTPROCESS finished|ExtractAudio
+STI_POSTPROCESS started|MoveFiles
+STI_POSTPROCESS finished|MoveFiles

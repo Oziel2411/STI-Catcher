@@ -344,6 +344,128 @@ code {
   margin-top: 16px;
 }
 
+/* Barra sin porcentaje (postprocesos que no informan avance). */
+.meter-indeterminate .meter-fill {
+  width: 30%;
+  animation: meter-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes meter-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meter-indeterminate .meter-fill {
+    width: 100%;
+    animation: none;
+    opacity: 0.4;
+  }
+}
+
+.button-secondary {
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+a.button {
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* Descargar */
+.url-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.grow {
+  flex: 1 1 320px;
+}
+
+.field input[type='url'] {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.options select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.media-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.thumbnail {
+  width: 200px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.media-title {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+}
+
+.options {
+  margin: 12px 0;
+  padding: 0;
+  border: none;
+}
+
+.options legend {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.options select {
+  padding: 7px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.choice {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 6px 0;
+  cursor: pointer;
+}
+
+.choice input {
+  flex: none;
+}
+
+.options:disabled .choice {
+  cursor: default;
+  opacity: 0.7;
+}
+
 @media (max-width: 640px) {
   .topbar,
   .content {

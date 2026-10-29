@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { ComingSoon } from './components/ComingSoon.tsx';
 import { Layout } from './components/Layout.tsx';
+import { DownloadPage } from './features/download/DownloadPage.tsx';
 import { StatusPage } from './features/status/StatusPage.tsx';
 
 export function App() {
@@ -9,7 +10,7 @@ export function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/descargar" replace />} />
-          <Route path="descargar" element={<ComingSoon title="Descargar video" phase={3} />} />
+          <Route path="descargar" element={<DownloadPage />} />
           <Route path="grabar" element={<ComingSoon title="Grabar pantalla" phase={6} />} />
           <Route path="convertir" element={<ComingSoon title="Convertir archivos" phase={5} />} />
           <Route path="historial" element={<ComingSoon title="Historial" phase={4} />} />

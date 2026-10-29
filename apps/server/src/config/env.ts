@@ -59,6 +59,17 @@ const rawEnvSchema = z
       .number({ error: 'Tiene que ser un número.' })
       .min(0, { error: 'No puede ser negativo.' })
       .default(5),
+
+    // Extractores de yt-dlp (D-040). Sin "generic" no se descarga de cualquier página.
+    YTDLP_EXTRACTORS: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9_:.*+-]+(,[A-Za-z0-9_:.*+-]+)*$/, {
+        error: 'Lista de extractores separados por comas, p. ej. "default,-generic".',
+      })
+      .default('default,-generic'),
+    // Segunda capa contra SSRF: rechazar URLs que apunten a la red interna.
+    BLOCK_PRIVATE_URLS: z.stringbool({ error: 'Tiene que ser true o false.' }).default(true),
   })
   .superRefine((env, ctx) => {
     const hasCert = env.HTTPS_CERT_PATH !== undefined;
@@ -107,6 +118,10 @@ export type Config = {
     maxUploadBytes: number;
     retentionDays: number;
     minFreeDiskBytes: number;
+  };
+  download: {
+    ytdlpExtractors: string;
+    blockPrivateUrls: boolean;
   };
 };
 
@@ -168,6 +183,10 @@ export function parseConfig(raw: Record<string, string | undefined>, baseDir: st
       maxUploadBytes: env.MAX_UPLOAD_MB * MB,
       retentionDays: env.RETENTION_DAYS,
       minFreeDiskBytes: Math.round(env.MIN_FREE_DISK_GB * GB),
+    },
+    download: {
+      ytdlpExtractors: env.YTDLP_EXTRACTORS,
+      blockPrivateUrls: env.BLOCK_PRIVATE_URLS,
     },
   };
 }

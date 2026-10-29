@@ -14,6 +14,10 @@ const job: Job = {
   error: null,
   sizeBytes: null,
   durationSeconds: null,
+  format: null,
+  resolution: null,
+  videoCodec: null,
+  audioCodec: null,
   parentJobId: null,
   progress: null,
 };

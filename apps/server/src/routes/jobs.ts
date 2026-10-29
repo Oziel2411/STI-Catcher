@@ -10,16 +10,21 @@ import { JobRejectedError } from '../jobs/errors.ts';
 import type { EnqueueInput, JobQueue } from '../jobs/queue.ts';
 import { selftestTitle } from '../modules/selftest/selftest-runner.ts';
 
+/** Si la cola rechazó el job, lo traduce a un error HTTP. Cualquier otro error sigue de largo. */
+export function rethrowJobRejection(error: unknown): void {
+  if (error instanceof JobRejectedError) {
+    // 507 Insufficient Storage: el código HTTP pensado exactamente para este caso.
+    const status = error.code === 'INSUFFICIENT_DISK' ? 507 : 501;
+    throw new HttpError(status, error.code, error.message);
+  }
+}
+
 /** Crea el job y traduce los rechazos de la cola a errores HTTP. */
 export async function enqueueOrThrow(queue: JobQueue, input: EnqueueInput): Promise<Job> {
   try {
     return await queue.enqueue(input);
   } catch (error) {
-    if (error instanceof JobRejectedError) {
-      // 507 Insufficient Storage: el código HTTP pensado exactamente para este caso.
-      const status = error.code === 'INSUFFICIENT_DISK' ? 507 : 501;
-      throw new HttpError(status, error.code, error.message);
-    }
+    rethrowJobRejection(error);
     throw error;
   }
 }

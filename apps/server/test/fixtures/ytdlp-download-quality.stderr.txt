@@ -1,0 +1,6 @@
+STI_POSTPROCESS started|Merger
+STI_POSTPROCESS finished|Merger
+STI_POSTPROCESS started|VideoRemuxer
+STI_POSTPROCESS finished|VideoRemuxer
+STI_POSTPROCESS started|MoveFiles
+STI_POSTPROCESS finished|MoveFiles

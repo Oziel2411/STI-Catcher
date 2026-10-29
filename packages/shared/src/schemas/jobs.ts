@@ -58,6 +58,12 @@ export const jobSchema = z.object({
   error: z.string().nullable(),
   sizeBytes: z.number().int().nonnegative().nullable(),
   durationSeconds: z.number().nonnegative().nullable(),
+  /** Datos técnicos del archivo final (de ffprobe). */
+  format: z.string().nullable(),
+  /** "1920x1080". */
+  resolution: z.string().nullable(),
+  videoCodec: z.string().nullable(),
+  audioCodec: z.string().nullable(),
   parentJobId: z.uuid().nullable(),
   /** Solo mientras el job está `running`. */
   progress: jobProgressSchema.nullable(),

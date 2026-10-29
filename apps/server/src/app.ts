@@ -8,20 +8,28 @@ import type { Logger } from 'pino';
 import { HttpError } from './http/validation.ts';
 import type { JobEventBus } from './jobs/event-bus.ts';
 import type { JobQueue } from './jobs/queue.ts';
+import type { DownloadService } from './modules/download/download-service.ts';
+import type { JobFiles } from './modules/files/job-files.ts';
 import type { HealthService } from './modules/health/health-service.ts';
 import { registerEventRoutes } from './routes/events.ts';
+import { registerFileRoutes } from './routes/files.ts';
 import { registerHealthRoutes } from './routes/health.ts';
 import { registerJobRoutes } from './routes/jobs.ts';
+import { registerMediaRoutes } from './routes/media.ts';
 
 export type AppServices = {
   health: HealthService;
   jobs: JobQueue;
   events: JobEventBus;
+  download: DownloadService;
+  jobFiles: JobFiles;
 };
 
 export type BuildAppOptions = {
   logger: Logger;
   services: AppServices;
+  /** STORAGE_DIR/files: de acá se sirven los archivos de los jobs. */
+  filesDir: string;
   /** Carpeta con el build de la web. Si es null no se sirve (en desarrollo lo hace Vite). */
   webDistDir: string | null;
   /** HTTPS + HTTP/2. null = HTTP/1.1 sin cifrar (solo localhost). */
@@ -81,8 +89,14 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       .send(apiError('INTERNAL_ERROR', 'Ocurrió un error interno en el servidor.'));
   });
 
+  // @fastify/static se registra siempre, sin servir rutas propias: aporta
+  // reply.download / reply.sendFile (Range, Content-Disposition RFC 5987).
+  await app.register(fastifyStatic, { root: options.filesDir, serve: false });
+
   registerHealthRoutes(app, options.services.health);
   registerJobRoutes(app, options.services.jobs);
+  registerMediaRoutes(app, options.services.download);
+  registerFileRoutes(app, options.services.jobFiles);
   registerEventRoutes(app, {
     queue: options.services.jobs,
     bus: options.services.events,
@@ -94,7 +108,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       ? options.webDistDir
       : null;
   if (webDir !== null) {
-    await app.register(fastifyStatic, { root: webDir, wildcard: false });
+    // Segunda instancia: sirve la web. decorateReply false porque la primera ya decoró reply.
+    await app.register(fastifyStatic, { root: webDir, wildcard: false, decorateReply: false });
   }
 
   app.setNotFoundHandler((request, reply) => {
@@ -102,7 +117,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     // SPA: cualquier ruta GET que no sea de la API devuelve index.html y el
     // router de React decide qué mostrar.
     if (!isApi && webDir !== null && request.method === 'GET') {
-      return reply.type('text/html').sendFile('index.html');
+      return reply.type('text/html').sendFile('index.html', webDir);
     }
     return reply.status(404).send(apiError('NOT_FOUND', 'Recurso no encontrado.'));
   });

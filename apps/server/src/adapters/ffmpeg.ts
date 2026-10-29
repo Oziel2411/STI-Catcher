@@ -64,6 +64,50 @@ export function buildSelftestArgs({ durationSeconds, outputPath }: SelftestArgsO
   ];
 }
 
+/**
+ * Recodificación a MP4 H.264 + AAC (modo "Recodificar a H.264", SPEC §5).
+ * - CRF 20 / preset medium: calidad visualmente igual al original a un tamaño
+ *   razonable; es el punto de equilibrio habitual de x264.
+ * - yuv420p: lo que esperan los reproductores y editores (VP9/AV1 pueden venir en 10 bits).
+ * - `0:a:0?`: el audio es opcional (algunos clips no tienen).
+ * - `-ac 2`: estéreo. El objetivo de este modo es la compatibilidad (ver selectFormat).
+ * - +faststart: el índice al principio, para poder reproducir y adelantar en el navegador.
+ */
+export function buildRecodeArgs({
+  inputPath,
+  outputPath,
+}: {
+  inputPath: string;
+  outputPath: string;
+}): string[] {
+  return [
+    ...BASE_ARGS,
+    '-i',
+    inputPath,
+    '-map',
+    '0:v:0',
+    '-map',
+    '0:a:0?',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'medium',
+    '-crf',
+    '20',
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    '-ac',
+    '2',
+    '-b:a',
+    '192k',
+    '-movflags',
+    '+faststart',
+    outputPath,
+  ];
+}
+
 export type FfmpegProgress = {
   outTimeSeconds: number | null;
   percent: number | null;

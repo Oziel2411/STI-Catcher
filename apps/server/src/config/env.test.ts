@@ -66,6 +66,30 @@ describe('parseConfig', () => {
     ).toContain('MAX_CONCURRENT_JOBS');
   });
 
+  it('descarga: sin extractor generic y con bloqueo de IPs privadas por defecto', () => {
+    expect(parseConfig(minimal, BASE).download).toEqual({
+      ytdlpExtractors: 'default,-generic',
+      blockPrivateUrls: true,
+    });
+    const custom = parseConfig(
+      { ...minimal, YTDLP_EXTRACTORS: 'youtube,instagram', BLOCK_PRIVATE_URLS: 'false' },
+      BASE,
+    );
+    expect(custom.download).toEqual({
+      ytdlpExtractors: 'youtube,instagram',
+      blockPrivateUrls: false,
+    });
+  });
+
+  it('rechaza extractores con caracteres raros y booleanos inválidos', () => {
+    expect(
+      errorOf(() => parseConfig({ ...minimal, YTDLP_EXTRACTORS: 'default; rm -rf' }, BASE)).message,
+    ).toContain('YTDLP_EXTRACTORS');
+    expect(
+      errorOf(() => parseConfig({ ...minimal, BLOCK_PRIVATE_URLS: 'quizás' }, BASE)).message,
+    ).toContain('BLOCK_PRIVATE_URLS');
+  });
+
   it('exige certificado y clave juntos', () => {
     const error = errorOf(() =>
       parseConfig({ ...minimal, HOST: '0.0.0.0', HTTPS_CERT_PATH: './cert.pem' }, BASE),

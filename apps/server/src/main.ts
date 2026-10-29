@@ -3,11 +3,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readDiskSpace } from './adapters/disk.ts';
 import { createFfmpegRunner } from './adapters/ffmpeg.ts';
+import { createFfprobe } from './adapters/ffprobe.ts';
 import { fileOps } from './adapters/files.ts';
 import { acquireInstanceLock, InstanceLockError } from './adapters/instance-lock.ts';
 import { killProcessTree, runCommand, runStreaming } from './adapters/process.ts';
 import { createProcessLister } from './adapters/process-list.ts';
 import { createToolVersionReader } from './adapters/tool-version.ts';
+import { createUrlGuard } from './adapters/url-guard.ts';
+import { createYtdlp } from './adapters/ytdlp.ts';
 import { buildApp } from './app.ts';
 import { ConfigError, loadConfig, resolveEnvFilePath } from './config/env.ts';
 import { openDatabase } from './db/connection.ts';
@@ -18,6 +21,9 @@ import { createJobEventBus } from './jobs/event-bus.ts';
 import { createJobQueue } from './jobs/queue.ts';
 import { recoverOnStartup } from './jobs/recovery.ts';
 import { createLogger } from './logger.ts';
+import { createDownloadRunner } from './modules/download/download-runner.ts';
+import { createDownloadService } from './modules/download/download-service.ts';
+import { createJobFiles } from './modules/files/job-files.ts';
 import { createHealthService } from './modules/health/health-service.ts';
 import { createSelftestRunner } from './modules/selftest/selftest-runner.ts';
 import packageJson from '../package.json' with { type: 'json' };
@@ -32,7 +38,16 @@ async function main(): Promise<void> {
     tempDir: path.join(config.paths.storage, 'tmp'),
     filesDir: path.join(config.paths.storage, 'files'),
   };
-  for (const dir of [...Object.values(config.paths), ...Object.values(storage)]) {
+  // Cachés de yt-dlp y Deno dentro de DATA_DIR: la cuenta del servicio no tiene perfil normal (D-012).
+  const caches = {
+    ytdlp: path.join(config.paths.data, 'cache', 'yt-dlp'),
+    deno: path.join(config.paths.data, 'cache', 'deno'),
+  };
+  for (const dir of [
+    ...Object.values(config.paths),
+    ...Object.values(storage),
+    ...Object.values(caches),
+  ]) {
     mkdirSync(dir, { recursive: true });
   }
 
@@ -91,11 +106,26 @@ async function main(): Promise<void> {
     logger.warn({ err: error }, 'Error en un suscriptor de eventos');
   });
   const runFfmpeg = createFfmpegRunner(runStreaming, config.tools.ffmpeg);
+  const ffprobe = createFfprobe(runCommand, config.tools.ffprobe);
+  const checkUrl = createUrlGuard({ enabled: config.download.blockPrivateUrls });
+  const ytdlp = createYtdlp({
+    runCommand,
+    runStreaming,
+    ytdlpPath: config.tools.ytdlp,
+    ffmpegPath: config.tools.ffmpeg,
+    base: {
+      extractors: config.download.ytdlpExtractors,
+      denoPath: config.tools.deno,
+      cacheDir: caches.ytdlp,
+    },
+    denoDir: caches.deno,
+  });
   const queue = createJobQueue({
     repo,
     bus,
     runners: {
       selftest: createSelftestRunner({ runFfmpeg, files: fileOps }),
+      download: createDownloadRunner({ ytdlp, runFfmpeg, ffprobe, files: fileOps, checkUrl }),
     },
     files: fileOps,
     paths: storage,
@@ -120,9 +150,22 @@ async function main(): Promise<void> {
     getJobCounts: () => queue.counts(),
   });
 
+  const download = createDownloadService({
+    ytdlp,
+    checkUrl,
+    enqueue: (input) => queue.enqueue(input),
+    logger,
+  });
+  const jobFiles = createJobFiles({
+    getJob: (id) => repo.get(id),
+    storageDir: config.paths.storage,
+    filesDir: storage.filesDir,
+  });
+
   const app = await buildApp({
     logger,
-    services: { health, jobs: queue, events: bus },
+    services: { health, jobs: queue, events: bus, download, jobFiles },
+    filesDir: storage.filesDir,
     webDistDir: config.nodeEnv === 'production' ? path.join(repoRoot, 'apps', 'web', 'dist') : null,
     https: config.server.https
       ? {

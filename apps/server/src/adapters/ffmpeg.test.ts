@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildRecodeArgs,
   buildSelftestArgs,
   createFfmpegProgressTracker,
   createFfmpegRunner,
@@ -29,6 +30,24 @@ describe('buildSelftestArgs', () => {
   it('rechaza duraciones inválidas', () => {
     expect(() => buildSelftestArgs({ durationSeconds: 0, outputPath: 'x' })).toThrow(RangeError);
     expect(() => buildSelftestArgs({ durationSeconds: 2.5, outputPath: 'x' })).toThrow(RangeError);
+  });
+});
+
+describe('buildRecodeArgs', () => {
+  const args = buildRecodeArgs({ inputPath: 'T:\\in put.mp4', outputPath: 'T:\\out.mp4' });
+
+  it('recodifica a H.264 8 bits + AAC, con índice al principio', () => {
+    expect(args[args.indexOf('-c:v') + 1]).toBe('libx264');
+    expect(args[args.indexOf('-pix_fmt') + 1]).toBe('yuv420p');
+    expect(args[args.indexOf('-c:a') + 1]).toBe('aac');
+    expect(args[args.indexOf('-ac') + 1]).toBe('2');
+    expect(args[args.indexOf('-movflags') + 1]).toBe('+faststart');
+  });
+
+  it('el audio es opcional y la entrada/salida van como argumentos únicos', () => {
+    expect(args).toContain('0:a:0?');
+    expect(args[args.indexOf('-i') + 1]).toBe('T:\\in put.mp4');
+    expect(args.at(-1)).toBe('T:\\out.mp4');
   });
 });
 
