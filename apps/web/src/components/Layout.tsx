@@ -12,7 +12,16 @@ export function Layout() {
   return (
     <div className="layout">
       <header className="topbar">
-        <span className="brand">STI-Catcher</span>
+        <span className="brand">
+          <img
+            className="brand-logo"
+            src="/logo-128.png"
+            alt="Centro de Capitanes de Ultramar y Oficiales de la Marina Mercante"
+            width={44}
+            height={44}
+          />
+          STI-Catcher
+        </span>
         <nav aria-label="Secciones">
           <ul className="nav">
             {NAV_ITEMS.map((item) => (
