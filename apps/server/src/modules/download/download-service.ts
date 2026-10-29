@@ -30,7 +30,10 @@ export type DownloadServiceDeps = {
 
 export type DownloadService = {
   probe: (url: string) => Promise<ProbeResponse>;
-  enqueue: (request: DownloadRequest, clientIp: string | null) => Promise<Job>;
+  enqueue: (
+    request: DownloadRequest,
+    requester: { clientId: string; ip: string | null },
+  ) => Promise<Job>;
 };
 
 export function createDownloadService(deps: DownloadServiceDeps): DownloadService {
@@ -78,7 +81,7 @@ export function createDownloadService(deps: DownloadServiceDeps): DownloadServic
       }
     },
 
-    async enqueue(request, clientIp) {
+    async enqueue(request, requester) {
       const parsed = downloadRequestSchema.parse(request);
       await assertUrlAllowed(parsed.url);
       const isVideo = parsed.format === 'mp4';
@@ -93,7 +96,8 @@ export function createDownloadService(deps: DownloadServiceDeps): DownloadServic
         params,
         title: parsed.title ?? parsed.url,
         sourceUrl: parsed.url,
-        clientIp,
+        clientIp: requester.ip,
+        clientId: requester.clientId,
       });
     },
   };

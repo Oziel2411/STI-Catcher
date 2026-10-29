@@ -59,3 +59,12 @@ export function formatUptime(totalSeconds: number): string {
   if (minutes > 0) return `${minutes} min`;
   return `${seconds} s`;
 }
+
+const dateTimeFormat = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+
+/** ISO → "29/10/26, 14:42" (hora local del navegador). */
+export function formatDateTime(iso: string | null): string {
+  if (iso === null) return '—';
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '—' : dateTimeFormat.format(date);
+}

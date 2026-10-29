@@ -24,7 +24,7 @@ export function registerMediaRoutes(app: FastifyInstance, download: DownloadServ
   app.post('/api/jobs/download', async (request, reply) => {
     const body = parseInput(downloadRequestSchema, request.body ?? {});
     try {
-      const job = await download.enqueue(body, request.ip);
+      const job = await download.enqueue(body, { clientId: request.clientId, ip: request.ip });
       return await reply.status(202).send({ jobId: job.id });
     } catch (error) {
       rethrowJobRejection(error);

@@ -74,10 +74,21 @@ export type Job = z.infer<typeof jobSchema>;
 export const jobEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('job.updated'), job: jobSchema }),
   z.object({ type: z.literal('job.progress'), jobId: z.uuid(), progress: jobProgressSchema }),
+  /** Se borró del historial (otras pestañas lo quitan de la lista). */
+  z.object({ type: z.literal('job.deleted'), jobId: z.uuid() }),
 ]);
 export type JobEvent = z.infer<typeof jobEventSchema>;
 export type JobEventType = JobEvent['type'];
-export const JOB_EVENT_TYPES = ['job.updated', 'job.progress'] as const satisfies JobEventType[];
+export const JOB_EVENT_TYPES = [
+  'job.updated',
+  'job.progress',
+  'job.deleted',
+] as const satisfies JobEventType[];
+
+/** Id del job al que se refiere un evento. */
+export function eventJobId(event: JobEvent): string {
+  return event.type === 'job.updated' ? event.job.id : event.jobId;
+}
 
 // --- Requests / responses ----------------------------------------------------
 

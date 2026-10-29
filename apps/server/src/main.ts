@@ -24,6 +24,7 @@ import { createLogger } from './logger.ts';
 import { createDownloadRunner } from './modules/download/download-runner.ts';
 import { createDownloadService } from './modules/download/download-service.ts';
 import { createJobFiles } from './modules/files/job-files.ts';
+import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
 import { createSelftestRunner } from './modules/selftest/selftest-runner.ts';
 import packageJson from '../package.json' with { type: 'json' };
@@ -160,11 +161,20 @@ async function main(): Promise<void> {
     getJob: (id) => repo.get(id),
     storageDir: config.paths.storage,
     filesDir: storage.filesDir,
+    onMissing: (id) => queue.expire(id),
+  });
+  const history = createHistoryService({
+    repo,
+    queue,
+    storageDir: config.paths.storage,
+    filesDir: storage.filesDir,
+    removeFile: fileOps.removeFile,
+    logger,
   });
 
   const app = await buildApp({
     logger,
-    services: { health, jobs: queue, events: bus, download, jobFiles },
+    services: { health, jobs: queue, events: bus, download, jobFiles, history },
     filesDir: storage.filesDir,
     webDistDir: config.nodeEnv === 'production' ? path.join(repoRoot, 'apps', 'web', 'dist') : null,
     https: config.server.https

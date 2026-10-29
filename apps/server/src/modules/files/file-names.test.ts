@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { buildDownloadFileName } from './file-names.ts';
+import { buildDownloadFileName, encodeRfc5987, inlineContentDisposition } from './file-names.ts';
+
+describe('inlineContentDisposition', () => {
+  it('inline con respaldo ASCII y nombre UTF-8 según RFC 5987', () => {
+    expect(inlineContentDisposition('Canción "ñ" (en vivo).mp4')).toBe(
+      `inline; filename="Canci_n ___ (en vivo).mp4"; filename*=UTF-8''Canci%C3%B3n%20%22%C3%B1%22%20%28en%20vivo%29.mp4`,
+    );
+  });
+
+  it('encodeRfc5987 también escapa los caracteres que encodeURIComponent deja', () => {
+    expect(encodeRfc5987("a'(b)*")).toBe('a%27%28b%29%2A');
+  });
+});
 
 describe('buildDownloadFileName', () => {
   it('conserva tildes, ñ y emojis', () => {

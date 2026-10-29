@@ -58,6 +58,7 @@ export function registerJobRoutes(app: FastifyInstance, queue: JobQueue): void {
       params: { durationSeconds },
       title: selftestTitle(durationSeconds),
       clientIp: request.ip,
+      clientId: request.clientId,
     });
     return reply.status(202).send({ jobId: job.id });
   });

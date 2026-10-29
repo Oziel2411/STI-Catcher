@@ -56,6 +56,17 @@ export type ListJobsFilter = {
   limit: number;
 };
 
+export type HistoryFilter = {
+  /** Tipos que se muestran en el historial (el selftest no). */
+  types: readonly JobType[];
+  /** Solo los de este navegador; null = todos. */
+  clientId: string | null;
+  /** Texto a buscar en el título (se normaliza sin tildes). */
+  search: string | null;
+  limit: number;
+  offset: number;
+};
+
 export type JobsRepository = {
   insert(job: NewJob): JobRecord;
   get(id: string): JobRecord | null;
@@ -69,6 +80,11 @@ export type JobsRepository = {
   /** Todos los running → failed con el mensaje dado. Devuelve los ids afectados. */
   failAllRunning(error: string, finishedAt: string): string[];
   countActive(): { queued: number; running: number };
+  /** done → expired (el archivo ya no está). false si no estaba en done. */
+  markExpired(id: string): boolean;
+  /** Borra un job terminado. false si no existe o todavía está activo. */
+  delete(id: string): boolean;
+  listHistory(filter: HistoryFilter): { records: JobRecord[]; total: number };
 };
 
 /** Resultado de un runner exitoso. */

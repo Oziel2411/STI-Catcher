@@ -34,3 +34,22 @@ export function buildDownloadFileName(title: string | null, extension: string): 
   if (RESERVED.test(name)) name = `_${name}`;
   return `${name}.${ext}`;
 }
+
+/** Codificación RFC 5987 (`filename*`): como encodeURIComponent, más `'()*`. */
+export function encodeRfc5987(value: string): string {
+  return encodeURIComponent(value).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+/**
+ * `Content-Disposition` para mostrar en el navegador (reproducir) en vez de
+ * descargar. Lleva igual el nombre, por si el usuario guarda desde el
+ * reproductor: `filename` en ASCII como respaldo y `filename*` en UTF-8.
+ */
+export function inlineContentDisposition(fileName: string): string {
+  // Respaldo ASCII: lo que no es ASCII imprimible, las comillas y la barra invertida van como "_".
+  const ascii = fileName.replace(/[^\x20-\x7e]|["\\]/g, '_');
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeRfc5987(fileName)}`;
+}

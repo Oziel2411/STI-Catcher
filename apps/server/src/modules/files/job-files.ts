@@ -13,6 +13,8 @@ export type JobFilesDeps = {
   getJob: (id: string) => JobRecord | null;
   storageDir: string;
   filesDir: string;
+  /** Se llama si un job terminado ya no tiene su archivo (lo marca como expirado). */
+  onMissing?: (jobId: string) => void;
 };
 
 /**
@@ -34,20 +36,21 @@ export function createJobFiles(deps: JobFilesDeps) {
     const absolute = path.resolve(deps.storageDir, job.filePath);
     if (!absolute.startsWith(filesRoot)) return { kind: 'not_found' };
 
-    try {
-      const info = await stat(absolute);
-      if (!info.isFile()) return { kind: 'gone' };
-      const extension = path.extname(absolute);
-      return {
-        kind: 'ok',
-        fileName: path.basename(absolute),
-        downloadName: buildDownloadFileName(job.title, extension),
-        sizeBytes: info.size,
-      };
-    } catch {
-      // Lo borró la retención o alguien a mano. La Fase 4 lo marca como expired.
+    const isFile = await stat(absolute).then(
+      (info) => (info.isFile() ? info : null),
+      () => null,
+    );
+    if (isFile === null) {
+      // Lo borró la retención o alguien a mano: pasa a expired (SPEC §8).
+      deps.onMissing?.(jobId);
       return { kind: 'gone' };
     }
+    return {
+      kind: 'ok',
+      fileName: path.basename(absolute),
+      downloadName: buildDownloadFileName(job.title, path.extname(absolute)),
+      sizeBytes: isFile.size,
+    };
   };
 }
 

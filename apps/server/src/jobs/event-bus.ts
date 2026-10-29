@@ -1,3 +1,4 @@
+import { eventJobId } from '@sti-catcher/shared';
 import type { JobEvent } from '@sti-catcher/shared';
 
 export type JobEventListener = (event: JobEvent) => void;
@@ -11,10 +12,6 @@ export type JobEventBus = {
   subscribe(listener: JobEventListener, jobIds?: ReadonlySet<string>): () => void;
   listenerCount(): number;
 };
-
-export function eventJobId(event: JobEvent): string {
-  return event.type === 'job.updated' ? event.job.id : event.jobId;
-}
 
 /**
  * Bus de eventos de jobs, en memoria. Única fuente de los streams SSE:

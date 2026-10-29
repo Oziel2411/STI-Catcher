@@ -1,4 +1,5 @@
 import type { Migration } from './migrate.ts';
+import { normalizeSearchText } from './search.ts';
 
 /**
  * Migraciones del esquema, en orden. Para cambiar el esquema se agrega una
@@ -47,5 +48,23 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX jobs_client_created ON jobs (client_id, created_at);
       CREATE INDEX jobs_parent ON jobs (parent_job_id);
     `,
+  },
+  {
+    version: 2,
+    name: 'add-title-search',
+    sql: /* sql */ `
+      -- Título en minúsculas y sin tildes, para buscar en el historial (ver db/search.ts).
+      ALTER TABLE jobs ADD COLUMN title_search TEXT;
+    `,
+    // Completa los registros existentes: SQLite no sabe quitar tildes.
+    migrate: (db) => {
+      const rows = db
+        .prepare<[], { id: string; title: string }>(
+          'SELECT id, title FROM jobs WHERE title IS NOT NULL',
+        )
+        .all();
+      const update = db.prepare<[string, string]>('UPDATE jobs SET title_search = ? WHERE id = ?');
+      for (const row of rows) update.run(normalizeSearchText(row.title), row.id);
+    },
   },
 ];

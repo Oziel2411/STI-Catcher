@@ -75,3 +75,22 @@ export const apiGet = <S extends z.ZodType>(url: string, schema: S, signal?: Abo
 
 export const apiPost = <S extends z.ZodType>(url: string, schema: S, body?: unknown) =>
   apiRequest(url, schema, { method: 'POST', body: body ?? {} });
+
+/** DELETE: el server responde 204 sin cuerpo; si falla, lanza ApiClientError con su mensaje. */
+export async function apiDelete(url: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(url, { method: 'DELETE', headers: { Accept: 'application/json' } });
+  } catch {
+    throw new ApiClientError('No se pudo conectar con el servidor.', 'NETWORK_ERROR', null);
+  }
+  if (response.ok) return;
+  const parsed = apiErrorSchema.safeParse(await response.json().catch(() => null));
+  throw parsed.success
+    ? new ApiClientError(parsed.data.error.message, parsed.data.error.code, response.status)
+    : new ApiClientError(
+        `El servidor respondió con un error (${String(response.status)}).`,
+        'HTTP_ERROR',
+        response.status,
+      );
+}

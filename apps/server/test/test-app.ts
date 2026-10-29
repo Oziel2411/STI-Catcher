@@ -1,4 +1,5 @@
 import { mkdtempSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { HealthResponse, ProbeResponse } from '@sti-catcher/shared';
@@ -15,6 +16,7 @@ import { createJobQueue } from '../src/jobs/queue.ts';
 import type { JobContext, JobResult, JobRunner } from '../src/jobs/types.ts';
 import { createDownloadService } from '../src/modules/download/download-service.ts';
 import { createJobFiles } from '../src/modules/files/job-files.ts';
+import { createHistoryService } from '../src/modules/history/history-service.ts';
 import type { HealthService } from '../src/modules/health/health-service.ts';
 
 export const sampleHealth: HealthResponse = {
@@ -87,18 +89,32 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     enqueue: (input) => queue.enqueue(input),
     logger: { warn: vi.fn() },
   });
-  const jobFiles = createJobFiles({ getJob: (id) => repo.get(id), storageDir, filesDir });
+  const jobFiles = createJobFiles({
+    getJob: (id) => repo.get(id),
+    storageDir,
+    filesDir,
+    onMissing: (id) => queue.expire(id),
+  });
+  const historyLogger = { info: vi.fn() };
+  const history = createHistoryService({
+    repo,
+    queue,
+    storageDir,
+    filesDir,
+    removeFile: (file) => rm(file, { force: true }),
+    logger: historyLogger,
+  });
 
   const getHealth = vi.fn<HealthService['getHealth']>(() => Promise.resolve(sampleHealth));
   const app = await buildApp({
     logger: pino({ level: 'silent' }),
-    services: { health: { getHealth }, jobs: queue, events: bus, download, jobFiles },
+    services: { health: { getHealth }, jobs: queue, events: bus, download, jobFiles, history },
     filesDir,
     webDistDir: options.webDistDir ?? null,
     https: null,
     ...(options.sseHeartbeatMs !== undefined ? { sseHeartbeatMs: options.sseHeartbeatMs } : {}),
   });
-  return { app, queue, repo, bus, runs, getHealth, probe, storageDir, filesDir };
+  return { app, queue, repo, bus, runs, getHealth, probe, storageDir, filesDir, historyLogger };
 }
 
 /** Deja correr las microtareas pendientes de la cola. */

@@ -13,7 +13,7 @@ Web app interna (inspirada en aTube Catcher) para **descargar video por URL**, *
 | 1    | Esqueleto: monorepo, config, logs, `/api/health`, página Estado, `setup.ps1` | ✅        |
 | 2    | Jobs + DB + SSE                                                              | ✅        |
 | 3    | Descarga por URL                                                             | ✅        |
-| 4    | Historial                                                                    | pendiente |
+| 4    | Historial                                                                    | ✅        |
 | 5    | Conversión                                                                   | pendiente |
 | 6    | Grabación de pantalla                                                        | pendiente |
 | 7    | Despliegue                                                                   | pendiente |
@@ -72,9 +72,10 @@ Detalle en `docs/DECISIONS.md`.
 - La cola borra los temporales de un job antes de publicar su estado final.
 - Descarga: `-f bv[height<=H]+ba/b[height<=H]/bv+ba/b`; compat `-S vcodec:h264,res:H,channels:2,acodec:aac`. "Recodificar" lo hace nuestro ffmpeg (con progreso), no yt-dlp. Archivo en disco `<jobId>.<ext>`; el título solo va en `Content-Disposition`.
 - `vite.config.ts` lee el `.env` directo (no `loadEnv`): una herramienta que define `PORT` apuntaba el proxy a sí mismo.
+- Historial: cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
 - TypeScript fijado en 6.0.x (typescript-eslint no soporta 7).
 
-## API (hasta la Fase 3)
+## API (hasta la Fase 4)
 
 | Método | Ruta                                                                | Respuesta                                                                                                           |
 | ------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -88,3 +89,6 @@ Detalle en `docs/DECISIONS.md`.
 | POST   | `/api/media/probe` `{ url }`                                        | título, resoluciones con codecs, `maxH264Height` · 400 URL inválida o interna · 422 error de yt-dlp traducido · 429 |
 | POST   | `/api/jobs/download` `{ url, format, maxHeight, videoMode, title }` | 202 `{ jobId }` · 400 · 507                                                                                         |
 | GET    | `/api/jobs/:id/file`                                                | el archivo (RFC 5987, Range) · 409 sin terminar · 410 ya no está                                                    |
+| GET    | `/api/history?scope=all&q=…&page=n`                                 | `{ items (job + isMine), total, page, pageSize }`; `scope` es `mine` (por defecto) o `all`                          |
+| DELETE | `/api/jobs/:id`                                                     | 204 · 403 no es tuyo · 409 en curso                                                                                 |
+| POST   | `/api/jobs/:id/retry`                                               | 202 `{ jobId }` (trabajo nuevo) · 409                                                                               |

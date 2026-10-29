@@ -5,6 +5,11 @@ export type Migration = {
   version: number;
   name: string;
   sql: string;
+  /**
+   * Paso opcional en JS, después del SQL y en la misma transacción. Para
+   * transformaciones que SQLite no sabe hacer (p. ej. quitar tildes).
+   */
+  migrate?: (db: Db) => void;
 };
 
 /**
@@ -38,6 +43,7 @@ export function migrate(db: Db, migrations: readonly Migration[]): Migration[] {
   for (const migration of pending) {
     db.transaction(() => {
       db.exec(migration.sql);
+      migration.migrate?.(db);
       // PRAGMA no acepta parámetros; version es un entero validado arriba.
       db.pragma(`user_version = ${String(migration.version)}`);
     })();

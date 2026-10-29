@@ -20,9 +20,9 @@ function freshDb() {
 describe('migrate', () => {
   it('aplica las pendientes una sola vez', () => {
     const db = openDatabase(':memory:');
-    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1]);
+    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1, 2]);
     expect(migrate(db, migrations)).toEqual([]);
-    expect(db.pragma('user_version', { simple: true })).toBe(1);
+    expect(db.pragma('user_version', { simple: true })).toBe(2);
   });
 
   it('revierte una migración que falla y no avanza la versión', () => {
@@ -140,5 +140,135 @@ describe('jobs repository', () => {
         )
         .run(),
     ).toThrow(/CHECK/);
+  });
+});
+
+describe('historial (repositorio)', () => {
+  const CLIENT_A = '11111111-1111-4111-8111-111111111111';
+  const CLIENT_B = '22222222-2222-4222-8222-222222222222';
+  const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const types = ['download', 'upload', 'conversion', 'recording'] as const;
+
+  function seeded() {
+    const repo = createJobsRepository(freshDb());
+    const add = (
+      n: number,
+      title: string,
+      clientId: string,
+      type: 'download' | 'selftest' = 'download',
+    ) =>
+      repo.insert({
+        id: id(n),
+        type,
+        params: {},
+        title,
+        clientId,
+        createdAt: `2026-10-29T12:00:${String(n).padStart(2, '0')}.000Z`,
+      });
+    add(1, 'Canción del Ñandú', CLIENT_A);
+    add(2, 'Big Buck Bunny', CLIENT_B);
+    add(3, 'cancion_sin_tilde 100%', CLIENT_A);
+    add(4, 'Prueba del sistema (10 s)', CLIENT_A, 'selftest');
+    return repo;
+  }
+
+  const ids = (result: { records: { id: string }[] }) => result.records.map((r) => r.id);
+
+  it('lista del más nuevo al más viejo, sin el selftest, con el total', () => {
+    const result = seeded().listHistory({
+      types,
+      clientId: null,
+      search: null,
+      limit: 10,
+      offset: 0,
+    });
+    expect(ids(result)).toEqual([id(3), id(2), id(1)]);
+    expect(result.total).toBe(3);
+  });
+
+  it('"Mis trabajos" filtra por navegador', () => {
+    const result = seeded().listHistory({
+      types,
+      clientId: CLIENT_A,
+      search: null,
+      limit: 10,
+      offset: 0,
+    });
+    expect(ids(result)).toEqual([id(3), id(1)]);
+  });
+
+  it('busca sin distinguir mayúsculas ni tildes', () => {
+    const repo = seeded();
+    const search = (text: string) =>
+      ids(repo.listHistory({ types, clientId: null, search: text, limit: 10, offset: 0 }));
+    expect(search('CANCION')).toEqual([id(3), id(1)]);
+    expect(search('ñandu')).toEqual([id(1)]);
+    expect(search('bunny')).toEqual([id(2)]);
+  });
+
+  it('% y _ en la búsqueda se toman literalmente', () => {
+    const repo = seeded();
+    expect(
+      ids(repo.listHistory({ types, clientId: null, search: '100%', limit: 10, offset: 0 })),
+    ).toEqual([id(3)]);
+    expect(
+      ids(repo.listHistory({ types, clientId: null, search: '_', limit: 10, offset: 0 })),
+    ).toEqual([id(3)]);
+  });
+
+  it('pagina con limit y offset; el total no depende de la página', () => {
+    const result = seeded().listHistory({
+      types,
+      clientId: null,
+      search: null,
+      limit: 2,
+      offset: 2,
+    });
+    expect(ids(result)).toEqual([id(1)]);
+    expect(result.total).toBe(3);
+  });
+
+  it('el título que informa el job al terminar también se puede buscar', () => {
+    const repo = seeded();
+    repo.markRunning(id(2), 't');
+    repo.finish(id(2), { status: 'done', finishedAt: 't', title: 'Título Nuevo Ácido' });
+    expect(
+      ids(repo.listHistory({ types, clientId: null, search: 'acido', limit: 10, offset: 0 })),
+    ).toEqual([id(2)]);
+  });
+
+  it('markExpired solo pasa de done a expired', () => {
+    const repo = seeded();
+    expect(repo.markExpired(id(1))).toBe(false); // queued
+    repo.markRunning(id(1), 't');
+    repo.finish(id(1), { status: 'done', finishedAt: 't' });
+    expect(repo.markExpired(id(1))).toBe(true);
+    expect(repo.get(id(1))?.status).toBe('expired');
+    expect(repo.markExpired(id(1))).toBe(false);
+  });
+
+  it('delete no borra trabajos activos', () => {
+    const repo = seeded();
+    expect(repo.delete(id(1))).toBe(false); // queued
+    repo.markRunning(id(1), 't');
+    repo.finish(id(1), { status: 'failed', finishedAt: 't', error: 'x' });
+    expect(repo.delete(id(1))).toBe(true);
+    expect(repo.get(id(1))).toBeNull();
+  });
+
+  it('la migración 2 completa la búsqueda de los trabajos que ya existían', () => {
+    const db = openDatabase(':memory:');
+    migrate(
+      db,
+      migrations.filter((m) => m.version === 1),
+    );
+    db.prepare(
+      "INSERT INTO jobs (id, type, status, created_at, title) VALUES ('x', 'download', 'done', 't', 'Canción Vieja')",
+    ).run();
+    migrate(db, migrations);
+    const row = db
+      .prepare<[], { title_search: string }>("SELECT title_search FROM jobs WHERE id = 'x'")
+      .get();
+    expect(row?.title_search).toBe('cancion vieja');
   });
 });

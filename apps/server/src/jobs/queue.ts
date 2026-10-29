@@ -68,6 +68,12 @@ export type JobQueue = {
   get(id: string): Job | null;
   list(filter: ListJobsFilter): Job[];
   counts(): { running: number; queued: number; maxConcurrent: number };
+  /** Representación para la API (incluye el progreso si está corriendo). */
+  toApi(record: JobRecord): Job;
+  /** done → expired y lo publica. false si el job no estaba en done. */
+  expire(id: string): boolean;
+  /** Borra un job terminado y publica `job.deleted`. false si no existe o está activo. */
+  remove(id: string): boolean;
   /** Empieza a procesar la cola (incluye los queued que quedaron de antes de un reinicio). */
   start(): void;
   /** Corta los jobs en curso (quedan failed "interrumpido") y deja de tomar nuevos. */
@@ -358,6 +364,21 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
 
     counts() {
       return { ...repo.countActive(), maxConcurrent: deps.maxConcurrent };
+    },
+
+    toApi,
+
+    expire(id) {
+      if (!repo.markExpired(id)) return false;
+      publishUpdated(id);
+      logger.info({ jobId: id }, 'Archivo de un trabajo ya no disponible: marcado como expirado');
+      return true;
+    },
+
+    remove(id) {
+      if (!repo.delete(id)) return false;
+      bus.publish({ type: 'job.deleted', jobId: id });
+      return true;
     },
 
     start() {

@@ -50,13 +50,33 @@ const HEARTBEAT_EVENT = 'ping';
 export function subscribeToJobEvents(
   jobId: string,
   handlers: JobEventHandlers,
+  options: SubscribeOptions = {},
+): () => void {
+  return subscribeToStream(`/api/jobs/${encodeURIComponent(jobId)}/events`, handlers, options);
+}
+
+/**
+ * Stream de varios jobs (el historial sigue los que están en curso). A
+ * diferencia del de un job, el server no lo cierra solo.
+ */
+export function subscribeToJobsEvents(
+  jobIds: readonly string[],
+  handlers: JobEventHandlers,
+  options: SubscribeOptions = {},
+): () => void {
+  const query = jobIds.map(encodeURIComponent).join(',');
+  return subscribeToStream(`/api/events?jobIds=${query}`, handlers, options);
+}
+
+function subscribeToStream(
+  url: string,
+  handlers: JobEventHandlers,
   {
     retryMs = 3000,
     staleAfterMs = 25_000,
-    createSource = (url) => new EventSource(url),
+    createSource = (sourceUrl) => new EventSource(sourceUrl),
   }: SubscribeOptions = {},
 ): () => void {
-  const url = `/api/jobs/${encodeURIComponent(jobId)}/events`;
   let source: EventSourceLike | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let staleTimer: ReturnType<typeof setTimeout> | undefined;

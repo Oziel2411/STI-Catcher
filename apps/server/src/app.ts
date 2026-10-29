@@ -5,14 +5,17 @@ import type { ApiError } from '@sti-catcher/shared';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
+import { registerClientId } from './http/client-id.ts';
 import { HttpError } from './http/validation.ts';
 import type { JobEventBus } from './jobs/event-bus.ts';
 import type { JobQueue } from './jobs/queue.ts';
 import type { DownloadService } from './modules/download/download-service.ts';
+import type { HistoryService } from './modules/history/history-service.ts';
 import type { JobFiles } from './modules/files/job-files.ts';
 import type { HealthService } from './modules/health/health-service.ts';
 import { registerEventRoutes } from './routes/events.ts';
 import { registerFileRoutes } from './routes/files.ts';
+import { registerHistoryRoutes } from './routes/history.ts';
 import { registerHealthRoutes } from './routes/health.ts';
 import { registerJobRoutes } from './routes/jobs.ts';
 import { registerMediaRoutes } from './routes/media.ts';
@@ -23,6 +26,7 @@ export type AppServices = {
   events: JobEventBus;
   download: DownloadService;
   jobFiles: JobFiles;
+  history: HistoryService;
 };
 
 export type BuildAppOptions = {
@@ -93,10 +97,14 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   // reply.download / reply.sendFile (Range, Content-Disposition RFC 5987).
   await app.register(fastifyStatic, { root: options.filesDir, serve: false });
 
+  // Cookie anónima por navegador para "Mis trabajos" (D-041). Secure solo con HTTPS.
+  registerClientId(app, { secure: options.https !== null });
+
   registerHealthRoutes(app, options.services.health);
   registerJobRoutes(app, options.services.jobs);
   registerMediaRoutes(app, options.services.download);
   registerFileRoutes(app, options.services.jobFiles);
+  registerHistoryRoutes(app, options.services.history);
   registerEventRoutes(app, {
     queue: options.services.jobs,
     bus: options.services.events,

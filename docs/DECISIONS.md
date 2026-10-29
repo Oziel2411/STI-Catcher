@@ -242,6 +242,8 @@ yt-dlp puede recodificar (`--recode-video`), pero no informa el progreso de esa 
 
 La UI no necesita leer la cookie: cada job llega con `isMine` calculado en el server. La vista "Todos" no muestra IPs (quedan en la DB y el log).
 
+**Implementación (Fase 4):** cookie `sti_client` con un UUID, `HttpOnly`, `SameSite=Lax` y `Secure` solo con HTTPS (si no, el navegador no la mandaría en desarrollo). Se renueva en cada respuesta con 400 días de vida (el máximo que acepta Chrome). Sin dependencias: el header `Cookie` se parsea a mano, y un valor que no es UUID se reemplaza. La API nunca devuelve el clientId ni la IP de nadie (hay un test que lo verifica).
+
 ### D-042 — Actualización de yt-dlp por renombre · Fase 3 · Vigente
 
 Windows no permite reemplazar ni borrar un `.exe` en ejecución, pero **sí renombrarlo**. `update-ytdlp.ps1`:
@@ -267,6 +269,36 @@ No se bloquea por jobs activos: los que están corriendo siguen con el ejecutabl
 Un GIF de un video largo pesa cientos de MB. El preset GIF tiene inicio/fin (recorte) y topes configurables: duración máxima 30 s, más FPS y ancho máximos. Valores exactos en la Fase 5.
 
 ---
+
+## Historial
+
+### D-060 — Búsqueda sin tildes: columna `title_search` · Fase 4 · Vigente
+
+SQLite compara con `LIKE` sin distinguir mayúsculas solo en ASCII, y no sabe quitar tildes. El título normalizado (NFD, sin diacríticos, en minúsculas) se guarda en `title_search` al crear el job y al terminar (cuando yt-dlp informa el título real), y la búsqueda se normaliza igual. "cancion" encuentra "Canción"; "nandu", "Ñandú". `%` y `_` en la búsqueda se escapan (`ESCAPE '\'`): se toman literalmente.
+
+La migración 2 completa los registros que ya existían. Para eso, las migraciones aceptan un paso opcional en JS (`migrate(db)`), en la misma transacción que el SQL.
+
+### D-061 — "Expirado" se detecta al mirar · Fase 4 · Vigente
+
+Al listar el historial (una página: hasta 20 `stat`) y al pedir un archivo, si un job `done` ya no tiene su archivo, pasa a `expired` y se publica por SSE. Así un borrado manual o la retención (Fase 7, que también lo marca directamente) nunca dejan un link roto. Es la única transición desde un estado final.
+
+### D-062 — Borrar: solo lo propio, registro y archivo · Fase 4 · Vigente
+
+- Solo el navegador que lo creó (cookie), si no **403**. No es seguridad, es prevención de accidentes (SPEC §8).
+- Un trabajo en curso no se borra (**409**): primero hay que cancelarlo.
+- Se borran la fila y el archivo. Se publica `job.deleted`, y las otras pestañas lo quitan de la lista sin recargar.
+- Log: "Trabajo borrado del historial", con id, título, IP de quien borra e IP de quien lo creó.
+
+### D-063 — Reintentar crea un trabajo nuevo · Fase 4 · Vigente
+
+Un trabajo `failed` o `cancelled` se reintenta con los mismos parámetros, como trabajo **nuevo** a nombre de quien reintenta. El original queda en el historial como estaba. Por ahora solo las descargas; las conversiones se suman en la Fase 5.
+
+### D-064 — Reproducción y lista en vivo · Fase 4 · Vigente
+
+- `GET /api/jobs/:id/file?inline=1` → `Content-Disposition: inline` (con nombre RFC 5987) para `<video>`/`<audio>`, con Range. Verificado: adelantar al segundo 90 pide 206 y sigue reproduciendo.
+- La página se suscribe a `/api/events?jobIds=<los visibles>`: progreso de los que están corriendo, terminados, expirados y borrados, sin recargar. Los eventos no traen `isMine` (depende de quién mira): la lista lo conserva.
+- Filtro, búsqueda y página viven en la URL (`?scope=all&q=…&page=2`).
+- El selftest no aparece en el historial (D-030).
 
 ## Despliegue
 
@@ -319,3 +351,7 @@ El soporte terminó en octubre de 2025 y las actualizaciones extendidas para usu
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5
 
 Modelar la subida como un job (D-030) mezcla un "archivo de entrada" con "trabajos procesados", y el historial va a tener que distinguirlos (filtro o agrupación bajo su conversión). Se acepta porque resuelve `parent_job_id` y la retención sin una tabla nueva. Revisar si el historial se vuelve confuso: la alternativa es una tabla `files` separada de `jobs`.
+
+### DT-002 — Trabajos anteriores a la Fase 4 sin dueño · Fase 4
+
+Los trabajos creados antes de que existiera la cookie tienen `client_id` vacío: aparecen solo en "Todos" y nadie los puede borrar desde la UI. En el servidor real no pasa (se instala con la Fase 4 ya hecha). En desarrollo los limpia la retención (Fase 7), o se borran a mano.
