@@ -2,12 +2,24 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readDiskSpace } from './adapters/disk.ts';
-import { runCommand } from './adapters/process.ts';
+import { createFfmpegRunner } from './adapters/ffmpeg.ts';
+import { fileOps } from './adapters/files.ts';
+import { acquireInstanceLock, InstanceLockError } from './adapters/instance-lock.ts';
+import { killProcessTree, runCommand, runStreaming } from './adapters/process.ts';
+import { createProcessLister } from './adapters/process-list.ts';
 import { createToolVersionReader } from './adapters/tool-version.ts';
 import { buildApp } from './app.ts';
 import { ConfigError, loadConfig, resolveEnvFilePath } from './config/env.ts';
+import { openDatabase } from './db/connection.ts';
+import { createJobsRepository } from './db/jobs-repository.ts';
+import { migrate } from './db/migrate.ts';
+import { migrations } from './db/migrations.ts';
+import { createJobEventBus } from './jobs/event-bus.ts';
+import { createJobQueue } from './jobs/queue.ts';
+import { recoverOnStartup } from './jobs/recovery.ts';
 import { createLogger } from './logger.ts';
 import { createHealthService } from './modules/health/health-service.ts';
+import { createSelftestRunner } from './modules/selftest/selftest-runner.ts';
 import packageJson from '../package.json' with { type: 'json' };
 
 // main.ts vive en apps/server/src (dev) o apps/server/dist (build): en ambos
@@ -16,8 +28,11 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
 async function main(): Promise<void> {
   const config = loadConfig(resolveEnvFilePath(repoRoot));
-
-  for (const dir of Object.values(config.paths)) {
+  const storage = {
+    tempDir: path.join(config.paths.storage, 'tmp'),
+    filesDir: path.join(config.paths.storage, 'files'),
+  };
+  for (const dir of [...Object.values(config.paths), ...Object.values(storage)]) {
     mkdirSync(dir, { recursive: true });
   }
 
@@ -26,6 +41,69 @@ async function main(): Promise<void> {
     { paths: config.paths, tools: config.tools, nodeEnv: config.nodeEnv },
     'Iniciando STI-Catcher',
   );
+
+  // Una sola instancia por DATA_DIR, antes de tocar procesos o la base (D-033).
+  const listProcesses = createProcessLister(runCommand);
+  const lock = await acquireInstanceLock({
+    lockPath: path.join(config.paths.data, 'sti-catcher.pid'),
+    selfPid: process.pid,
+    isOtherInstance: async (pid) => {
+      try {
+        const proc = (await listProcesses()).find((p) => p.pid === pid);
+        return (
+          proc !== undefined && path.basename(proc.executablePath).toLowerCase() === 'node.exe'
+        );
+      } catch {
+        // Sin lista de procesos, alcanza con saber si el PID existe (conservador).
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    },
+  });
+
+  const db = openDatabase(path.join(config.paths.data, 'sti-catcher.db'));
+  const applied = migrate(db, migrations);
+  if (applied.length > 0) {
+    logger.info(
+      { migrations: applied.map((m) => `${String(m.version)}-${m.name}`) },
+      'Migraciones aplicadas',
+    );
+  }
+  const repo = createJobsRepository(db);
+
+  await recoverOnStartup({
+    repo,
+    listProcesses,
+    killProcessTree,
+    files: fileOps,
+    binDir: config.paths.bin,
+    tempDir: storage.tempDir,
+    selfPid: process.pid,
+    now: () => new Date(),
+    logger,
+  });
+
+  const bus = createJobEventBus((error) => {
+    logger.warn({ err: error }, 'Error en un suscriptor de eventos');
+  });
+  const runFfmpeg = createFfmpegRunner(runStreaming, config.tools.ffmpeg);
+  const queue = createJobQueue({
+    repo,
+    bus,
+    runners: {
+      selftest: createSelftestRunner({ runFfmpeg, files: fileOps }),
+    },
+    files: fileOps,
+    paths: storage,
+    maxConcurrent: config.limits.maxConcurrentJobs,
+    minFreeDiskBytes: config.limits.minFreeDiskBytes,
+    readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,
+    logger,
+  });
 
   const health = createHealthService({
     appVersion: packageJson.version,
@@ -39,13 +117,12 @@ async function main(): Promise<void> {
     minFreeDiskBytes: config.limits.minFreeDiskBytes,
     readToolVersion: createToolVersionReader(runCommand),
     readDiskSpace,
-    // Se conecta a la cola de jobs en la Fase 2.
-    getJobCounts: () => ({ running: 0, queued: 0, maxConcurrent: config.limits.maxConcurrentJobs }),
+    getJobCounts: () => queue.counts(),
   });
 
   const app = await buildApp({
     logger,
-    services: { health },
+    services: { health, jobs: queue, events: bus },
     webDistDir: config.nodeEnv === 'production' ? path.join(repoRoot, 'apps', 'web', 'dist') : null,
     https: config.server.https
       ? {
@@ -55,17 +132,24 @@ async function main(): Promise<void> {
       : null,
   });
 
-  // WinSW detiene el servicio enviando Ctrl+C (SIGINT).
+  // WinSW detiene el servicio enviando Ctrl+C (SIGINT). Orden: cortar jobs
+  // (matan sus procesos y quedan "interrumpido"), cerrar HTTP y SSE, cerrar la base.
   let closing = false;
   const shutdown = (signal: string) => {
     if (closing) return;
     closing = true;
     logger.info({ signal }, 'Deteniendo el servidor');
-    app
-      .close()
-      .then(() => process.exit(0))
+    queue
+      .stop()
+      .then(() => app.close())
+      .then(() => {
+        db.close();
+        lock.release();
+        process.exit(0);
+      })
       .catch((error: unknown) => {
         logger.error({ err: error }, 'Error al detener el servidor');
+        lock.release();
         process.exit(1);
       });
   };
@@ -73,13 +157,14 @@ async function main(): Promise<void> {
   process.once('SIGTERM', shutdown);
 
   await app.listen({ host: config.server.host, port: config.server.port });
+  queue.start();
   const protocol = config.server.https ? 'https' : 'http';
-  logger.info(`Escuchando en ${protocol}://${config.server.host}:${config.server.port}`);
+  logger.info(`Escuchando en ${protocol}://${config.server.host}:${String(config.server.port)}`);
 }
 
 main().catch((error: unknown) => {
   // El logger puede no existir todavía (p. ej. .env inválido): va a stderr.
-  if (error instanceof ConfigError) {
+  if (error instanceof ConfigError || error instanceof InstanceLockError) {
     console.error(`\n[STI-Catcher] ${error.message}\n`);
   } else {
     console.error('[STI-Catcher] Error fatal al iniciar:', error);

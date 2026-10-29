@@ -80,7 +80,33 @@ El navegador limita a 6 las conexiones HTTP/1.1 simultáneas **por servidor, sum
 
 ### D-021 — SSE: un event bus, dos endpoints filtro · Fase 2 · Vigente
 
-Hay un único event bus de jobs. `GET /api/events` es el stream de una pestaña (todos los jobs que le interesan) y `GET /api/jobs/:id/events` es el mismo mecanismo filtrado por un job, no otra implementación. Se envía un comentario `: ping` cada 15 s para que ningún proxy corte la conexión por inactividad.
+Hay un único event bus de jobs (en memoria). `GET /api/events?jobIds=…` es el stream de una pestaña y `GET /api/jobs/:id/events` es el mismo mecanismo filtrado por un job, no otra implementación.
+
+- Al conectar se manda primero el estado actual de los jobs pedidos (`job.updated`): el cliente no depende de haber visto eventos anteriores, y al reconectar se pone al día solo.
+- `/api/jobs/:id/events` se cierra cuando el job termina. El cliente también cierra su `EventSource` al ver el estado final: si no, el navegador reconectaría solo.
+- Snapshot y suscripción ocurren en el mismo tick (todo sincrónico): no se pierde ningún evento en el medio.
+- `app.close()` cierra los streams abiertos en un hook `preClose`. Sin eso el servicio no podría detenerse, porque los streams no terminan solos.
+- Latido: ver D-025.
+
+### D-025 — Latido SSE como evento + watchdog en el cliente · Fase 2 · Vigente
+
+**Problema medido.** Con el server detrás de un proxy (el de Vite en desarrollo), un crash del server **no** cierra la conexión del navegador: el proxy la deja abierta sin datos, `EventSource` no se entera y la UI queda trabada en "En curso". Además, si `EventSource` recibe una respuesta HTTP de error (el 502 del proxy mientras el server reinicia), se cierra para siempre y no reintenta.
+
+**Decisión.**
+
+- El server manda `event: ping` cada 10 s. Es un evento con nombre y no un comentario SSE (`: ping`) porque los comentarios no llegan a JavaScript.
+- El cliente (`apps/web/src/api/events.ts`) tiene un watchdog: si pasan 25 s sin recibir nada, cierra y abre otra conexión.
+- Si el navegador da la conexión por cerrada (`readyState === CLOSED`), el cliente reconecta a los 3 s.
+
+Verificado en vivo: después de un crash y reinicio, la UI pasó sola a "Falló · Interrumpido por un reinicio del servidor".
+
+### D-026 — Cancelar es `POST /api/jobs/:id/cancel` · Fase 2 · Vigente
+
+No `DELETE /api/jobs/:id`: eso queda para borrar del historial (Fase 4). Respuestas: 200 si estaba en cola (ya quedó cancelado), 202 si estaba corriendo (se está deteniendo; el estado final llega por SSE cuando el proceso ya terminó y los temporales están borrados), 409 si ya había terminado, 404 si no existe.
+
+### D-027 — Sin espacio en disco: 507 al crear, `failed` al arrancar · Fase 2 · Vigente
+
+El espacio libre (`MIN_FREE_DISK_GB`) se verifica dos veces: al crear el job (responde **507 Insufficient Storage** con un mensaje claro, sin crear nada) y justo antes de arrancarlo, porque el disco se puede llenar mientras el job espera en cola (en ese caso queda `failed` con el mismo mensaje).
 
 ### D-022 — La API no expone rutas del servidor · Fase 1 · Vigente
 
@@ -109,16 +135,52 @@ Hay un único event bus de jobs. `GET /api/events` es el stream de una pestaña 
 
   Se renombró a `selftest` para que no se confunda con los tests automatizados. Su archivo se borra al terminar y no aparece en "Mis trabajos".
 
+  `-re` lee las entradas a velocidad real, así que la prueba dura lo mismo que el video y se puede ver el progreso y cancelar a mano; sin `-re`, un minuto se codifica en pocos segundos. No usa `-shortest`: medido, hacía que el progreso quedara clavado ~9 s al inicio, y las dos entradas ya duran lo mismo.
+
 ### D-031 — Recuperación al arrancar · Fase 2 · Vigente
 
-Antes de aceptar requests:
+Antes de empezar a procesar la cola, en este orden:
 
-1. Jobs `running` → `failed` con motivo "Interrumpido por un reinicio del servidor".
-2. Jobs `queued` → se vuelven a encolar en su orden original.
-3. Se vacía `STORAGE_DIR\tmp\` (archivos parciales de jobs que no terminaron).
-4. Procesos huérfanos: se buscan procesos cuyo ejecutable esté dentro de `BIN_DIR` (yt-dlp, ffmpeg, ffprobe, deno) y se matan con `taskkill /T /F`. Se busca por ruta de ejecutable y no por el PID guardado porque Windows reutiliza los PID: matar "el PID del job anterior" podría cerrar un proceso ajeno.
+1. **Procesos huérfanos.** Se buscan procesos cuyo ejecutable esté dentro de `BIN_DIR` (yt-dlp, ffmpeg, ffprobe, deno) y se matan con `taskkill /T /F`. Van primero porque pueden tener abiertos archivos de `tmp`. Se busca por ruta de ejecutable y no por PID guardado porque Windows reutiliza los PID: matar "el PID del job anterior" podría cerrar un proceso ajeno. La lista sale de `Get-CimInstance Win32_Process` (PowerShell), porque `wmic` ya no viene en Windows actuales. Si no se puede listar, se avisa en el log y se sigue.
+2. Se vacía `STORAGE_DIR\tmp\` (parciales de jobs que no terminaron).
+3. Jobs `running` → `failed` con el motivo "Interrumpido por un reinicio del servidor".
+4. Jobs `queued`: quedan como están; `queue.start()` los retoma en orden de llegada.
 
-Todo con tests, mockeando el adapter de procesos.
+Verificado en vivo (crash simulado matando solo el proceso del server): mató un ffmpeg huérfano lanzado desde `bin\`, borró el parcial de `tmp` y marcó el job como interrumpido.
+
+Dato medido: cuando el server muere, ffmpeg en general muere solo, porque se rompe el pipe de stdout donde escribe el progreso. Los huérfanos reales son más probables con procesos que no escriben seguido (yt-dlp descargando), por eso el paso 1 sigue siendo necesario.
+
+Al detener el server en forma ordenada (Ctrl+C o detener el servicio), la cola aborta los jobs en curso (matan su árbol de procesos y quedan "interrumpido") antes de cerrar HTTP y la base.
+
+### D-033 — Una sola instancia por `DATA_DIR` · Fase 2 · Vigente
+
+**Riesgo encontrado al implementar D-031.** Con dos instancias sobre la misma carpeta de datos (por ejemplo `npm run dev` y `npm start` a la vez), la recuperación de la segunda mataría los ffmpeg de la primera (corren desde el mismo `BIN_DIR`) y marcaría sus jobs como interrumpidos.
+
+**Decisión.** Lock en `DATA_DIR\sti-catcher.pid` antes de tocar procesos o la base. Si el PID del archivo corresponde a un `node.exe` vivo, la nueva instancia no arranca y explica por qué. Si quedó de una ejecución que terminó mal (el proceso no existe, o el PID lo reutilizó otro programa), se toma igual. Se libera al detener el server.
+
+### D-034 — Migraciones como módulos TS; versión en `PRAGMA user_version` · Fase 2 · Vigente
+
+Las migraciones son strings SQL en `apps/server/src/db/migrations.ts` y no archivos `.sql`, para que entren en el bundle de producción sin copiar archivos aparte. Cada una corre en su transacción; la versión aplicada se guarda en `PRAGMA user_version` (un entero en el encabezado del archivo), sin tabla de control. Si la base es más nueva que el código (se instaló una versión anterior de la app), el server no arranca. Una migración publicada nunca se edita: se agrega otra.
+
+SQLite en modo WAL (las lecturas del historial y del SSE no bloquean las escrituras de la cola), `busy_timeout` 5 s, `foreign_keys` activado y `synchronous=NORMAL` (con WAL, un corte del proceso no corrompe la base).
+
+### D-035 — Progreso en memoria, máximo cada 250 ms · Fase 2 · Vigente
+
+El progreso no se guarda en SQLite: cambia varias veces por segundo y solo sirve mientras el job corre. Vive en la cola y se publica como máximo cada 250 ms por job, garantizando que el último valor siempre se envíe. `GET /api/jobs/:id` lo incluye mientras el job está `running`.
+
+Las transiciones de estado sí van a la base, con un `WHERE status = …` en el mismo `UPDATE`: si cancelar y arrancar compiten, gana solo uno. Con better-sqlite3 (sincrónico) y sin `await` en el medio, `cancel()` es atómico respecto de la cola.
+
+### D-036 — La cola es dueña de la carpeta temporal · Fase 2 · Vigente
+
+Los runners escriben en `STORAGE_DIR\tmp` solo archivos que empiezan con el id del job. Al terminar (bien o mal), la cola borra todo lo que empiece con ese id y **recién después** publica el estado final: cuando la UI muestra "Cancelado", ya no quedan parciales. Si el job produce un archivo, la cola lo mueve a `STORAGE_DIR\files\<id><ext>` (mismo volumen: renombrar es instantáneo) y guarda la ruta relativa `files/<id><ext>`. La extensión que devuelve un runner se valida (`^\.[a-z0-9]{1,5}$`).
+
+`runStreaming` recién resuelve en el evento `close` del proceso, es decir cuando el proceso y todos los que heredaron sus pipes terminaron: después de un abort, la cola puede borrar sabiendo que nadie tiene los archivos abiertos.
+
+### D-037 — Velocidad de ffmpeg calculada, no la que informa ffmpeg · Fase 2 · Vigente
+
+**Problema medido.** El `speed=` de `-progress` es un promedio desde el arranque: decía 0,1x mientras el video avanzaba a tiempo real, y el tiempo restante salía en minutos cuando faltaban segundos.
+
+**Decisión.** Velocidad instantánea entre bloques de progreso (segundos de video avanzados ÷ segundos de reloj), suavizada con un promedio móvil exponencial (peso 0,3 para la última medición). El valor de ffmpeg solo se usa en el primer bloque. Verificado: con la prueba de 10 s, el tiempo restante bajó 8 → 7 → 5 → 4 → 3 → 2 → 1 s.
 
 ### D-032 — Grabaciones abandonadas · Fase 6 · Vigente
 

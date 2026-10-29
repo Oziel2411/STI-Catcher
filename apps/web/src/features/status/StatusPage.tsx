@@ -1,5 +1,6 @@
 import type { HealthResponse, ToolName } from '@sti-catcher/shared';
 import { formatBytes, formatUptime } from '../../lib/format.ts';
+import { SelfTestCard } from './SelfTestCard.tsx';
 import { useHealth } from './useHealth.ts';
 
 const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
@@ -10,7 +11,7 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
 };
 
 export function StatusPage() {
-  const { state, isRefreshing, refresh } = useHealth();
+  const { state, isRefreshing, refresh, reload } = useHealth();
 
   return (
     <section className="page">
@@ -31,6 +32,8 @@ export function StatusPage() {
         </div>
       )}
       {state.kind === 'ready' && <StatusDetails health={state.data} />}
+      {/* Cada cambio de estado de la prueba actualiza el contador de trabajos. */}
+      <SelfTestCard onJobUpdated={reload} />
     </section>
   );
 }

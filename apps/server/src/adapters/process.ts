@@ -89,3 +89,111 @@ export const runCommand: CommandRunner = (file, args, { timeoutMs, maxOutputChar
       resolve({ exitCode, stdout, stderr, timedOut });
     });
   });
+
+// --- Procesos largos ------------------------------------------------------------
+
+/**
+ * Corta un stream de texto en líneas. Acepta `\n`, `\r\n` y `\r` solo (ffmpeg
+ * y yt-dlp usan `\r` para reescribir la línea de progreso). Ignora líneas vacías.
+ */
+export function createLineSplitter(onLine: (line: string) => void) {
+  let buffer = '';
+  return {
+    push(chunk: string) {
+      buffer += chunk;
+      const parts = buffer.split(/\r\n|\r|\n/);
+      buffer = parts.pop() ?? '';
+      for (const part of parts) {
+        if (part.length > 0) onLine(part);
+      }
+    },
+    flush() {
+      if (buffer.length > 0) onLine(buffer);
+      buffer = '';
+    },
+  };
+}
+
+export type StreamingOptions = {
+  /** Al abortar se mata el árbol de procesos y la promesa se rechaza con `signal.reason`. */
+  signal: AbortSignal;
+  onStdoutLine?: (line: string) => void;
+  onStderrLine?: (line: string) => void;
+  /** Variables de entorno del proceso hijo (por defecto, las del server). */
+  env?: NodeJS.ProcessEnv;
+  /** Cuántas líneas finales de stderr se guardan para diagnosticar errores. */
+  stderrTailLines?: number;
+};
+
+export type StreamingResult = {
+  exitCode: number | null;
+  stderrTail: string[];
+};
+
+export type StreamingRunner = (
+  file: string,
+  args: readonly string[],
+  options: StreamingOptions,
+) => Promise<StreamingResult>;
+
+/**
+ * Ejecuta un proceso largo (descarga, conversión) leyendo su salida línea por línea.
+ *
+ * La promesa recién se resuelve o rechaza en 'close', es decir cuando el
+ * proceso y todos los que heredaron sus pipes terminaron. Así, después de un
+ * abort, la cola puede borrar los archivos parciales sabiendo que nadie los
+ * tiene abiertos.
+ */
+export const runStreaming: StreamingRunner = (file, args, options) =>
+  new Promise((resolve, reject) => {
+    const { signal } = options;
+    if (signal.aborted) {
+      reject(signal.reason as Error);
+      return;
+    }
+
+    const child = spawn(file, args, {
+      shell: false,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: options.env ?? process.env,
+    });
+
+    const tailSize = options.stderrTailLines ?? 30;
+    const stderrTail: string[] = [];
+    const stdoutLines = createLineSplitter((line) => options.onStdoutLine?.(line));
+    const stderrLines = createLineSplitter((line) => {
+      stderrTail.push(line);
+      if (stderrTail.length > tailSize) stderrTail.shift();
+      options.onStderrLine?.(line);
+    });
+
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdoutLines.push(chunk);
+    });
+    child.stderr.on('data', (chunk: string) => {
+      stderrLines.push(chunk);
+    });
+
+    const onAbort = () => {
+      if (child.pid !== undefined) void killProcessTree(child.pid);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    child.once('error', (error) => {
+      signal.removeEventListener('abort', onAbort);
+      reject(error);
+    });
+    child.once('close', (exitCode) => {
+      signal.removeEventListener('abort', onAbort);
+      stdoutLines.flush();
+      stderrLines.flush();
+      if (signal.aborted) {
+        reject(signal.reason as Error);
+      } else {
+        resolve({ exitCode, stderrTail });
+      }
+    });
+  });

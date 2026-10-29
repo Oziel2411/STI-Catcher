@@ -47,9 +47,9 @@ export default tseslint.config(
     files: ['apps/server/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
-  // La lógica de negocio no conoce Fastify (SPEC §11).
+  // La lógica de negocio y la cola de jobs no conocen Fastify (SPEC §11).
   {
-    files: ['apps/server/src/modules/**/*.ts'],
+    files: ['apps/server/src/modules/**/*.ts', 'apps/server/src/jobs/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

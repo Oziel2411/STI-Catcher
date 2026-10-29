@@ -6,11 +6,17 @@ import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import { HttpError } from './http/validation.ts';
+import type { JobEventBus } from './jobs/event-bus.ts';
+import type { JobQueue } from './jobs/queue.ts';
 import type { HealthService } from './modules/health/health-service.ts';
+import { registerEventRoutes } from './routes/events.ts';
 import { registerHealthRoutes } from './routes/health.ts';
+import { registerJobRoutes } from './routes/jobs.ts';
 
 export type AppServices = {
   health: HealthService;
+  jobs: JobQueue;
+  events: JobEventBus;
 };
 
 export type BuildAppOptions = {
@@ -20,6 +26,8 @@ export type BuildAppOptions = {
   webDistDir: string | null;
   /** HTTPS + HTTP/2. null = HTTP/1.1 sin cifrar (solo localhost). */
   https: { cert: Buffer; key: Buffer } | null;
+  /** Intervalo del heartbeat SSE (los tests lo achican). */
+  sseHeartbeatMs?: number;
 };
 
 const apiError = (
@@ -74,6 +82,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
 
   registerHealthRoutes(app, options.services.health);
+  registerJobRoutes(app, options.services.jobs);
+  registerEventRoutes(app, {
+    queue: options.services.jobs,
+    bus: options.services.events,
+    ...(options.sseHeartbeatMs !== undefined ? { heartbeatMs: options.sseHeartbeatMs } : {}),
+  });
 
   const webDir =
     options.webDistDir !== null && existsSync(path.join(options.webDistDir, 'index.html'))

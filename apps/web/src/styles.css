@@ -283,6 +283,67 @@ code {
   background: var(--error);
 }
 
+.meter-fill {
+  transition: width 0.3s linear;
+}
+
+.text-warn {
+  color: var(--warn);
+}
+
+.button-danger {
+  background: var(--error);
+}
+
+.badge-muted {
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field select {
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.job {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.job-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.grid + .card {
+  margin-top: 16px;
+}
+
 @media (max-width: 640px) {
   .topbar,
   .content {

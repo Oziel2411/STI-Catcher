@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatUptime } from './format.ts';
+import { formatBytes, formatEta, formatSpeedRatio, formatUptime } from './format.ts';
+
+describe('formatEta', () => {
+  it('usa la unidad más grande con dos dígitos en la menor', () => {
+    expect(formatEta(0)).toBe('0 s');
+    expect(formatEta(44.6)).toBe('45 s');
+    expect(formatEta(65)).toBe('1 min 05 s');
+    expect(formatEta(3720)).toBe('1 h 02 min');
+  });
+
+  it('devuelve un guion si no se conoce', () => {
+    expect(formatEta(null)).toBe('—');
+    expect(formatEta(-3)).toBe('—');
+  });
+});
+
+describe('formatSpeedRatio', () => {
+  it('redondea a un decimal con coma', () => {
+    expect(formatSpeedRatio(1.013)).toBe('1x');
+    expect(formatSpeedRatio(2.46)).toBe('2,5x');
+    expect(formatSpeedRatio(null)).toBe('—');
+  });
+});
 
 describe('formatBytes', () => {
   it('usa base 1024 y el formato de es-AR (punto de miles, coma decimal)', () => {

@@ -21,9 +21,7 @@ export function useHealth() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    apiGet(`/api/health${force ? '?refresh=1' : ''}`, healthResponseSchema, {
-      signal: controller.signal,
-    })
+    apiGet(`/api/health${force ? '?refresh=1' : ''}`, healthResponseSchema, controller.signal)
       .then(
         (data) => {
           setState({ kind: 'ready', data });
@@ -46,10 +44,16 @@ export function useHealth() {
     return () => controllerRef.current?.abort();
   }, [fetchHealth]);
 
+  /** Vuelve a consultar las versiones de las herramientas (tarda unos segundos). */
   const refresh = useCallback(() => {
     setIsRefreshing(true);
     fetchHealth(true);
   }, [fetchHealth]);
 
-  return { state, isRefreshing, refresh };
+  /** Actualiza disco y trabajos; las versiones salen de la caché del server. */
+  const reload = useCallback(() => {
+    fetchHealth(false);
+  }, [fetchHealth]);
+
+  return { state, isRefreshing, refresh, reload };
 }

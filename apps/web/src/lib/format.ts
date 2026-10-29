@@ -18,6 +18,25 @@ export function formatBytes(bytes: number): string {
   return `${numberFormat(unit === 0 ? 0 : 1).format(value)} ${BYTE_UNITS[unit] ?? 'B'}`;
 }
 
+/** Tiempo restante: 45 → "45 s", 65 → "1 min 05 s", 3720 → "1 h 02 min". */
+export function formatEta(totalSeconds: number | null): string {
+  if (totalSeconds === null || !Number.isFinite(totalSeconds) || totalSeconds < 0) return '—';
+  const seconds = Math.round(totalSeconds);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (hours > 0) return `${String(hours)} h ${pad(minutes)} min`;
+  if (minutes > 0) return `${String(minutes)} min ${pad(rest)} s`;
+  return `${String(rest)} s`;
+}
+
+/** Velocidad de ffmpeg relativa al tiempo real: 1.013 → "1,0x". */
+export function formatSpeedRatio(ratio: number | null): string {
+  if (ratio === null || !Number.isFinite(ratio) || ratio < 0) return '—';
+  return `${numberFormat(1).format(Math.round(ratio * 10) / 10)}x`;
+}
+
 /** 3725 → "1 h 2 min". Para tiempos de actividad y duraciones largas. */
 export function formatUptime(totalSeconds: number): string {
   if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '—';
