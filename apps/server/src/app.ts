@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import fastifyStatic from '@fastify/static';
-import type { ApiError } from '@sti-catcher/shared';
+import type { ApiError, ConversionOptionsResponse } from '@sti-catcher/shared';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
@@ -9,10 +9,13 @@ import { registerClientId } from './http/client-id.ts';
 import { HttpError } from './http/validation.ts';
 import type { JobEventBus } from './jobs/event-bus.ts';
 import type { JobQueue } from './jobs/queue.ts';
+import type { ConversionService } from './modules/conversion/conversion-service.ts';
+import type { UploadService } from './modules/conversion/upload-service.ts';
 import type { DownloadService } from './modules/download/download-service.ts';
 import type { HistoryService } from './modules/history/history-service.ts';
 import type { JobFiles } from './modules/files/job-files.ts';
 import type { HealthService } from './modules/health/health-service.ts';
+import { registerConversionRoutes } from './routes/conversion.ts';
 import { registerEventRoutes } from './routes/events.ts';
 import { registerFileRoutes } from './routes/files.ts';
 import { registerHistoryRoutes } from './routes/history.ts';
@@ -27,6 +30,9 @@ export type AppServices = {
   download: DownloadService;
   jobFiles: JobFiles;
   history: HistoryService;
+  conversion: ConversionService;
+  upload: UploadService;
+  conversionOptions: ConversionOptionsResponse;
 };
 
 export type BuildAppOptions = {
@@ -105,6 +111,11 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   registerMediaRoutes(app, options.services.download);
   registerFileRoutes(app, options.services.jobFiles);
   registerHistoryRoutes(app, options.services.history);
+  registerConversionRoutes(app, {
+    conversion: options.services.conversion,
+    upload: options.services.upload,
+    options: options.services.conversionOptions,
+  });
   registerEventRoutes(app, {
     queue: options.services.jobs,
     bus: options.services.events,

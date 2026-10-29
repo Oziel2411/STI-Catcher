@@ -268,6 +268,13 @@ No se bloquea por jobs activos: los que están corriendo siguen con el ejecutabl
 
 Un GIF de un video largo pesa cientos de MB. El preset GIF tiene inicio/fin (recorte) y topes configurables: duración máxima 30 s, más FPS y ancho máximos. Valores exactos en la Fase 5.
 
+**Implementación (Fase 5):**
+
+- `.env`: `GIF_MAX_SECONDS=30`, `GIF_MAX_FPS=15`, `GIF_MAX_WIDTH=800`. Por defecto se proponen 10 fps y 480 px, siempre sin pasar los topes ni el ancho del video.
+- El server valida contra los topes y contra la duración real del archivo (ffprobe). La UI muestra los mismos problemas antes de enviar y deshabilita el botón.
+- Paleta propia en una sola pasada (`palettegen` + `paletteuse`, dither bayer): con la paleta genérica, el GIF sale con bandas y ruido. El recorte (`-ss`/`-t`) va **antes** de `-i`, así ffmpeg salta directo al inicio. Sin audio.
+- Verificado: de 2 a 7 s a 10 fps dio exactamente 5,0 s y 50 cuadros, 480×270, 1,2 MB.
+
 ---
 
 ## Historial
@@ -299,6 +306,44 @@ Un trabajo `failed` o `cancelled` se reintenta con los mismos parámetros, como 
 - La página se suscribe a `/api/events?jobIds=<los visibles>`: progreso de los que están corriendo, terminados, expirados y borrados, sin recargar. Los eventos no traen `isMine` (depende de quién mira): la lista lo conserva.
 - Filtro, búsqueda y página viven en la URL (`?scope=all&q=…&page=2`).
 - El selftest no aparece en el historial (D-030).
+
+## Conversión
+
+### D-070 — Presets cerrados en `shared` · Fase 5 · Vigente
+
+Los nueve presets (MP4, WebM, MKV, MOV, AVI, GIF, MP3, M4A, WAV) están en `packages/shared/src/presets/conversion.ts`: id, etiqueta, descripción, extensión, qué necesita del origen (video o audio) y si admite escalar. El cliente solo manda el **id**. Los argumentos de ffmpeg los arma `buildConversionArgs` (función pura y testeada, en `modules/conversion/conversion-args.ts`), sin texto del cliente (SPEC §7).
+
+| Preset    | Salida                                         | Por qué                                                   |
+| --------- | ---------------------------------------------- | --------------------------------------------------------- |
+| MP4 / MOV | H.264 CRF 20 + AAC 192k, `+faststart`          | Abre en cualquier lado / editores                         |
+| MKV       | copia (o H.264 + AAC si se escala)             | MKV acepta casi cualquier codec: sin pérdida, en segundos |
+| WebM      | VP9 CRF 32 + Opus 128k, `cpu-used 4`, `row-mt` | Calidad aceptable sin tardar una eternidad                |
+| AVI       | MPEG-4 Part 2 tag XVID + MP3                   | Lo que abren reproductores y equipos viejos               |
+| MP3       | LAME VBR q2 (~190 kbps)                        | Indistinguible del original para voz y música             |
+| M4A       | AAC 192k (o copia si ya es AAC)                |                                                           |
+| WAV       | PCM 16 bits                                    | Para edición de sonido                                    |
+
+- **Copiar sin recodificar** cuando el origen ya cumple: MP4/MOV si es H.264 8 bits (yuv420p) + AAC y no se escala; M4A si ya es AAC; MP3 si ya es MP3. Verificado: un MP4 de 10,6 MB pasó a MOV en 0,6 s.
+- Más de 2 canales → estéreo en MP3, M4A, WebM y MP4 (MP3 no admite más; los demás, por compatibilidad). Mono queda mono.
+- Escalar: solo hacia abajo (`scale=-2:H`, ancho par) y solo en presets de video. Una altura igual o mayor que la original se ignora.
+
+### D-071 — Solo se ofrecen las conversiones con sentido · Fase 5 · Vigente
+
+`GET /api/conversion/sources/:id` corre ffprobe sobre el archivo real y devuelve qué tiene (video, audio, duración, resolución, codecs) y los presets válidos (`availablePresets`, compartida con la web). Un archivo de solo audio no ofrece salidas de video ni GIF, y uno sin audio no ofrece MP3/M4A/WAV. Al crear la conversión el server lo vuelve a validar (**422** si no tiene sentido). Verificado en vivo con un .mov HEVC (9 opciones) y una nota de voz .m4a (solo MP3, M4A y WAV).
+
+El origen puede ser un archivo subido o **cualquier** trabajo terminado del historial (botón "Convertir"), propio o ajeno: convertir no modifica el original.
+
+### D-072 — Subida: cuerpo binario en streaming · Fase 5 · Vigente
+
+- `POST /api/uploads` con el archivo como cuerpo (`application/octet-stream`) y el nombre en el header `x-file-name` (URL-encoded). Sin multipart ni dependencias: un content-type parser de Fastify pasa el stream sin leerlo, y se escribe directo a `STORAGE_DIR\tmp` con `pipeline`. El archivo nunca está entero en memoria (SPEC §7).
+- Límite `MAX_UPLOAD_MB`: se rechaza antes de leer si `Content-Length` lo supera (**413**), y si no hay `Content-Length`, un contador corta el stream al pasarse. También se verifica el espacio en disco (**507**).
+- ffprobe confirma que es video o audio; si no, se borra (**422**). El nombre del cliente solo es título: en disco queda `<jobId><ext>`, con la extensión validada (`.bin` si es rara).
+- Queda en el historial como trabajo `upload` ya terminado (D-030, DT-001), con `queue.recordCompleted`.
+- La web sube con `XMLHttpRequest` y no con `fetch`, porque `fetch` no informa el progreso de una subida.
+
+### D-073 — La conversión queda vinculada al original · Fase 5 · Vigente
+
+El job de conversión tiene `parent_job_id` = el origen y el título "Original → MP4". El historial muestra "Convertido de «…»" (`parentTitle`, resuelto en el server). Si el origen se borra o expira mientras la conversión espera en la cola, el runner falla con "El archivo de origen ya no está disponible". Las conversiones fallidas o canceladas se pueden reintentar.
 
 ## Despliegue
 

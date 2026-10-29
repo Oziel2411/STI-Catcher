@@ -26,6 +26,8 @@ export type HistoryQuery = z.input<typeof historyQuerySchema>;
  */
 export const historyItemSchema = jobSchema.extend({
   isMine: z.boolean(),
+  /** Título del trabajo de origen (p. ej. el archivo del que salió una conversión). */
+  parentTitle: z.string().nullable(),
 });
 export type HistoryItem = z.infer<typeof historyItemSchema>;
 

@@ -1,10 +1,12 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { HealthResponse, ProbeResponse } from '@sti-catcher/shared';
 import { pino } from 'pino';
 import { vi } from 'vitest';
+import type { Ffprobe, MediaInfo } from '../src/adapters/ffprobe.ts';
+import { fileOps } from '../src/adapters/files.ts';
 import type { UrlGuard } from '../src/adapters/url-guard.ts';
 import { buildApp } from '../src/app.ts';
 import { openDatabase } from '../src/db/connection.ts';
@@ -14,6 +16,8 @@ import { migrations } from '../src/db/migrations.ts';
 import { createJobEventBus } from '../src/jobs/event-bus.ts';
 import { createJobQueue } from '../src/jobs/queue.ts';
 import type { JobContext, JobResult, JobRunner } from '../src/jobs/types.ts';
+import { createConversionService } from '../src/modules/conversion/conversion-service.ts';
+import { createUploadService } from '../src/modules/conversion/upload-service.ts';
 import { createDownloadService } from '../src/modules/download/download-service.ts';
 import { createJobFiles } from '../src/modules/files/job-files.ts';
 import { createHistoryService } from '../src/modules/history/history-service.ts';
@@ -39,6 +43,25 @@ export type TestAppOptions = {
   sseHeartbeatMs?: number;
   probe?: (url: string) => Promise<ProbeResponse>;
   checkUrl?: UrlGuard;
+  /** ffprobe falso para subidas y conversiones (por defecto: video H.264 + AAC de 12 s). */
+  ffprobe?: Ffprobe;
+  maxUploadBytes?: number;
+};
+
+export const sampleVideoMedia: MediaInfo = {
+  durationSeconds: 12,
+  formatName: 'mov,mp4,m4a,3gp,3g2,mj2',
+  sizeBytes: 1000,
+  video: { codec: 'hevc', width: 1920, height: 1080, pixFmt: 'yuv420p' },
+  audio: { codec: 'aac', channels: 2 },
+};
+
+export const testGifLimits = {
+  maxSeconds: 30,
+  maxFps: 15,
+  maxWidth: 800,
+  defaultFps: 10,
+  defaultWidth: 480,
 };
 
 /**
@@ -67,7 +90,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
   const queue = createJobQueue({
     repo,
     bus,
-    runners: { selftest: runner, download: runner },
+    runners: { selftest: runner, download: runner, conversion: runner },
     files: {
       removeByPrefix: () => Promise.resolve(0),
       moveFile: () => Promise.resolve(),
@@ -105,16 +128,64 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     logger: historyLogger,
   });
 
+  const ffprobe = vi.fn<Ffprobe>(options.ffprobe ?? (() => Promise.resolve(sampleVideoMedia)));
+  const conversion = createConversionService({
+    getJob: (id) => repo.get(id),
+    storageDir,
+    filesDir,
+    ffprobe,
+    queue,
+    gifLimits: testGifLimits,
+  });
+  mkdirSync(path.join(storageDir, 'tmp'), { recursive: true });
+  mkdirSync(filesDir, { recursive: true });
+  const upload = createUploadService({
+    tempDir: path.join(storageDir, 'tmp'),
+    filesDir,
+    maxUploadBytes: options.maxUploadBytes ?? 1024 ** 3,
+    minFreeDiskBytes: 1024,
+    readFreeDiskBytes: () => Promise.resolve(options.freeDiskBytes ?? 1024 ** 4),
+    ffprobe,
+    files: fileOps,
+    queue,
+  });
+  const conversionOptions = {
+    gif: testGifLimits,
+    maxUploadBytes: options.maxUploadBytes ?? 1024 ** 3,
+  };
+
   const getHealth = vi.fn<HealthService['getHealth']>(() => Promise.resolve(sampleHealth));
   const app = await buildApp({
     logger: pino({ level: 'silent' }),
-    services: { health: { getHealth }, jobs: queue, events: bus, download, jobFiles, history },
+    services: {
+      health: { getHealth },
+      jobs: queue,
+      events: bus,
+      download,
+      jobFiles,
+      history,
+      conversion,
+      upload,
+      conversionOptions,
+    },
     filesDir,
     webDistDir: options.webDistDir ?? null,
     https: null,
     ...(options.sseHeartbeatMs !== undefined ? { sseHeartbeatMs: options.sseHeartbeatMs } : {}),
   });
-  return { app, queue, repo, bus, runs, getHealth, probe, storageDir, filesDir, historyLogger };
+  return {
+    app,
+    queue,
+    repo,
+    bus,
+    runs,
+    getHealth,
+    probe,
+    ffprobe,
+    storageDir,
+    filesDir,
+    historyLogger,
+  };
 }
 
 /** Deja correr las microtareas pendientes de la cola. */

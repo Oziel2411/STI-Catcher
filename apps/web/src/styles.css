@@ -610,3 +610,49 @@ a.button {
   gap: 16px;
   margin: 16px 0;
 }
+
+/* Convertir */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 28px 16px;
+  text-align: center;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.dropzone p {
+  margin: 0;
+}
+
+.dropzone .meter {
+  width: 100%;
+  max-width: 480px;
+}
+
+.dropzone-active {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.preset-group {
+  margin-bottom: 8px;
+}
+
+.preset-group-title {
+  margin: 8px 0 2px;
+  font-weight: 600;
+}
+
+.field input[type='number'] {
+  width: 110px;
+  padding: 7px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}

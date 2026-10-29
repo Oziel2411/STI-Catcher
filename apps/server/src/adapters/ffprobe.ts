@@ -6,8 +6,8 @@ export type MediaInfo = {
   /** Nombre del contenedor según ffprobe, p. ej. "mov,mp4,m4a,3gp,3g2,mj2". */
   formatName: string | null;
   sizeBytes: number | null;
-  video: { codec: string; width: number; height: number } | null;
-  audio: { codec: string } | null;
+  video: { codec: string; width: number; height: number; pixFmt: string | null } | null;
+  audio: { codec: string; channels: number | null } | null;
 };
 
 export function buildFfprobeArgs(filePath: string): string[] {
@@ -18,6 +18,8 @@ const streamSchema = z.looseObject({
   codec_type: z.string().optional(),
   codec_name: z.string().optional(),
   width: z.number().optional(),
+  pix_fmt: z.string().optional(),
+  channels: z.number().optional(),
   height: z.number().optional(),
   disposition: z.looseObject({ attached_pic: z.number().optional() }).optional(),
 });
@@ -57,9 +59,14 @@ export function parseFfprobeOutput(json: unknown): MediaInfo {
     sizeBytes: size === null ? null : Math.round(size),
     video:
       video?.codec_name && video.width && video.height
-        ? { codec: video.codec_name, width: video.width, height: video.height }
+        ? {
+            codec: video.codec_name,
+            width: video.width,
+            height: video.height,
+            pixFmt: video.pix_fmt ?? null,
+          }
         : null,
-    audio: audio?.codec_name ? { codec: audio.codec_name } : null,
+    audio: audio?.codec_name ? { codec: audio.codec_name, channels: audio.channels ?? null } : null,
   };
 }
 

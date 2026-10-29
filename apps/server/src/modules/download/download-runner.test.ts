@@ -18,8 +18,8 @@ const h264Media: MediaInfo = {
   durationSeconds: 19.02,
   formatName: 'mov,mp4,m4a,3gp,3g2,mj2',
   sizeBytes: 742000,
-  video: { codec: 'h264', width: 320, height: 240 },
-  audio: { codec: 'aac' },
+  video: { codec: 'h264', width: 320, height: 240, pixFmt: 'yuv420p' },
+  audio: { codec: 'aac', channels: 2 },
 };
 
 function setup(params: Partial<DownloadParams> = {}, overrides: Partial<DownloadRunnerDeps> = {}) {
@@ -147,7 +147,7 @@ describe('createDownloadRunner', () => {
 
   it('MP3: el archivo esperado es tmp/<id>.mp3', async () => {
     const { runner, context, ffprobe } = setup({ format: 'mp3', maxHeight: null });
-    ffprobe.mockResolvedValue({ ...h264Media, video: null, audio: { codec: 'mp3' } });
+    ffprobe.mockResolvedValue({ ...h264Media, video: null, audio: { codec: 'mp3', channels: 2 } });
     const result = await runner.run(context);
     expect(result.output).toEqual({ tempPath: `${TMP}\\${JOB_ID}.mp3`, extension: '.mp3' });
     expect(result.metadata).toMatchObject({ format: 'mp3', resolution: null, audioCodec: 'mp3' });

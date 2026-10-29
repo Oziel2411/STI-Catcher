@@ -74,6 +74,14 @@ export type JobQueue = {
   expire(id: string): boolean;
   /** Borra un job terminado y publica `job.deleted`. false si no existe o está activo. */
   remove(id: string): boolean;
+  /**
+   * Registra un job que ya terminó sin pasar por la cola (p. ej. un archivo
+   * subido: D-030 / DT-001). Queda `done` con su archivo y se publica.
+   */
+  recordCompleted(
+    input: EnqueueInput & { id: string },
+    result: Omit<JobFinish, 'status' | 'finishedAt'>,
+  ): Job;
   /** Empieza a procesar la cola (incluye los queued que quedaron de antes de un reinicio). */
   start(): void;
   /** Corta los jobs en curso (quedan failed "interrumpido") y deja de tomar nuevos. */
@@ -379,6 +387,27 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
       if (!repo.delete(id)) return false;
       bus.publish({ type: 'job.deleted', jobId: id });
       return true;
+    },
+
+    recordCompleted(input, result) {
+      const timestamp = now().toISOString();
+      repo.insert({
+        id: input.id,
+        createdAt: timestamp,
+        type: input.type,
+        params: input.params,
+        title: input.title ?? null,
+        sourceUrl: input.sourceUrl ?? null,
+        clientIp: input.clientIp ?? null,
+        clientId: input.clientId ?? null,
+        parentJobId: input.parentJobId ?? null,
+      });
+      repo.markRunning(input.id, timestamp);
+      repo.finish(input.id, { ...result, status: 'done', finishedAt: timestamp });
+      const record = repo.get(input.id);
+      if (!record) throw new Error(`No se pudo leer el job registrado ${input.id}`);
+      bus.publish({ type: 'job.updated', job: toApi(record) });
+      return toApi(record);
     },
 
     start() {

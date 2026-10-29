@@ -20,8 +20,8 @@ describe('buildFfprobeArgs', () => {
 describe('parseFfprobeOutput (salidas reales)', () => {
   it('MP4 H.264 + AAC', () => {
     const info = parseFfprobeOutput(readJsonFixture('ffprobe-sample-mp4.json'));
-    expect(info.video).toEqual({ codec: 'h264', width: 1280, height: 720 });
-    expect(info.audio).toEqual({ codec: 'aac' });
+    expect(info.video).toEqual({ codec: 'h264', width: 1280, height: 720, pixFmt: 'yuv420p' });
+    expect(info.audio).toEqual({ codec: 'aac', channels: 1 });
     expect(info.durationSeconds).toBeCloseTo(3, 0);
     expect(info.formatName).toContain('mp4');
     expect(info.sizeBytes).toBeGreaterThan(0);
@@ -30,7 +30,7 @@ describe('parseFfprobeOutput (salidas reales)', () => {
   it('MP3: solo audio', () => {
     const info = parseFfprobeOutput(readJsonFixture('ffprobe-sample-mp3.json'));
     expect(info.video).toBeNull();
-    expect(info.audio).toEqual({ codec: 'mp3' });
+    expect(info.audio).toEqual({ codec: 'mp3', channels: 1 });
     expect(info.formatName).toBe('mp3');
   });
 

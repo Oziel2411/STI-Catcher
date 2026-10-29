@@ -21,6 +21,9 @@ import { createJobEventBus } from './jobs/event-bus.ts';
 import { createJobQueue } from './jobs/queue.ts';
 import { recoverOnStartup } from './jobs/recovery.ts';
 import { createLogger } from './logger.ts';
+import { createConversionRunner } from './modules/conversion/conversion-runner.ts';
+import { createConversionService } from './modules/conversion/conversion-service.ts';
+import { createUploadService } from './modules/conversion/upload-service.ts';
 import { createDownloadRunner } from './modules/download/download-runner.ts';
 import { createDownloadService } from './modules/download/download-service.ts';
 import { createJobFiles } from './modules/files/job-files.ts';
@@ -127,6 +130,13 @@ async function main(): Promise<void> {
     runners: {
       selftest: createSelftestRunner({ runFfmpeg, files: fileOps }),
       download: createDownloadRunner({ ytdlp, runFfmpeg, ffprobe, files: fileOps, checkUrl }),
+      conversion: createConversionRunner({
+        getJob: (id) => repo.get(id),
+        storageDir: config.paths.storage,
+        filesDir: storage.filesDir,
+        ffprobe,
+        runFfmpeg,
+      }),
     },
     files: fileOps,
     paths: storage,
@@ -171,10 +181,44 @@ async function main(): Promise<void> {
     removeFile: fileOps.removeFile,
     logger,
   });
+  const gifLimits = {
+    ...config.gif,
+    defaultFps: Math.min(10, config.gif.maxFps),
+    defaultWidth: Math.min(480, config.gif.maxWidth),
+  };
+  const conversion = createConversionService({
+    getJob: (id) => repo.get(id),
+    storageDir: config.paths.storage,
+    filesDir: storage.filesDir,
+    ffprobe,
+    queue,
+    gifLimits,
+  });
+  const upload = createUploadService({
+    tempDir: storage.tempDir,
+    filesDir: storage.filesDir,
+    maxUploadBytes: config.limits.maxUploadBytes,
+    minFreeDiskBytes: config.limits.minFreeDiskBytes,
+    readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,
+    ffprobe,
+    files: fileOps,
+    queue,
+  });
+  const conversionOptions = { gif: gifLimits, maxUploadBytes: config.limits.maxUploadBytes };
 
   const app = await buildApp({
     logger,
-    services: { health, jobs: queue, events: bus, download, jobFiles, history },
+    services: {
+      health,
+      jobs: queue,
+      events: bus,
+      download,
+      jobFiles,
+      history,
+      conversion,
+      upload,
+      conversionOptions,
+    },
     filesDir: storage.filesDir,
     webDistDir: config.nodeEnv === 'production' ? path.join(repoRoot, 'apps', 'web', 'dist') : null,
     https: config.server.https

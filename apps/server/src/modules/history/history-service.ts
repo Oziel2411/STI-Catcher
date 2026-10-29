@@ -9,7 +9,7 @@ import type { JobRecord, JobsRepository } from '../../jobs/types.ts';
 export const HISTORY_TYPES: readonly JobType[] = ['download', 'upload', 'conversion', 'recording'];
 
 /** Tipos que se pueden reintentar con los mismos parámetros. */
-const RETRYABLE_TYPES: readonly JobType[] = ['download'];
+const RETRYABLE_TYPES: readonly JobType[] = ['download', 'conversion'];
 
 /** Error con mensaje para el usuario; las rutas lo traducen al código HTTP. */
 export class HistoryError extends Error {
@@ -87,6 +87,9 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
   const toItem = (record: JobRecord, requester: Requester): HistoryItem => ({
     ...deps.queue.toApi(record),
     isMine: record.clientId !== null && record.clientId === requester.clientId,
+    // Una consulta por item con origen (a lo sumo una página): más simple que un JOIN.
+    parentTitle:
+      record.parentJobId === null ? null : (deps.repo.get(record.parentJobId)?.title ?? null),
   });
 
   const getOrThrow = (id: string): JobRecord => {

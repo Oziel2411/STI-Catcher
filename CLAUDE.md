@@ -14,7 +14,7 @@ Web app interna (inspirada en aTube Catcher) para **descargar video por URL**, *
 | 2    | Jobs + DB + SSE                                                              | ✅        |
 | 3    | Descarga por URL                                                             | ✅        |
 | 4    | Historial                                                                    | ✅        |
-| 5    | Conversión                                                                   | pendiente |
+| 5    | Conversión                                                                   | ✅        |
 | 6    | Grabación de pantalla                                                        | pendiente |
 | 7    | Despliegue                                                                   | pendiente |
 
@@ -43,7 +43,7 @@ npm run check        # typecheck + lint + format:check + test (correr antes de c
   - `db/` — conexión SQLite, migraciones (`migrations.ts`, se agregan al final, nunca se editan), repositorios.
   - `http/` — helpers HTTP (errores, `parseInput`). `test/` — helpers de tests (`makeTestApp`) y fixtures.
 - `apps/web` — React + Vite. `features/<sección>/`, `components/`, `api/` (cliente HTTP + SSE tipado, con reconexión), `lib/` (formato y lógica pura).
-- `packages/shared` — esquemas Zod del contrato de API (y presets en la Fase 5). Se consume como código TS, sin build.
+- `packages/shared` — esquemas Zod del contrato de API y presets de conversión (`presets/conversion.ts`, lista cerrada). Se consume como código TS, sin build.
 - `scripts/` — PowerShell: `setup.ps1`, `update-ytdlp.ps1` y `common.ps1` (funciones compartidas). `bin/`, `storage/`, `data/`, `logs/` están en `.gitignore`.
 
 ## Convenciones
@@ -73,9 +73,10 @@ Detalle en `docs/DECISIONS.md`.
 - Descarga: `-f bv[height<=H]+ba/b[height<=H]/bv+ba/b`; compat `-S vcodec:h264,res:H,channels:2,acodec:aac`. "Recodificar" lo hace nuestro ffmpeg (con progreso), no yt-dlp. Archivo en disco `<jobId>.<ext>`; el título solo va en `Content-Disposition`.
 - `vite.config.ts` lee el `.env` directo (no `loadEnv`): una herramienta que define `PORT` apuntaba el proxy a sí mismo.
 - Historial: cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
+- Conversión: presets cerrados en shared → `buildConversionArgs` (pura); copia sin recodificar cuando el origen ya cumple; solo se ofrecen los presets que tienen sentido para el archivo (ffprobe); subida en streaming como `application/octet-stream`.
 - TypeScript fijado en 6.0.x (typescript-eslint no soporta 7).
 
-## API (hasta la Fase 4)
+## API (hasta la Fase 5)
 
 | Método | Ruta                                                                | Respuesta                                                                                                           |
 | ------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -92,3 +93,7 @@ Detalle en `docs/DECISIONS.md`.
 | GET    | `/api/history?scope=all&q=…&page=n`                                 | `{ items (job + isMine), total, page, pageSize }`; `scope` es `mine` (por defecto) o `all`                          |
 | DELETE | `/api/jobs/:id`                                                     | 204 · 403 no es tuyo · 409 en curso                                                                                 |
 | POST   | `/api/jobs/:id/retry`                                               | 202 `{ jobId }` (trabajo nuevo) · 409                                                                               |
+| GET    | `/api/conversion/options`                                           | topes del GIF y `maxUploadBytes`                                                                                    |
+| POST   | `/api/uploads` (cuerpo binario, header `x-file-name`)               | 201 `{ jobId }` (job `upload` terminado) · 413 · 415 · 422 · 507                                                    |
+| GET    | `/api/conversion/sources/:id`                                       | `{ job, media, presets }` · 409 · 410                                                                               |
+| POST   | `/api/jobs/convert` `{ sourceJobId, preset, maxHeight?, gif? }`     | 202 `{ jobId }` · 422 preset sin sentido o GIF inválido                                                             |

@@ -1,7 +1,7 @@
 import type { StreamingRunner } from './process.ts';
 
 /** Opciones comunes a toda ejecución de ffmpeg. */
-const BASE_ARGS = [
+export const FFMPEG_BASE_ARGS = [
   '-hide_banner',
   // Sin stdin: ffmpeg no espera teclas ('q') ni se cuelga leyendo la consola.
   '-nostdin',
@@ -34,7 +34,7 @@ export function buildSelftestArgs({ durationSeconds, outputPath }: SelftestArgsO
   }
   const d = String(durationSeconds);
   return [
-    ...BASE_ARGS,
+    ...FFMPEG_BASE_ARGS,
     '-re',
     '-f',
     'lavfi',
@@ -81,7 +81,7 @@ export function buildRecodeArgs({
   outputPath: string;
 }): string[] {
   return [
-    ...BASE_ARGS,
+    ...FFMPEG_BASE_ARGS,
     '-i',
     inputPath,
     '-map',

@@ -70,6 +70,11 @@ const rawEnvSchema = z
       .default('default,-generic'),
     // Segunda capa contra SSRF: rechazar URLs que apunten a la red interna.
     BLOCK_PRIVATE_URLS: z.stringbool({ error: 'Tiene que ser true o false.' }).default(true),
+
+    // Topes del GIF (D-043): un GIF largo o grande pesa cientos de MB.
+    GIF_MAX_SECONDS: intInRange(1, 300, 30),
+    GIF_MAX_FPS: intInRange(1, 30, 15),
+    GIF_MAX_WIDTH: intInRange(64, 1920, 800),
   })
   .superRefine((env, ctx) => {
     const hasCert = env.HTTPS_CERT_PATH !== undefined;
@@ -122,6 +127,11 @@ export type Config = {
   download: {
     ytdlpExtractors: string;
     blockPrivateUrls: boolean;
+  };
+  gif: {
+    maxSeconds: number;
+    maxFps: number;
+    maxWidth: number;
   };
 };
 
@@ -187,6 +197,11 @@ export function parseConfig(raw: Record<string, string | undefined>, baseDir: st
     download: {
       ytdlpExtractors: env.YTDLP_EXTRACTORS,
       blockPrivateUrls: env.BLOCK_PRIVATE_URLS,
+    },
+    gif: {
+      maxSeconds: env.GIF_MAX_SECONDS,
+      maxFps: env.GIF_MAX_FPS,
+      maxWidth: env.GIF_MAX_WIDTH,
     },
   };
 }

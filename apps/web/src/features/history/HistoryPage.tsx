@@ -6,7 +6,7 @@ import {
 } from '@sti-catcher/shared';
 import type { HistoryItem, HistoryResponse, HistoryScope } from '@sti-catcher/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { apiDelete, apiGet, apiPost } from '../../api/client.ts';
 import { subscribeToJobsEvents } from '../../api/events.ts';
 import { formatBytes, formatDateTime, formatDuration } from '../../lib/format.ts';
@@ -290,6 +290,9 @@ function HistoryRow({
           <span className="history-title">{item.title ?? 'Sin título'}</span>
         </div>
         <p className="muted small">{meta.join(' · ')}</p>
+        {item.parentTitle !== null && (
+          <p className="small muted">Convertido de «{item.parentTitle}»</p>
+        )}
 
         {item.status === 'running' && (
           <>
@@ -339,21 +342,20 @@ function HistoryRow({
             <a className="button button-secondary" href={fileUrl} download>
               Descargar
             </a>
-            <button
-              type="button"
+            <Link
               className="button button-secondary"
-              disabled
-              title="Disponible en la Fase 5"
+              to={`/convertir?origen=${encodeURIComponent(item.id)}`}
             >
               Convertir
-            </button>
+            </Link>
           </>
         )}
-        {(item.status === 'failed' || item.status === 'cancelled') && item.type === 'download' && (
-          <button type="button" className="button button-secondary" onClick={onRetry}>
-            Reintentar
-          </button>
-        )}
+        {(item.status === 'failed' || item.status === 'cancelled') &&
+          (item.type === 'download' || item.type === 'conversion') && (
+            <button type="button" className="button button-secondary" onClick={onRetry}>
+              Reintentar
+            </button>
+          )}
         {item.sourceUrl && (
           <a
             className="button button-secondary"

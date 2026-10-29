@@ -21,8 +21,18 @@ describe('applyEventToList', () => {
     parentJobId: null,
     progress: null,
   };
-  const a = { ...base, id: '00000000-0000-4000-8000-00000000000a', isMine: true };
-  const b = { ...base, id: '00000000-0000-4000-8000-00000000000b', isMine: false };
+  const a = {
+    ...base,
+    id: '00000000-0000-4000-8000-00000000000a',
+    isMine: true,
+    parentTitle: null,
+  };
+  const b = {
+    ...base,
+    id: '00000000-0000-4000-8000-00000000000b',
+    isMine: false,
+    parentTitle: 'Origen',
+  };
 
   it('actualiza el job y conserva isMine (los eventos no lo traen)', () => {
     const next = applyEventToList([a, b], {
