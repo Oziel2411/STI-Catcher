@@ -87,3 +87,79 @@ function Invoke-VerifiedDownload([string]$Url, [string]$SumsUrl, [string]$SumsFi
   }
   Write-Host "    SHA-256 verificado."
 }
+
+# Descarga un archivo y verifica un SHA-256 fijado en el script (para releases que
+# no publican sumas). Si no coincide, lo borra y falla.
+function Invoke-PinnedDownload([string]$Url, [string]$Sha256, [string]$OutFile) {
+  Write-Host "    Descargando $Url"
+  $partial = "$OutFile.download"
+  Invoke-WebRequest -Uri $Url -OutFile $partial -UseBasicParsing
+  $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $partial).Hash.ToUpperInvariant()
+  if ($actual -ne $Sha256.ToUpperInvariant()) {
+    Remove-Item -LiteralPath $partial -Force
+    throw "El SHA-256 de $Url no coincide (esperado $Sha256, obtenido $actual). Se descartó la descarga."
+  }
+  Move-Item -LiteralPath $partial -Destination $OutFile -Force
+  Write-Host "    SHA-256 verificado."
+}
+
+# True si el archivo existe y tiene el SHA-256 esperado.
+function Test-FileHash([string]$Path, [string]$Sha256) {
+  if (-not (Test-Path -LiteralPath $Path)) { return $false }
+  return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash -eq $Sha256.ToUpperInvariant()
+}
+
+# Node.js instalado para todos los usuarios (en Program Files): el servicio corre
+# con otra cuenta y no puede usar un Node instalado en el perfil de alguien.
+function Test-MachineWideNode([string]$NodePath) {
+  $machineDirs = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }
+  return @($machineDirs | Where-Object {
+      $NodePath.StartsWith($_.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
+    }).Count -gt 0
+}
+
+function Test-Administrator {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  return (New-Object Security.Principal.WindowsPrincipal $identity).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# Cambia (o agrega) CLAVE=valor en el .env, sin tocar el resto del archivo.
+function Set-EnvValue([string]$Path, [string]$Key, [string]$Value) {
+  $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8)
+  $pattern = "^\s*$([regex]::Escape($Key))\s*="
+  $found = $false
+  $updated = foreach ($line in $lines) {
+    if (-not $found -and $line -match $pattern) { $found = $true; "$Key=$Value" } else { $line }
+  }
+  if (-not $found) { $updated = @($updated) + "$Key=$Value" }
+  # UTF-8 sin BOM, como lo lee el server.
+  [IO.File]::WriteAllText($Path, (($updated -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding $false))
+}
+
+# Configuración del .env que usan los scripts de instalación, con rutas absolutas.
+function Get-AppConfig([string]$EnvFile) {
+  if (-not (Test-Path -LiteralPath $EnvFile)) {
+    throw "No existe $EnvFile. Corré primero .\scripts\setup.ps1."
+  }
+  $values = Read-EnvFile $EnvFile
+  $baseDir = Split-Path -Parent $EnvFile
+  $path = {
+    param([string]$Key, [string]$Default)
+    $value = if ($values[$Key]) { $values[$Key] } else { $Default }
+    if (-not $value) { return $null }
+    return Resolve-ConfigPath $value $baseDir
+  }
+  return [pscustomobject]@{
+    EnvFile    = [IO.Path]::GetFullPath($EnvFile)
+    NodeEnv    = $values['NODE_ENV']
+    HostName   = if ($values['HOST']) { $values['HOST'] } else { '127.0.0.1' }
+    Port       = if ($values['PORT']) { [int]$values['PORT'] } else { 3000 }
+    StorageDir = & $path 'STORAGE_DIR' './storage'
+    DataDir    = & $path 'DATA_DIR' './data'
+    LogDir     = & $path 'LOG_DIR' './logs'
+    BinDir     = & $path 'BIN_DIR' './bin'
+    CertPath   = & $path 'HTTPS_CERT_PATH' $null
+    KeyPath    = & $path 'HTTPS_KEY_PATH' $null
+  }
+}

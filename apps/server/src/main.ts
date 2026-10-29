@@ -32,6 +32,7 @@ import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
 import { createRecordingRunner } from './modules/recording/recording-runner.ts';
 import { createRecordingService } from './modules/recording/recording-service.ts';
+import { createRetentionService } from './modules/retention/retention-service.ts';
 import { createSelftestRunner } from './modules/selftest/selftest-runner.ts';
 import packageJson from '../package.json' with { type: 'json' };
 
@@ -227,6 +228,16 @@ async function main(): Promise<void> {
     logger,
   });
 
+  const retention = createRetentionService({
+    retentionDays: config.limits.retentionDays,
+    repo,
+    expire: (id) => queue.expire(id),
+    storageDir: config.paths.storage,
+    filesDir: storage.filesDir,
+    recordingsDir: storage.recordingsDir,
+    logger,
+  });
+
   const app = await buildApp({
     logger,
     services: {
@@ -259,6 +270,7 @@ async function main(): Promise<void> {
     closing = true;
     logger.info({ signal }, 'Deteniendo el servidor');
     recordings.stop();
+    retention.stop();
     queue
       .stop()
       .then(() => app.close())
@@ -280,6 +292,8 @@ async function main(): Promise<void> {
   queue.start();
   // Cierra grabaciones abandonadas, incluidas las que quedaron abiertas antes de un reinicio.
   recordings.start();
+  // Retención: una pasada ahora y después cada hora (RETENTION_DAYS=0 la desactiva).
+  retention.start();
   const protocol = config.server.https ? 'https' : 'http';
   logger.info(`Escuchando en ${protocol}://${config.server.host}:${String(config.server.port)}`);
 }

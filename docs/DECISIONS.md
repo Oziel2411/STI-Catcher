@@ -397,6 +397,14 @@ Lo usan la subida de la conversión y los fragmentos de grabación: se registra 
 
 Se usa `WinSW.NET461.exe` (≈ 650 KB, requiere .NET Framework 4.6.1, que Windows 10 trae como 4.8). El release no publica checksums: `install-service.ps1` fijará el SHA-256 en el script.
 
+**Implementación (Fase 7):**
+
+- **SHA-256 fijado:** `B5066B7B…ADFC4F`, calculado al descargarlo de la URL oficial del release. No hay una segunda fuente para compararlo: GitHub no publica el digest de assets de 2023 y Scoop solo empaqueta las variantes `-x64`/`-x86`. El de mkcert sí coincide con el manifiesto de Scoop.
+- **El XML no se versiona:** se genera en `service\sti-catcher.xml` (en `.gitignore`), porque lleva rutas de cada equipo: Node, la app, el `.env`, los logs. `install-service.ps1` lo valida con `sti-catcher.exe status`, que no requiere administrador.
+- **`<stopparentprocessfirst>true`:** por defecto WinSW 2.x corta primero a los procesos hijos. ffmpeg moriría antes que Node y el job quedaría como "falló" con un error de ffmpeg, en vez de "interrumpido". Con esta opción, Node recibe Ctrl+C, aborta la cola y mata a sus hijos (D-031). `<stoptimeout>` es de 30 s.
+- **Ejecutable:** la ruta absoluta de `node.exe` (para todos los usuarios), con `STI_ENV_FILE` apuntando al `.env`.
+- **Inicio y fallas:** inicio automático retrasado (deja que la red esté lista) y reinicio a los 10 s, 30 s y 2 min, con el contador puesto a cero tras 1 h estable.
+
 ### D-051 — Cuenta del servicio: virtual `NT SERVICE\sti-catcher` · Fase 7 · A verificar en la instalación
 
 El servicio **no** corre como LocalSystem (es el default de WinSW).
@@ -423,9 +431,49 @@ Permisos (en `install-service.ps1`, **después** de crear el servicio, porque an
 
 Plan B si en la instalación real `CreateService` rechaza la cuenta virtual: instalar con LocalService y cambiarla con `sc.exe config sti-catcher obj= "NT SERVICE\sti-catcher"` (soportado por Windows). Se verifica y documenta en `docs/DEPLOY.md` en la Fase 7.
 
+**Implementación (Fase 7):**
+
+- **Plan B automático:** el plan B quedó automatizado en `install-service.ps1`. Después de instalar, el script verifica con `Win32_Service.StartName` que la cuenta sea la virtual; si no lo es, falla.
+- **Sin contraseña en `sc.exe`:** no se le pasa `password=`. PowerShell 5.1 descarta los argumentos vacíos, y una cuenta virtual no lleva contraseña.
+- **ACLs con SIDs de grupos integrados** (`*S-1-5-32-544`, `*S-1-5-18`): en un Windows en español el grupo se llama "Administradores" y los nombres en inglés no existen.
+- **Rutas dentro de un perfil:** el script rechaza la app o los datos dentro de `C:\Users\…`, porque la cuenta virtual no entra a perfiles ajenos.
+- **Pendiente:** la instalación real (requiere administrador) no se corrió en desarrollo. Se probó `-DryRun`, que valida configuración, descarga y XML.
+
 ### D-052 — CA de mkcert en las PCs cliente · Fase 7 · Vigente
 
 `docs/DEPLOY.md` va a cubrir cómo instalar la CA raíz de mkcert (`rootCA.pem`) en "Entidades de certificación raíz de confianza" de cada PC cliente (manual o por GPO), y avisar que Firefox usa su propio almacén de certificados. La clave de la CA (`rootCA-key.pem`) no sale del servidor.
+
+**Implementación (Fase 7):** `scripts/new-certificate.ps1`:
+
+- **mkcert:** descarga mkcert 1.4.4 con SHA-256 fijado.
+- **CA:** `mkcert -install` instala la CA en el almacén del usuario que corre el script. La CA vive en su perfil (`mkcert -CAROOT`), no en `DATA_DIR`, para que la cuenta del servicio no pueda leer su clave.
+- **Certificado del servidor:** emitido para el nombre del equipo, su FQDN, sus IPv4 (sin APIPA ni loopback), `localhost` y `127.0.0.1`. Se guarda en `DATA_DIR\certs` y se escribe en el `.env`.
+- **CA pública para las PCs cliente:** se copia a `DATA_DIR\certs\sti-catcher-ca.crt`.
+
+Si otra persona regenera el certificado desde su usuario, se crea **otra** CA y hay que redistribuirla. `DEPLOY.md` lo advierte.
+
+### D-054 — Retención automática · Fase 7 · Vigente
+
+`modules/retention/retention-service.ts` hace una pasada al arrancar y después cada hora (`RETENTION_DAYS=0` la desactiva):
+
+1. Jobs `done` con archivo que terminaron hace más de N días: se borra el archivo y el job pasa a `expired` (sigue en el historial). Se excluye el origen de una conversión en cola o en curso. Si no se puede borrar (por ejemplo, alguien lo está reproduciendo), se reintenta en la próxima pasada.
+2. Huérfanos de `files/`: archivos viejos que ningún job `done` usa, como un borrado que falló a mitad. Se decide por el registro en la base, no por la fecha del archivo: yt-dlp puede dejar la fecha de publicación del video.
+3. Crudos de grabación viejos en `recordings/`: los que nunca se procesaron, o cuyo procesamiento falló y se guardaban para reintentar. Una grabación en curso recibe un fragmento cada 2 s, así que nunca es vieja.
+
+### D-055 — HTTPS verificado en producción · Fase 7 · Vigente
+
+Con un certificado de una CA de prueba y `NODE_ENV=production`, por un cliente HTTP/2 de Node, funcionaron:
+
+- negociación `h2` y fallback HTTP/1.1;
+- la SPA;
+- SSE;
+- subida en streaming;
+- fragmentos de grabación y su procesamiento;
+- Range con 206.
+
+La capa de compatibilidad `http2` de Fastify cubre lo que usa la app.
+
+Puerto sugerido: **443**, para que la dirección no lleve puerto. En Windows no hay puertos privilegiados para un socket común, así que la cuenta virtual puede escuchar en 443.
 
 ### D-053 — Windows 10 sin soporte · Fase 7 · Vigente
 

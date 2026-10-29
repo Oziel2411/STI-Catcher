@@ -146,6 +146,17 @@ export function createJobsRepository(db: Db): JobsRepository {
   const deleteStmt = db.prepare<[string]>(
     "DELETE FROM jobs WHERE id = ? AND status NOT IN ('queued', 'running')",
   );
+  // Retención: no se borra el origen de una conversión que todavía lo va a leer.
+  const expirableStmt = db.prepare<[string], { id: string; file_path: string }>(`
+    SELECT j.id, j.file_path FROM jobs j
+     WHERE j.status = 'done' AND j.file_path IS NOT NULL AND j.finished_at < ?
+       AND NOT EXISTS (SELECT 1 FROM jobs c
+                        WHERE c.parent_job_id = j.id AND c.status IN ('queued', 'running'))
+     ORDER BY j.finished_at
+  `);
+  const liveFilePathsStmt = db.prepare<[], { file_path: string }>(
+    "SELECT file_path FROM jobs WHERE status = 'done' AND file_path IS NOT NULL",
+  );
 
   /** WHERE del historial; los valores van como parámetros (nunca concatenados). */
   const historyWhere = (filter: HistoryFilter) => {
@@ -274,6 +285,14 @@ export function createJobsRepository(db: Db): JobsRepository {
         )
         .all(...args, filter.limit, filter.offset);
       return { records: rows.map(toRecord), total };
+    },
+
+    listExpirable(beforeIso) {
+      return expirableStmt.all(beforeIso).map((row) => ({ id: row.id, filePath: row.file_path }));
+    },
+
+    listLiveFilePaths() {
+      return liveFilePathsStmt.all().map((row) => row.file_path);
     },
   };
 }

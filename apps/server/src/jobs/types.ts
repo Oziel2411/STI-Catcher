@@ -85,6 +85,13 @@ export type JobsRepository = {
   /** Borra un job terminado. false si no existe o todavía está activo. */
   delete(id: string): boolean;
   listHistory(filter: HistoryFilter): { records: JobRecord[]; total: number };
+  /**
+   * Jobs `done` con archivo que terminaron antes de `beforeIso` (retención).
+   * Excluye los que son origen de una conversión en cola o en curso.
+   */
+  listExpirable(beforeIso: string): { id: string; filePath: string }[];
+  /** Rutas relativas (`files/<id>.<ext>`) de los archivos de jobs `done`. */
+  listLiveFilePaths(): string[];
 };
 
 /** Resultado de un runner exitoso. */

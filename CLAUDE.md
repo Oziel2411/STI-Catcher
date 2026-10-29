@@ -7,16 +7,16 @@ Web app interna (inspirada en aTube Catcher) para **descargar video por URL**, *
 
 ## Estado
 
-| Fase | Contenido                                                                    | Estado    |
-| ---- | ---------------------------------------------------------------------------- | --------- |
-| 0    | Plan                                                                         | ✅        |
-| 1    | Esqueleto: monorepo, config, logs, `/api/health`, página Estado, `setup.ps1` | ✅        |
-| 2    | Jobs + DB + SSE                                                              | ✅        |
-| 3    | Descarga por URL                                                             | ✅        |
-| 4    | Historial                                                                    | ✅        |
-| 5    | Conversión                                                                   | ✅        |
-| 6    | Grabación de pantalla                                                        | ✅        |
-| 7    | Despliegue                                                                   | pendiente |
+| Fase | Contenido                                                                    | Estado                                  |
+| ---- | ---------------------------------------------------------------------------- | --------------------------------------- |
+| 0    | Plan                                                                         | ✅                                      |
+| 1    | Esqueleto: monorepo, config, logs, `/api/health`, página Estado, `setup.ps1` | ✅                                      |
+| 2    | Jobs + DB + SSE                                                              | ✅                                      |
+| 3    | Descarga por URL                                                             | ✅                                      |
+| 4    | Historial                                                                    | ✅                                      |
+| 5    | Conversión                                                                   | ✅                                      |
+| 6    | Grabación de pantalla                                                        | ✅                                      |
+| 7    | Despliegue                                                                   | ✅ (falta instalar en el servidor real) |
 
 Se trabaja de a una fase: tests + commit + resumen, y **esperar el OK** antes de la siguiente.
 
@@ -25,6 +25,9 @@ Se trabaja de a una fase: tests + commit + resumen, y **esperar el OK** antes de
 ```bash
 .\scripts\setup.ps1 -AllowUserNode   # primera vez en una PC de desarrollo (binarios, .env, carpetas)
 .\scripts\update-ytdlp.ps1           # actualizar yt-dlp (rutina; no hace falta detener nada)
+.\scripts\new-certificate.ps1        # certificado HTTPS con mkcert (servidor; ver docs/DEPLOY.md)
+.\scripts\install-service.ps1        # servicio + permisos + firewall (admin; -DryRun simula)
+.\scripts\uninstall-service.ps1      # quita servicio y regla de firewall (admin)
 npm install
 npm run dev          # server (tsx watch, :3000) + web (Vite, http://127.0.0.1:5173)
 npm run build        # web (apps/web/dist) + server (apps/server/dist)
@@ -44,7 +47,7 @@ npm run check        # typecheck + lint + format:check + test (correr antes de c
   - `http/` — helpers HTTP (errores, `parseInput`). `test/` — helpers de tests (`makeTestApp`) y fixtures.
 - `apps/web` — React + Vite. `features/<sección>/`, `components/`, `api/` (cliente HTTP + SSE tipado, con reconexión), `lib/` (formato y lógica pura).
 - `packages/shared` — esquemas Zod del contrato de API y presets de conversión (`presets/conversion.ts`, lista cerrada). Se consume como código TS, sin build.
-- `scripts/` — PowerShell: `setup.ps1`, `update-ytdlp.ps1` y `common.ps1` (funciones compartidas). `bin/`, `storage/`, `data/`, `logs/` están en `.gitignore`.
+- `scripts/` — PowerShell: `setup.ps1`, `update-ytdlp.ps1`, `new-certificate.ps1`, `install-service.ps1`, `uninstall-service.ps1` y `common.ps1` (funciones compartidas). Instalación en el servidor: `docs/DEPLOY.md`. `service/` (WinSW + XML generado) va en `.gitignore`. `bin/`, `storage/`, `data/`, `logs/` están en `.gitignore`.
 
 ## Convenciones
 
@@ -75,9 +78,10 @@ Detalle en `docs/DECISIONS.md`.
 - Historial: cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
 - Conversión: presets cerrados en shared → `buildConversionArgs` (pura); copia sin recodificar cuando el origen ya cumple; solo se ofrecen los presets que tienen sentido para el archivo (ffprobe); subida en streaming como `application/octet-stream`.
 - Grabación: MediaRecorder en el navegador → fragmentos de 2 s numerados (`?seq=N`, reintento idempotente) a una **sesión** (tabla `recordings`, crudo en `STORAGE_DIR\recordings`, fuera de `tmp`). Al detener (o tras `RECORDING_IDLE_MINUTES` sin fragmentos) se crea el job `recording`, que deja MP4 H.264 + AAC (copia si ya cumple). Sin contexto seguro la página explica que hace falta HTTPS.
+- Despliegue: WinSW 2.12 con XML generado por `install-service.ps1` (`stopparentprocessfirst`: Node corta los jobs antes que mueran sus hijos); ACLs con SIDs (Windows en español); certificado con mkcert, CA en el perfil del admin. Retención cada hora: archivos de jobs viejos → `expired`, huérfanos de `files/` y crudos de `recordings/`.
 - TypeScript fijado en 6.0.x (typescript-eslint no soporta 7).
 
-## API (hasta la Fase 6)
+## API
 
 | Método | Ruta                                                                | Respuesta                                                                                                           |
 | ------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |

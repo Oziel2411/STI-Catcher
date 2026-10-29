@@ -25,3 +25,6 @@ Desktop.ini
 
 # Claude Code: preferencias locales
 .claude/settings.local.json
+
+# Servicio de Windows: WinSW y su XML, generados por install-service.ps1
+/service/
