@@ -15,7 +15,7 @@ Web app interna (inspirada en aTube Catcher) para **descargar video por URL**, *
 | 3    | Descarga por URL                                                             | ✅        |
 | 4    | Historial                                                                    | ✅        |
 | 5    | Conversión                                                                   | ✅        |
-| 6    | Grabación de pantalla                                                        | pendiente |
+| 6    | Grabación de pantalla                                                        | ✅        |
 | 7    | Despliegue                                                                   | pendiente |
 
 Se trabaja de a una fase: tests + commit + resumen, y **esperar el OK** antes de la siguiente.
@@ -74,9 +74,10 @@ Detalle en `docs/DECISIONS.md`.
 - `vite.config.ts` lee el `.env` directo (no `loadEnv`): una herramienta que define `PORT` apuntaba el proxy a sí mismo.
 - Historial: cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
 - Conversión: presets cerrados en shared → `buildConversionArgs` (pura); copia sin recodificar cuando el origen ya cumple; solo se ofrecen los presets que tienen sentido para el archivo (ffprobe); subida en streaming como `application/octet-stream`.
+- Grabación: MediaRecorder en el navegador → fragmentos de 2 s numerados (`?seq=N`, reintento idempotente) a una **sesión** (tabla `recordings`, crudo en `STORAGE_DIR\recordings`, fuera de `tmp`). Al detener (o tras `RECORDING_IDLE_MINUTES` sin fragmentos) se crea el job `recording`, que deja MP4 H.264 + AAC (copia si ya cumple). Sin contexto seguro la página explica que hace falta HTTPS.
 - TypeScript fijado en 6.0.x (typescript-eslint no soporta 7).
 
-## API (hasta la Fase 5)
+## API (hasta la Fase 6)
 
 | Método | Ruta                                                                | Respuesta                                                                                                           |
 | ------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -97,3 +98,6 @@ Detalle en `docs/DECISIONS.md`.
 | POST   | `/api/uploads` (cuerpo binario, header `x-file-name`)               | 201 `{ jobId }` (job `upload` terminado) · 413 · 415 · 422 · 507                                                    |
 | GET    | `/api/conversion/sources/:id`                                       | `{ job, media, presets }` · 409 · 410                                                                               |
 | POST   | `/api/jobs/convert` `{ sourceJobId, preset, maxHeight?, gif? }`     | 202 `{ jobId }` · 422 preset sin sentido o GIF inválido                                                             |
+| POST   | `/api/recordings` `{ mimeType, fps, title }`                        | 201 `{ recordingId, maxChunkBytes }` · 507                                                                          |
+| POST   | `/api/recordings/:id/chunks?seq=N` (cuerpo binario)                 | `{ nextSeq }` · 403 · 409 fuera de orden o cerrada · 413 · 415 · 507                                                |
+| POST   | `/api/recordings/:id/finish`                                        | 202 `{ jobId }` (idempotente) · 409 vacía                                                                           |

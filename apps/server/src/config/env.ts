@@ -75,6 +75,9 @@ const rawEnvSchema = z
     GIF_MAX_SECONDS: intInRange(1, 300, 30),
     GIF_MAX_FPS: intInRange(1, 30, 15),
     GIF_MAX_WIDTH: intInRange(64, 1920, 800),
+
+    // Grabación: sin fragmentos nuevos durante este tiempo se da por terminada (D-032).
+    RECORDING_IDLE_MINUTES: intInRange(1, 60, 2),
   })
   .superRefine((env, ctx) => {
     const hasCert = env.HTTPS_CERT_PATH !== undefined;
@@ -127,6 +130,9 @@ export type Config = {
   download: {
     ytdlpExtractors: string;
     blockPrivateUrls: boolean;
+  };
+  recording: {
+    idleMinutes: number;
   };
   gif: {
     maxSeconds: number;
@@ -197,6 +203,9 @@ export function parseConfig(raw: Record<string, string | undefined>, baseDir: st
     download: {
       ytdlpExtractors: env.YTDLP_EXTRACTORS,
       blockPrivateUrls: env.BLOCK_PRIVATE_URLS,
+    },
+    recording: {
+      idleMinutes: env.RECORDING_IDLE_MINUTES,
     },
     gif: {
       maxSeconds: env.GIF_MAX_SECONDS,

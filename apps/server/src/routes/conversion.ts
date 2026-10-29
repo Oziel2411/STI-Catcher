@@ -36,12 +36,6 @@ export function registerConversionRoutes(
   app: FastifyInstance,
   options: ConversionRoutesOptions,
 ): void {
-  // El cuerpo binario no se parsea: se pasa como stream al handler, que lo
-  // escribe directo a disco (SPEC §7: nunca el archivo entero en memoria).
-  app.addContentTypeParser('application/octet-stream', (_request, payload, done) => {
-    done(null, payload);
-  });
-
   app.get('/api/conversion/options', () => options.options);
 
   app.get('/api/conversion/sources/:id', async (request) => {

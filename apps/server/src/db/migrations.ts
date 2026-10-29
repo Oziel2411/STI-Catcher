@@ -67,4 +67,31 @@ export const migrations: readonly Migration[] = [
       for (const row of rows) update.run(normalizeSearchText(row.title), row.id);
     },
   },
+  {
+    version: 3,
+    name: 'create-recordings',
+    sql: /* sql */ `
+      -- Sesiones de grabación de pantalla (Fase 6). Los fragmentos llegan
+      -- mientras se graba y se agregan a STORAGE_DIR/recordings/<id>.<ext>;
+      -- al terminar se crea un job 'recording' que normaliza a MP4.
+      CREATE TABLE recordings (
+        id             TEXT PRIMARY KEY,
+        status         TEXT NOT NULL CHECK (status IN ('recording', 'finalized', 'discarded')),
+        mime_type      TEXT NOT NULL,
+        extension      TEXT NOT NULL,
+        fps            INTEGER NOT NULL,
+        title          TEXT NOT NULL,
+        client_id      TEXT,
+        client_ip      TEXT,
+        -- Próximo número de fragmento esperado (los anteriores ya están en disco).
+        next_seq       INTEGER NOT NULL DEFAULT 0,
+        size_bytes     INTEGER NOT NULL DEFAULT 0,
+        created_at     TEXT NOT NULL,
+        last_chunk_at  TEXT,
+        job_id         TEXT REFERENCES jobs (id) ON DELETE SET NULL
+      );
+      -- Barrido de grabaciones abandonadas.
+      CREATE INDEX recordings_status ON recordings (status, last_chunk_at);
+    `,
+  },
 ];

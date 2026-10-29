@@ -187,6 +187,8 @@ Los runners escriben en `STORAGE_DIR\tmp` solo archivos que empiezan con el id d
 
 Si una grabación no recibe fragmentos durante `RECORDING_IDLE_MINUTES` (por defecto 2), el server la da por terminada y la procesa con lo recibido. Cubre el caso "se cerró la pestaña" de la SPEC §6. Endpoint de inicio: `POST /api/recordings` (crea la sesión y devuelve el id).
 
+**Implementación (Fase 6):** un barrido cada 30 s busca sesiones `recording` cuyo último fragmento (o su creación, si nunca llegó ninguno) es más viejo que el límite. Con datos: se encola el procesamiento igual que con "Detener". Vacía: se descarta y se borra el archivo. El barrido usa el mismo lock por sesión que los fragmentos, así que no compite con uno que está llegando. Al arrancar el server no hace falta nada especial: las sesiones viejas de antes del reinicio las toma el primer barrido.
+
 ---
 
 ## Descarga y seguridad
@@ -344,6 +346,46 @@ El origen puede ser un archivo subido o **cualquier** trabajo terminado del hist
 ### D-073 — La conversión queda vinculada al original · Fase 5 · Vigente
 
 El job de conversión tiene `parent_job_id` = el origen y el título "Original → MP4". El historial muestra "Convertido de «…»" (`parentTitle`, resuelto en el server). Si el origen se borra o expira mientras la conversión espera en la cola, el runner falla con "El archivo de origen ya no está disponible". Las conversiones fallidas o canceladas se pueden reintentar.
+
+## Grabación de pantalla
+
+### D-080 — Sesión de grabación fuera de la cola · Fase 6 · Vigente
+
+Mientras se graba no hay job: hay una **sesión** en la tabla `recordings` (estado `recording` → `finalized` o `discarded`). El job `recording` se crea recién al terminar, y es el que procesa el archivo. Así la grabación no ocupa un lugar de `MAX_CONCURRENT_JOBS` durante minutos sin hacer nada, y el historial solo muestra grabaciones que ya se pueden procesar.
+
+El archivo crudo se escribe en `STORAGE_DIR\recordings\<recordingId>.<webm|mp4>`, **no** en `tmp`: la recuperación al arrancar vacía `tmp` (D-031), y una grabación en curso tiene que sobrevivir a un reinicio del server. El runner borra el crudo solo si el procesamiento salió bien; si falla, queda para "Reintentar".
+
+### D-081 — Protocolo de fragmentos · Fase 6 · Vigente
+
+`POST /api/recordings/:id/chunks?seq=N` con el fragmento como `application/octet-stream` (sin multipart, igual que D-072). El server lleva `next_seq` en la base:
+
+- `seq == next_seq`: se agrega al archivo y se avanza, en un `UPDATE … WHERE next_seq = ?` atómico.
+- `seq < next_seq`: es un reintento de algo que ya llegó (la respuesta se perdió): se descarta el cuerpo y se responde OK con `nextSeq`. Reintentar nunca duplica video.
+- `seq > next_seq`: 409, falta uno anterior.
+- Si el cuerpo se corta a mitad, el archivo se trunca al tamaño anterior y se responde error: el cliente reintenta el mismo número.
+
+Un lock por sesión serializa fragmentos, "Detener" y el barrido de D-032. Tope por fragmento: 64 MB (a 8 Mbps un fragmento de 2 s pesa ~2 MB). Solo el navegador que creó la sesión (cookie de D-041) puede enviar fragmentos o terminarla.
+
+En la web, `ChunkUploader` envía de a uno y en orden; ante errores de red o 5xx reintenta el mismo número con espera creciente (1, 2, 4… hasta 15 s, 6 intentos). Ante 403/404/409/413/507 no reintenta, corta la grabación y pide procesar lo que llegó.
+
+### D-082 — Formato de grabación y procesamiento · Fase 6 · Vigente
+
+El navegador elige el primer formato que soporte: `video/mp4;codecs=avc1,mp4a.40.2` (Chrome/Edge actuales), `video/webm;codecs=vp9,opus`, `video/webm`. El resultado siempre es **MP4 H.264 + AAC** con `+faststart`:
+
+- Si ya viene en H.264 yuv420p y el audio es AAC o no hay audio: se copia sin recodificar (segundos).
+- Si no: se recodifica con `libx264 -preset veryfast -crf 23`, AAC 160 kbps, `-fps_mode cfr -r <fps>` (MediaRecorder graba con cuadros a intervalos variables y algunos reproductores lo saltean mal) y escala a dimensiones pares (`yuv420p` lo exige; una ventana puede medir 1281×721).
+
+**Medido:** el WebM de MediaRecorder no trae duración ni índice (ffprobe: `N/A`), y por eso no se puede adelantar. El progreso usa la duración estimada desde la sesión (creación → último fragmento). Verificado con una grabación simulada de 2:10 cortada desde "Dejar de compartir": MP4 de 129,9 s, `moov` antes de `mdat`, se adelanta a 1:40 en el reproductor, audio presente.
+
+### D-083 — Audio: una sola pista · Fase 6 · Vigente
+
+MediaRecorder graba una pista de audio. Si se pide sonido del sistema **y** micrófono, se mezclan con Web Audio (`AudioContext` → `MediaStreamDestination`). Si el usuario no tilda "Compartir audio" en el selector del navegador, se avisa en vez de grabar en silencio sin decir nada. Sin contexto seguro (`http://<IP>`) `getDisplayMedia` no existe: la página explica que hace falta HTTPS (Fase 7) en vez de mostrar un botón que falla.
+
+### D-084 — Parser de `application/octet-stream` en `app.ts` · Fase 6 · Vigente
+
+Lo usan la subida de la conversión y los fragmentos de grabación: se registra una vez en `app.ts` (deja el cuerpo como stream, sin leerlo) en vez de en cada archivo de rutas.
+
+---
 
 ## Despliegue
 

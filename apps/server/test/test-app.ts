@@ -11,6 +11,7 @@ import type { UrlGuard } from '../src/adapters/url-guard.ts';
 import { buildApp } from '../src/app.ts';
 import { openDatabase } from '../src/db/connection.ts';
 import { createJobsRepository } from '../src/db/jobs-repository.ts';
+import { createRecordingsRepository } from '../src/db/recordings-repository.ts';
 import { migrate } from '../src/db/migrate.ts';
 import { migrations } from '../src/db/migrations.ts';
 import { createJobEventBus } from '../src/jobs/event-bus.ts';
@@ -18,6 +19,7 @@ import { createJobQueue } from '../src/jobs/queue.ts';
 import type { JobContext, JobResult, JobRunner } from '../src/jobs/types.ts';
 import { createConversionService } from '../src/modules/conversion/conversion-service.ts';
 import { createUploadService } from '../src/modules/conversion/upload-service.ts';
+import { createRecordingService } from '../src/modules/recording/recording-service.ts';
 import { createDownloadService } from '../src/modules/download/download-service.ts';
 import { createJobFiles } from '../src/modules/files/job-files.ts';
 import { createHistoryService } from '../src/modules/history/history-service.ts';
@@ -90,7 +92,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
   const queue = createJobQueue({
     repo,
     bus,
-    runners: { selftest: runner, download: runner, conversion: runner },
+    runners: { selftest: runner, download: runner, conversion: runner, recording: runner },
     files: {
       removeByPrefix: () => Promise.resolve(0),
       moveFile: () => Promise.resolve(),
@@ -153,6 +155,21 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     gif: testGifLimits,
     maxUploadBytes: options.maxUploadBytes ?? 1024 ** 3,
   };
+  const recordingsDir = path.join(storageDir, 'recordings');
+  mkdirSync(recordingsDir, { recursive: true });
+  // Reloj controlable para probar el cierre por inactividad.
+  const clock = { now: new Date('2026-10-29T12:00:00.000Z') };
+  const recordingsRepo = createRecordingsRepository(db);
+  const recordings = createRecordingService({
+    repo: recordingsRepo,
+    recordingsDir,
+    minFreeDiskBytes: 1024,
+    readFreeDiskBytes: () => Promise.resolve(options.freeDiskBytes ?? 1024 ** 4),
+    queue,
+    idleMinutes: 2,
+    logger: { info: vi.fn(), warn: vi.fn() },
+    now: () => clock.now,
+  });
 
   const getHealth = vi.fn<HealthService['getHealth']>(() => Promise.resolve(sampleHealth));
   const app = await buildApp({
@@ -167,6 +184,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       conversion,
       upload,
       conversionOptions,
+      recordings,
     },
     filesDir,
     webDistDir: options.webDistDir ?? null,
@@ -185,6 +203,10 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     storageDir,
     filesDir,
     historyLogger,
+    recordings,
+    recordingsRepo,
+    recordingsDir,
+    clock,
   };
 }
 

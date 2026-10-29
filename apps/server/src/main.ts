@@ -21,6 +21,7 @@ import { createJobEventBus } from './jobs/event-bus.ts';
 import { createJobQueue } from './jobs/queue.ts';
 import { recoverOnStartup } from './jobs/recovery.ts';
 import { createLogger } from './logger.ts';
+import { createRecordingsRepository } from './db/recordings-repository.ts';
 import { createConversionRunner } from './modules/conversion/conversion-runner.ts';
 import { createConversionService } from './modules/conversion/conversion-service.ts';
 import { createUploadService } from './modules/conversion/upload-service.ts';
@@ -29,6 +30,8 @@ import { createDownloadService } from './modules/download/download-service.ts';
 import { createJobFiles } from './modules/files/job-files.ts';
 import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
+import { createRecordingRunner } from './modules/recording/recording-runner.ts';
+import { createRecordingService } from './modules/recording/recording-service.ts';
 import { createSelftestRunner } from './modules/selftest/selftest-runner.ts';
 import packageJson from '../package.json' with { type: 'json' };
 
@@ -41,6 +44,9 @@ async function main(): Promise<void> {
   const storage = {
     tempDir: path.join(config.paths.storage, 'tmp'),
     filesDir: path.join(config.paths.storage, 'files'),
+    // Crudos de grabaciones en curso. No van en tmp: tmp se vacía al arrancar, y
+    // una grabación tiene que sobrevivir a un reinicio (se procesa lo que llegó).
+    recordingsDir: path.join(config.paths.storage, 'recordings'),
   };
   // Cachés de yt-dlp y Deno dentro de DATA_DIR: la cuenta del servicio no tiene perfil normal (D-012).
   const caches = {
@@ -137,6 +143,12 @@ async function main(): Promise<void> {
         ffprobe,
         runFfmpeg,
       }),
+      recording: createRecordingRunner({
+        recordingsDir: storage.recordingsDir,
+        ffprobe,
+        runFfmpeg,
+        removeFile: fileOps.removeFile,
+      }),
     },
     files: fileOps,
     paths: storage,
@@ -205,6 +217,15 @@ async function main(): Promise<void> {
     queue,
   });
   const conversionOptions = { gif: gifLimits, maxUploadBytes: config.limits.maxUploadBytes };
+  const recordings = createRecordingService({
+    repo: createRecordingsRepository(db),
+    recordingsDir: storage.recordingsDir,
+    minFreeDiskBytes: config.limits.minFreeDiskBytes,
+    readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,
+    queue,
+    idleMinutes: config.recording.idleMinutes,
+    logger,
+  });
 
   const app = await buildApp({
     logger,
@@ -218,6 +239,7 @@ async function main(): Promise<void> {
       conversion,
       upload,
       conversionOptions,
+      recordings,
     },
     filesDir: storage.filesDir,
     webDistDir: config.nodeEnv === 'production' ? path.join(repoRoot, 'apps', 'web', 'dist') : null,
@@ -236,6 +258,7 @@ async function main(): Promise<void> {
     if (closing) return;
     closing = true;
     logger.info({ signal }, 'Deteniendo el servidor');
+    recordings.stop();
     queue
       .stop()
       .then(() => app.close())
@@ -255,6 +278,8 @@ async function main(): Promise<void> {
 
   await app.listen({ host: config.server.host, port: config.server.port });
   queue.start();
+  // Cierra grabaciones abandonadas, incluidas las que quedaron abiertas antes de un reinicio.
+  recordings.start();
   const protocol = config.server.https ? 'https' : 'http';
   logger.info(`Escuchando en ${protocol}://${config.server.host}:${String(config.server.port)}`);
 }

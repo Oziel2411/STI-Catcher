@@ -9,7 +9,7 @@ import type { JobRecord, JobsRepository } from '../../jobs/types.ts';
 export const HISTORY_TYPES: readonly JobType[] = ['download', 'upload', 'conversion', 'recording'];
 
 /** Tipos que se pueden reintentar con los mismos parámetros. */
-const RETRYABLE_TYPES: readonly JobType[] = ['download', 'conversion'];
+const RETRYABLE_TYPES: readonly JobType[] = ['download', 'conversion', 'recording'];
 
 /** Error con mensaje para el usuario; las rutas lo traducen al código HTTP. */
 export class HistoryError extends Error {

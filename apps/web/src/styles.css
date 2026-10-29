@@ -390,7 +390,8 @@ a.button {
   flex: 1 1 320px;
 }
 
-.field input[type='url'] {
+.field input[type='url'],
+.field input[type='text'] {
   width: 100%;
   padding: 8px 10px;
   font: inherit;
@@ -655,4 +656,33 @@ a.button {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+/* Grabación */
+.recording-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.recording-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--error);
+  border-radius: 50%;
+  animation: recording-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recording-dot {
+    animation: none;
+  }
 }

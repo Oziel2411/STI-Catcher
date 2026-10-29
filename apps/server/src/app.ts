@@ -11,6 +11,7 @@ import type { JobEventBus } from './jobs/event-bus.ts';
 import type { JobQueue } from './jobs/queue.ts';
 import type { ConversionService } from './modules/conversion/conversion-service.ts';
 import type { UploadService } from './modules/conversion/upload-service.ts';
+import type { RecordingService } from './modules/recording/recording-service.ts';
 import type { DownloadService } from './modules/download/download-service.ts';
 import type { HistoryService } from './modules/history/history-service.ts';
 import type { JobFiles } from './modules/files/job-files.ts';
@@ -21,6 +22,7 @@ import { registerFileRoutes } from './routes/files.ts';
 import { registerHistoryRoutes } from './routes/history.ts';
 import { registerHealthRoutes } from './routes/health.ts';
 import { registerJobRoutes } from './routes/jobs.ts';
+import { registerRecordingRoutes } from './routes/recordings.ts';
 import { registerMediaRoutes } from './routes/media.ts';
 
 export type AppServices = {
@@ -33,6 +35,7 @@ export type AppServices = {
   conversion: ConversionService;
   upload: UploadService;
   conversionOptions: ConversionOptionsResponse;
+  recordings: RecordingService;
 };
 
 export type BuildAppOptions = {
@@ -110,7 +113,14 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   registerJobRoutes(app, options.services.jobs);
   registerMediaRoutes(app, options.services.download);
   registerFileRoutes(app, options.services.jobFiles);
+  // Cuerpos binarios (subidas y fragmentos de grabación): no se parsean, se pasan
+  // como stream al handler, que los escribe directo a disco (nunca enteros en memoria).
+  app.addContentTypeParser('application/octet-stream', (_request, payload, done) => {
+    done(null, payload);
+  });
+
   registerHistoryRoutes(app, options.services.history);
+  registerRecordingRoutes(app, options.services.recordings);
   registerConversionRoutes(app, {
     conversion: options.services.conversion,
     upload: options.services.upload,
