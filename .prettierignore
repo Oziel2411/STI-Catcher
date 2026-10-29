@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+bin/
+storage/
+data/
+logs/
+package-lock.json
+SPEC.md
+*.ps1

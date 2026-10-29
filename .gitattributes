@@ -1,0 +1,10 @@
+# Todo el código en LF; los scripts de PowerShell en CRLF (convención de Windows).
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.xml text eol=crlf
+
+# Binarios
+*.exe binary
+*.zip binary
+*.png binary
+*.ico binary

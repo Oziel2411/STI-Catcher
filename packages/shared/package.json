@@ -1,0 +1,16 @@
+{
+  "name": "@sti-catcher/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contrato de API (esquemas Zod) y presets compartidos entre server y web.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

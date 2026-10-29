@@ -1,0 +1,27 @@
+# Dependencias y builds
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Configuración local (contiene rutas y certificados de cada equipo)
+.env
+
+# Binarios externos (los descarga scripts/setup.ps1)
+bin/
+
+# Datos generados en runtime
+storage/
+data/
+logs/
+*.log
+
+# Editor / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+Desktop.ini
+
+# Claude Code: preferencias locales
+.claude/settings.local.json

@@ -1,0 +1,40 @@
+{
+  "name": "sti-catcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web app interna para descargar, grabar y convertir video.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names server,web --prefix-colors blue,magenta \"npm run dev -w @sti-catcher/server\" \"npm run dev -w @sti-catcher/web\"",
+    "build": "npm run build -w @sti-catcher/web && npm run build -w @sti-catcher/server",
+    "start": "node apps/server/dist/main.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  }
+}
