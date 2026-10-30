@@ -18,7 +18,16 @@ const forbiddenChildProcess = ['node:child_process', 'child_process'].map((name)
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/coverage/**', 'bin/**', 'storage/**', 'data/**', 'logs/**'],
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      'bin/**',
+      'storage/**',
+      'data/**',
+      'logs/**',
+      // Mockups de diseño: referencia, no código de la app.
+      'docs/design/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="nocturne-reference.css">
+
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+body{margin:0;background:#101119}
+a{color:var(--color-accent)}a:hover{color:var(--color-accent-300)}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(255,255,255,.06);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#e9e9ed;color:#161826;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 Inter,system-ui,sans-serif;color:#e9e9ed}
+.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;margin-bottom:36px}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(255,255,255,.1);color:#e9e9ed;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.3 Inter,system-ui,sans-serif;color:rgba(233,233,237,.6)}
+.dv-card{max-width:100%;border:1px solid rgba(255,255,255,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.3);overflow:hidden}
+.dv-opt:target .dv-oid{background:#9184d9;color:#161826}
+.dv-next{margin:6px 0 0;font:12px/1.5 Inter,system-ui,sans-serif;color:rgba(233,233,237,.5)}
+.dv-sub{font:500 12px Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(233,233,237,.5);margin:0 0 14px}
+@keyframes ind{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+@keyframes pulse{50%{opacity:.3}}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t2" style="background:#101119">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Nocturne · varios links, varios archivos y elección de pantalla</span></div>
+<div style="max-width:880px;margin:0 0 28px;font:13px/1.6 Inter,system-ui,sans-serif;color:rgba(233,233,237,.7);display:flex;flex-direction:column;gap:6px">
+<p style="margin:0"><strong style="color:#e9e9ed;font-weight:500">Supuestos.</strong> Cada link o archivo es su propio trabajo en la cola, con su formato de salida. En Descargar, elegir WebM/MOV/MKV/WAV/GIF encadena la descarga con una conversión (el server ya sabe hacer ambas). La variante A de cada par es densa (tabla, barra superior); la B es más cómoda (tarjetas o maestro‑detalle, barra lateral).</p>
+<p style="margin:0"><strong style="color:#e9e9ed;font-weight:500">Pantalla o ventana.</strong> El navegador no deja que una página liste las ventanas abiertas: la lista real siempre la muestra el diálogo del navegador. Lo que sí se puede es elegir antes el tipo (pantalla, ventana o pestaña) para que ese diálogo abra en esa solapa, y mostrar una vista previa de lo elegido antes de empezar a grabar, con «Cambiar».</p>
+</div>
+
+<p class="dv-sub">Descargar varios links</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Denso · tabla con formato por fila</div>
+<div class="dv-card" style="width:1120px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
+<header style="display:flex;align-items:center;gap:22px;padding:10px 22px;box-shadow:inset 0 -1px 0 var(--color-divider)">
+<span style="display:flex;align-items:center;gap:9px;font-size:16px;font-weight:500"><img src="assets/logo-128.png" alt="" width="30" height="30" style="border-radius:6px">STI-Catcher</span>
+<nav style="display:flex;gap:4px;font-size:13.5px">
+<span style="padding:6px 11px;border-radius:var(--radius-md);color:var(--color-accent);background:var(--color-accent-900)">Descargar</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Grabar pantalla</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Convertir</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Historial</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Estado</span>
+</nav>
+<span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)"><i class="ph ph-queue"></i>3 en curso · 1 en cola</span>
+</header>
+<main style="padding:22px 22px 28px;display:flex;flex-direction:column;gap:16px">
+<div><h1 style="font-size:24px;margin:0 0 4px">Descargar videos</h1><p style="margin:0;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">YouTube, Instagram, X y otros sitios. Pegá uno o varios links, uno por línea.</p></div>
+<div class="card elev-sm" style="flex-direction:row;align-items:flex-end;gap:12px;padding:12px">
+<div class="field" style="flex:1"><label>Links</label><textarea class="input" style="min-height:62px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6">https://www.youtube.com/watch?v=Qd8pX1ruwJk
+https://www.instagram.com/reel/C9mT2-kRw0a/</textarea></div>
+<button class="btn btn-primary" style="height:36px"><i class="ph ph-magnifying-glass"></i>Analizar 2 links</button>
+</div>
+<div style="display:flex;align-items:center;gap:12px;font-size:13px">
+<span style="color:color-mix(in srgb,var(--color-text) 55%,transparent)">7 links</span>
+<span style="width:1px;height:16px;background:var(--color-divider)"></span>
+<span style="color:color-mix(in srgb,var(--color-text) 70%,transparent)">Formato para los seleccionados</span>
+<select class="input" style="width:auto;min-height:30px;padding:4px 8px;font-size:13px"><option>MP4 · 1080p · Compatibilidad máxima</option></select>
+<button class="btn btn-secondary" style="padding:5px 10px;font-size:13px">Aplicar a 2</button>
+<button class="btn btn-primary" style="margin-left:auto"><i class="ph ph-download-simple"></i>Descargar 2 listos</button>
+</div>
+<table class="table" style="font-size:13px">
+<thead><tr><th style="width:28px"><input type="checkbox" style="accent-color:var(--color-accent)"></th><th>Video</th><th style="width:170px">Formato</th><th style="width:150px">Calidad</th><th style="width:250px">Estado</th><th style="width:70px"></th></tr></thead>
+<tbody>
+<tr><td><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)"></td>
+<td><div style="display:flex;gap:10px;align-items:center"><div style="width:64px;height:36px;flex:none;border-radius:4px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700)"><i class="ph ph-film-strip"></i></div><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">Maniobras de amarre en puerto — clase 4</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">YouTube · Escuela Náutica · 24:10</div></div></div></td>
+<td><select class="input" style="min-height:30px;padding:4px 8px;font-size:13px"><option>Video · MP4</option></select></td>
+<td><select class="input" style="min-height:30px;padding:4px 8px;font-size:13px"><option>1080p</option></select></td>
+<td><span class="tag tag-neutral">Listo para descargar</span></td>
+<td style="text-align:right"><button class="btn btn-ghost btn-icon" style="width:28px;height:28px;color:color-mix(in srgb,var(--color-text) 55%,transparent)" aria-label="Quitar"><i class="ph ph-x"></i></button></td></tr>
+
+<tr><td><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)"></td>
+<td><div style="display:flex;gap:10px;align-items:center"><div style="width:64px;height:36px;flex:none;border-radius:4px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700)"><i class="ph ph-film-strip"></i></div><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">Entrevista radio — Día de la Marina Mercante</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">YouTube · 41:02 · tiene video y audio</div></div></div></td>
+<td><select class="input" style="min-height:30px;padding:4px 8px;font-size:13px"><option>Solo audio · MP3</option></select></td>
+<td style="font-size:12px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">—</td>
+<td><span class="tag tag-neutral">Listo para descargar</span></td>
+<td style="text-align:right"><button class="btn btn-ghost btn-icon" style="width:28px;height:28px;color:color-mix(in srgb,var(--color-text) 55%,transparent)" aria-label="Quitar"><i class="ph ph-x"></i></button></td></tr>
+
+<tr><td><input type="checkbox" disabled style="accent-color:var(--color-accent)"></td>
+<td><div style="display:flex;gap:10px;align-items:center"><div style="width:64px;height:36px;flex:none;border-radius:4px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700)"><i class="ph ph-film-strip"></i></div><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">Simulacro de abandono de buque 2026</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">YouTube · 08:47</div></div></div></td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">Video · MP4</td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">1080p · H.264</td>
+<td><div style="display:flex;flex-direction:column;gap:5px"><div style="height:4px;border-radius:99px;background:var(--color-neutral-800);overflow:hidden"><div style="width:64%;height:100%;background:var(--color-accent)"></div></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 65%,transparent)">Descargando · 64 % · 4,2 MB/s · faltan 38 s</span></div></td>
+<td style="text-align:right"><button class="btn btn-ghost" style="font-size:12px;color:oklch(0.74 0.13 25)">Cancelar</button></td></tr>
+
+<tr><td><input type="checkbox" disabled style="accent-color:var(--color-accent)"></td>
+<td><div style="display:flex;gap:10px;align-items:center"><div style="width:64px;height:36px;flex:none;border-radius:4px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700)"><i class="ph ph-film-strip"></i></div><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">Reel — egresados promoción 2026</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Instagram · 00:58</div></div></div></td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">Animación · GIF</td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">480 px · 12 cuadros/s</td>
+<td><div style="display:flex;flex-direction:column;gap:5px"><div style="height:4px;border-radius:99px;background:var(--color-neutral-800);overflow:hidden"><div style="width:30%;height:100%;background:var(--color-accent);animation:ind 1.2s ease-in-out infinite"></div></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 65%,transparent)">Descargado · Convirtiendo a GIF</span></div></td>
+<td style="text-align:right"><button class="btn btn-ghost" style="font-size:12px;color:oklch(0.74 0.13 25)">Cancelar</button></td></tr>
+
+<tr><td><input type="checkbox" disabled style="accent-color:var(--color-accent)"></td>
+<td><div style="display:flex;gap:10px;align-items:center"><div style="width:64px;height:36px;flex:none;border-radius:4px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700)"><i class="ph ph-film-strip"></i></div><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">Charla: convenio STCW y certificaciones</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">YouTube · 1:12:30</div></div></div></td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">Video · MP4</td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">720p · H.264</td>
+<td><span class="tag tag-neutral">En cola</span></td>
+<td style="text-align:right"><button class="btn btn-ghost" style="font-size:12px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Quitar</button></td></tr>
+
+<tr><td><input type="checkbox" disabled style="accent-color:var(--color-accent)"></td>
+<td><div style="display:flex;gap:10px;align-items:center"><div style="width:64px;height:36px;flex:none;border-radius:4px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700)"><i class="ph ph-film-strip"></i></div><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">Inducción a seguridad a bordo — parte 1</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">YouTube · 12:41</div></div></div></td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">Video · MP4</td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">1080p · H.264 + AAC</td>
+<td><span style="display:flex;align-items:center;gap:8px"><span class="tag" style="background:oklch(0.32 0.05 155);color:oklch(0.9 0.06 155)">Terminado</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">312 MB</span></span></td>
+<td style="text-align:right"><button class="btn btn-primary btn-icon" style="width:30px;height:30px" aria-label="Descargar archivo"><i class="ph ph-download-simple"></i></button></td></tr>
+
+<tr><td><input type="checkbox" style="accent-color:var(--color-accent)"></td>
+<td><div style="display:flex;gap:10px;align-items:center"><div style="width:64px;height:36px;flex:none;border-radius:4px;background:color-mix(in srgb,oklch(0.74 0.13 25) 12%,transparent);display:grid;place-items:center;color:oklch(0.74 0.13 25)"><i class="ph ph-warning"></i></div><div style="min-width:0"><div style="font-family:ui-monospace,Menlo,monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px">x.com/ccuomm/status/1849…</div><div style="font-size:11.5px;color:oklch(0.74 0.13 25)">El video es privado o fue eliminado.</div></div></div></td>
+<td colspan="2" style="font-size:12px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">—</td>
+<td><span class="tag" style="background:oklch(0.3 0.06 25);color:oklch(0.9 0.05 25)">Falló</span></td>
+<td style="text-align:right"><button class="btn btn-ghost" style="font-size:12px">Reintentar</button></td></tr>
+</tbody></table>
+</main>
+</div></div>
+
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Cómodo · tarjetas, barra lateral</div>
+<div class="dv-card" style="width:1120px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);display:flex">
+<aside style="width:196px;flex:none;padding:16px 12px;display:flex;flex-direction:column;gap:3px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));box-shadow:inset -1px 0 0 var(--color-divider)">
+<span style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:500;padding:0 6px 16px"><img src="assets/logo-128.png" alt="" width="28" height="28" style="border-radius:6px">STI-Catcher</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--radius-md);font-size:13.5px;color:var(--color-accent-200);background:var(--color-accent-900)"><i class="ph ph-download-simple" style="font-size:16px;color:var(--color-accent)"></i>Descargar<span style="margin-left:auto;font-size:11px;color:var(--color-accent)">3</span></span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-record" style="font-size:16px"></i>Grabar pantalla</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-arrows-left-right" style="font-size:16px"></i>Convertir</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-clock-counter-clockwise" style="font-size:16px"></i>Historial</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-pulse" style="font-size:16px"></i>Estado</span>
+<span style="margin-top:auto;padding:16px 6px 0;font-size:11px;line-height:1.45;color:color-mix(in srgb,var(--color-text) 45%,transparent)">Usar solo con contenido propio o con autorización.</span>
+</aside>
+<main style="flex:1;min-width:0;padding:24px 26px 28px;display:flex;flex-direction:column;gap:16px">
+<div><h1 style="font-size:24px;margin:0 0 4px">Descargar videos</h1><p style="margin:0;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Pegá links de a uno o varios juntos. Cada uno se baja con su propio formato.</p></div>
+<div style="display:flex;gap:10px"><input class="input" style="flex:1;min-height:40px" placeholder="https://www.youtube.com/watch?v=…" value="https://www.youtube.com/watch?v=Qd8pX1ruwJk"><button class="btn btn-primary" style="height:40px"><i class="ph ph-plus"></i>Agregar</button></div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+
+<div class="card elev-sm" style="padding:12px;gap:10px">
+<div style="display:flex;gap:12px"><div style="width:132px;aspect-ratio:16/9;flex:none;border-radius:6px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700);font-size:20px"><i class="ph ph-film-strip"></i></div>
+<div style="min-width:0;flex:1"><div class="card-title" style="font-size:15px">Maniobras de amarre en puerto — clase 4</div><div class="card-meta" style="margin-top:4px">YouTube · Escuela Náutica · 24:10</div></div>
+<button class="btn btn-ghost btn-icon" style="width:28px;height:28px;color:color-mix(in srgb,var(--color-text) 55%,transparent)" aria-label="Quitar"><i class="ph ph-x"></i></button></div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+<div class="seg"><label class="seg-opt"><input type="radio" name="f1" defaultChecked="{{ true }}">MP4</label><label class="seg-opt"><input type="radio" name="f1">MP3</label><label class="seg-opt"><input type="radio" name="f1">M4A</label><label class="seg-opt"><input type="radio" name="f1">Otro…</label></div>
+<select class="input" style="width:auto;min-height:32px;padding:4px 8px;font-size:13px"><option>1080p</option></select>
+<select class="input" style="width:auto;min-height:32px;padding:4px 8px;font-size:13px"><option>Compatibilidad máxima</option></select>
+</div>
+<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">H.264 + AAC · abre en cualquier lado</span><button class="btn btn-primary" style="margin-left:auto;padding:5px 12px;font-size:13px">Descargar</button></div>
+</div>
+
+<div class="card elev-sm" style="padding:12px;gap:10px">
+<div style="display:flex;gap:12px"><div style="width:132px;aspect-ratio:16/9;flex:none;border-radius:6px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700);font-size:20px"><i class="ph ph-film-strip"></i></div>
+<div style="min-width:0;flex:1"><div class="card-title" style="font-size:15px">Simulacro de abandono de buque 2026</div><div class="card-meta" style="margin-top:4px">YouTube · 08:47 · MP4 · 1080p</div></div></div>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:auto"><div style="height:5px;border-radius:99px;background:var(--color-neutral-800);overflow:hidden"><div style="width:64%;height:100%;background:var(--color-accent);box-shadow:0 0 12px var(--color-accent)"></div></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 65%,transparent)">Descargando · 64 % · 4,2 MB/s · faltan 38 s</span><button class="btn btn-secondary" style="margin-left:auto;padding:5px 12px;font-size:13px">Cancelar</button></div></div>
+</div>
+
+<div class="card elev-sm" style="padding:12px;gap:10px">
+<div style="display:flex;gap:12px"><div style="width:132px;aspect-ratio:16/9;flex:none;border-radius:6px;background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-700);font-size:20px"><i class="ph ph-film-strip"></i></div>
+<div style="min-width:0;flex:1"><div class="card-title" style="font-size:15px">Inducción a seguridad a bordo — parte 1</div><div class="card-meta" style="margin-top:4px">YouTube · 12:41</div></div></div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:auto"><span class="tag" style="background:oklch(0.32 0.05 155);color:oklch(0.9 0.06 155)"><i class="ph ph-check" style="margin-right:4px"></i>Terminado</span><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">1080p · H.264 + AAC · 312 MB</span><button class="btn btn-primary" style="margin-left:auto;padding:5px 12px;font-size:13px"><i class="ph ph-download-simple"></i>Descargar archivo</button></div>
+</div>
+
+<div class="card" style="padding:12px;gap:10px;box-shadow:0 0 0 1px color-mix(in srgb,oklch(0.74 0.13 25) 45%,transparent)">
+<div style="display:flex;gap:12px"><div style="width:132px;aspect-ratio:16/9;flex:none;border-radius:6px;background:color-mix(in srgb,oklch(0.74 0.13 25) 10%,transparent);display:grid;place-items:center;color:oklch(0.74 0.13 25);font-size:20px"><i class="ph ph-warning"></i></div>
+<div style="min-width:0;flex:1"><div style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;overflow-wrap:anywhere">x.com/ccuomm/status/1849…</div><div style="margin-top:6px;font-size:13px;color:oklch(0.8 0.1 25)">No se pudo analizar: el video es privado o fue eliminado.</div></div></div>
+<div style="display:flex;gap:8px;margin-top:auto;justify-content:flex-end"><button class="btn btn-secondary" style="padding:5px 12px;font-size:13px">Quitar</button><button class="btn btn-primary" style="padding:5px 12px;font-size:13px">Reintentar</button></div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px;padding-top:4px"><span style="font-size:13px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">4 links · 1 listo · 1 en curso · 1 terminado · 1 con error</span><button class="btn btn-primary" style="margin-left:auto"><i class="ph ph-download-simple"></i>Descargar todos los listos</button></div>
+</main>
+</div></div>
+
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Estados vacío y error de análisis (para <a class="dv-oid" href="#2a">2a</a> y <a class="dv-oid" href="#2b">2b</a>)</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<div class="dv-card" style="width:440px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:22px;display:flex;flex-direction:column;gap:12px">
+<div class="card-kicker">Vacío</div>
+<textarea class="input" style="min-height:96px;font-size:13px" placeholder="Pegá uno o varios links, uno por línea"></textarea>
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">YouTube, Instagram, X y otros sitios.</span><button class="btn btn-primary" disabled style="margin-left:auto">Analizar</button></div>
+<div style="padding:26px 0 6px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><i class="ph ph-tray" style="font-size:26px;color:var(--color-neutral-600)"></i><span style="font-size:14px">Todavía no agregaste links.</span><span style="font-size:12.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Los que pegues aparecen acá para elegir el formato de cada uno.</span></div>
+</div>
+<div class="dv-card" style="width:440px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:22px;display:flex;flex-direction:column;gap:10px">
+<div class="card-kicker">Links que no sirven</div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);background:color-mix(in srgb,oklch(0.74 0.13 25) 12%,transparent);color:oklch(0.86 0.07 25);font-size:13px;line-height:1.5">2 de los 5 renglones no son links válidos y no se agregaron:<div style="font-family:ui-monospace,Menlo,monospace;font-size:12px;margin-top:4px;color:oklch(0.8 0.1 25)">renglón 3 · «youtube video clase»<br>renglón 5 · «www.»</div></div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);background:color-mix(in srgb,oklch(0.82 0.11 85) 10%,transparent);color:oklch(0.88 0.07 85);font-size:13px;line-height:1.5">«Transmisión: acto de colación» es en vivo: no se puede descargar mientras está en curso.</div>
+</div>
+</div></div>
+</div>
+
+<p class="dv-sub">Convertir varios archivos</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2d"><div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Denso · tabla, opciones de GIF en la misma fila</div>
+<div class="dv-card" style="width:1120px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
+<header style="display:flex;align-items:center;gap:22px;padding:10px 22px;box-shadow:inset 0 -1px 0 var(--color-divider)">
+<span style="display:flex;align-items:center;gap:9px;font-size:16px;font-weight:500"><img src="assets/logo-128.png" alt="" width="30" height="30" style="border-radius:6px">STI-Catcher</span>
+<nav style="display:flex;gap:4px;font-size:13.5px">
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Descargar</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Grabar pantalla</span>
+<span style="padding:6px 11px;border-radius:var(--radius-md);color:var(--color-accent);background:var(--color-accent-900)">Convertir</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Historial</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Estado</span>
+</nav></header>
+<main style="padding:22px 22px 28px;display:flex;flex-direction:column;gap:16px">
+<div><h1 style="font-size:24px;margin:0 0 4px">Convertir archivos</h1><p style="margin:0;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Video y audio entre MP4, WebM, MKV, MOV, AVI, GIF, MP3, M4A y WAV.</p></div>
+<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px dashed var(--color-divider);border-radius:var(--radius-md)">
+<i class="ph ph-upload-simple" style="font-size:20px;color:var(--color-neutral-500)"></i><span style="font-size:13.5px">Arrastrá uno o varios archivos acá</span>
+<button class="btn btn-secondary" style="padding:5px 12px;font-size:13px">Elegir archivos</button><button class="btn btn-ghost" style="font-size:13px">Sumar del historial</button>
+<span style="margin-left:auto;font-size:12px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">Máximo 4 GB por archivo.</span></div>
+<div style="display:flex;align-items:center;gap:12px;font-size:13px">
+<span style="color:color-mix(in srgb,var(--color-text) 55%,transparent)">5 archivos</span><span style="width:1px;height:16px;background:var(--color-divider)"></span>
+<span style="color:color-mix(in srgb,var(--color-text) 70%,transparent)">Convertir los seleccionados a</span>
+<select class="input" style="width:auto;min-height:30px;padding:4px 8px;font-size:13px"><option>MP4 (H.264 + AAC)</option></select><button class="btn btn-secondary" style="padding:5px 10px;font-size:13px">Aplicar a 2</button>
+<button class="btn btn-primary" style="margin-left:auto"><i class="ph ph-arrows-left-right"></i>Convertir 2 listos</button></div>
+<table class="table" style="font-size:13px">
+<thead><tr><th style="width:28px"><input type="checkbox" style="accent-color:var(--color-accent)"></th><th>Archivo</th><th style="width:200px">Convertir a</th><th style="width:170px">Resolución</th><th style="width:230px">Estado</th><th style="width:60px"></th></tr></thead>
+<tbody>
+<tr><td><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)"></td>
+<td><div>reunion-armadores-oct.mkv</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Archivo subido · 52:18 · 1920x1080 · H.265 + AAC · 1,4 GB</div></td>
+<td><select class="input" style="min-height:30px;padding:4px 8px;font-size:13px"><option>MP4 (H.264 + AAC)</option></select></td>
+<td><select class="input" style="min-height:30px;padding:4px 8px;font-size:13px"><option>Reducir a 720p</option></select></td>
+<td><span class="tag tag-neutral">Listo</span></td>
+<td style="text-align:right"><button class="btn btn-ghost btn-icon" style="width:28px;height:28px;color:color-mix(in srgb,var(--color-text) 55%,transparent)" aria-label="Quitar"><i class="ph ph-x"></i></button></td></tr>
+
+<tr style="background:var(--color-surface)"><td style="vertical-align:top;padding-top:12px"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)"></td>
+<td style="vertical-align:top"><div>Grabación 30-10-2026 10.14</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Grabación · 03:12 · 1920x1080 · H.264 + Opus</div></td>
+<td colspan="3" style="vertical-align:top"><div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><select class="input" style="width:184px;min-height:30px;padding:4px 8px;font-size:13px;border-color:var(--color-accent)"><option>GIF animado</option></select><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Un fragmento corto, sin sonido.</span></div>
+<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+<div class="field"><label>Inicio (s)</label><input class="input" style="width:82px;min-height:30px;padding:4px 8px;font-size:13px" value="12"></div>
+<div class="field"><label>Fin (s)</label><input class="input" style="width:82px;min-height:30px;padding:4px 8px;font-size:13px" value="20,5"></div>
+<div class="field"><label>Cuadros por segundo</label><select class="input" style="width:110px;min-height:30px;padding:4px 8px;font-size:13px"><option>12</option></select></div>
+<div class="field"><label>Ancho</label><select class="input" style="width:110px;min-height:30px;padding:4px 8px;font-size:13px"><option>480 px</option></select></div>
+<span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent);padding-bottom:6px">Duración del GIF: 8,5 s (máximo 15 s). Sin sonido.</span></div></div></td>
+<td style="text-align:right;vertical-align:top"><button class="btn btn-ghost btn-icon" style="width:28px;height:28px;color:color-mix(in srgb,var(--color-text) 55%,transparent)" aria-label="Quitar"><i class="ph ph-x"></i></button></td></tr>
+
+<tr><td><input type="checkbox" disabled style="accent-color:var(--color-accent)"></td>
+<td><div>entrevista-capitan-rios.mov</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Archivo subido · 2,1 GB</div></td>
+<td colspan="2"><div style="display:flex;flex-direction:column;gap:5px;max-width:340px"><div style="height:4px;border-radius:99px;background:var(--color-neutral-800);overflow:hidden"><div style="width:45%;height:100%;background:var(--color-neutral-400)"></div></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 65%,transparent)">Subiendo: 950 MB de 2,1 GB</span></div></td>
+<td><span class="tag tag-neutral">Subiendo</span></td>
+<td style="text-align:right"><button class="btn btn-ghost" style="font-size:12px;color:oklch(0.74 0.13 25)">Cancelar</button></td></tr>
+
+<tr><td><input type="checkbox" disabled style="accent-color:var(--color-accent)"></td>
+<td><div>Maniobras de amarre en puerto — clase 4</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Descarga · 24:10 · 1920x1080</div></td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">WebM (VP9 + Opus)</td><td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">Mantener (1080p)</td>
+<td><div style="display:flex;flex-direction:column;gap:5px"><div style="height:4px;border-radius:99px;background:var(--color-neutral-800);overflow:hidden"><div style="width:31%;height:100%;background:var(--color-accent)"></div></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 65%,transparent)">Convirtiendo · 31 % · velocidad 1,8x · faltan 9 min</span></div></td>
+<td style="text-align:right"><button class="btn btn-ghost" style="font-size:12px;color:oklch(0.74 0.13 25)">Cancelar</button></td></tr>
+
+<tr><td><input type="checkbox" disabled style="accent-color:var(--color-accent)"></td>
+<td><div>audio-guardia-nocturna.wav</div><div style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Archivo subido · 18:40 · solo audio</div></td>
+<td style="color:color-mix(in srgb,var(--color-text) 75%,transparent)">MP3</td><td style="font-size:12px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">—</td>
+<td><span style="display:flex;align-items:center;gap:8px"><span class="tag" style="background:oklch(0.32 0.05 155);color:oklch(0.9 0.06 155)">Terminado</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">17 MB</span></span></td>
+<td style="text-align:right"><button class="btn btn-primary btn-icon" style="width:30px;height:30px" aria-label="Descargar"><i class="ph ph-download-simple"></i></button></td></tr>
+
+<tr><td><input type="checkbox" style="accent-color:var(--color-accent)"></td>
+<td><div>presentacion-final.avi</div><div style="font-size:11.5px;color:oklch(0.74 0.13 25)">No se pudo leer el archivo: puede estar dañado o incompleto.</div></td>
+<td colspan="2" style="font-size:12px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">—</td>
+<td><span class="tag" style="background:oklch(0.3 0.06 25);color:oklch(0.9 0.05 25)">Falló</span></td>
+<td style="text-align:right"><button class="btn btn-ghost" style="font-size:12px">Quitar</button></td></tr>
+</tbody></table>
+</main></div></div>
+
+<div class="dv-opt" id="2e"><div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a>Cómodo · lista + detalle del archivo elegido</div>
+<div class="dv-card" style="width:1120px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);display:flex">
+<aside style="width:196px;flex:none;padding:16px 12px;display:flex;flex-direction:column;gap:3px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));box-shadow:inset -1px 0 0 var(--color-divider)">
+<span style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:500;padding:0 6px 16px"><img src="assets/logo-128.png" alt="" width="28" height="28" style="border-radius:6px">STI-Catcher</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-download-simple" style="font-size:16px"></i>Descargar</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-record" style="font-size:16px"></i>Grabar pantalla</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--radius-md);font-size:13.5px;color:var(--color-accent-200);background:var(--color-accent-900)"><i class="ph ph-arrows-left-right" style="font-size:16px;color:var(--color-accent)"></i>Convertir<span style="margin-left:auto;font-size:11px;color:var(--color-accent)">2</span></span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-clock-counter-clockwise" style="font-size:16px"></i>Historial</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-pulse" style="font-size:16px"></i>Estado</span>
+<span style="margin-top:auto;padding:16px 6px 0;font-size:11px;line-height:1.45;color:color-mix(in srgb,var(--color-text) 45%,transparent)">Usar solo con contenido propio o con autorización.</span>
+</aside>
+<main style="flex:1;min-width:0;padding:24px 26px 28px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:flex-end;gap:12px"><div><h1 style="font-size:24px;margin:0 0 4px">Convertir archivos</h1><p style="margin:0;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Elegí un archivo de la lista para cambiar su formato de salida.</p></div>
+<button class="btn btn-secondary" style="margin-left:auto"><i class="ph ph-plus"></i>Agregar archivos</button><button class="btn btn-primary"><i class="ph ph-arrows-left-right"></i>Convertir 3</button></div>
+<div style="display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="padding:10px 12px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:0 0 0 1px var(--color-accent);display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">reunion-armadores-oct.mkv</span><span class="tag tag-accent">MP4 · 720p</span></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">52:18 · 1,4 GB · listo</span></div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Grabación 30-10-2026 10.14</span><span class="tag tag-accent">GIF</span></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">03:12 · listo</span></div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">audio-guardia-nocturna.wav</span><span class="tag tag-accent">MP3</span></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">18:40 · listo</span></div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Maniobras de amarre — clase 4</span><span class="tag tag-neutral">WebM</span></div><div style="height:4px;border-radius:99px;background:var(--color-neutral-800);overflow:hidden"><div style="width:31%;height:100%;background:var(--color-accent)"></div></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Convirtiendo · 31 % · faltan 9 min</span></div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">curso-radar-arpa.mp4</span><span class="tag" style="background:oklch(0.32 0.05 155);color:oklch(0.9 0.06 155)">Terminado</span></div><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">MOV · 640 MB · <a href="#2e">Descargar</a></span></div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);display:flex;flex-direction:column;gap:4px;background:color-mix(in srgb,oklch(0.74 0.13 25) 8%,transparent)"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">presentacion-final.avi</span><span class="tag" style="background:oklch(0.3 0.06 25);color:oklch(0.9 0.05 25)">Falló</span></div><span style="font-size:11.5px;color:oklch(0.8 0.1 25)">No se pudo leer el archivo.</span></div>
+</div>
+<div class="card elev-sm" style="padding:16px 18px;gap:12px">
+<div><div class="card-title">reunion-armadores-oct.mkv</div><div class="card-meta" style="margin-top:4px">Archivo subido · 52:18 · 1920x1080 · H.265 + AAC · 1,4 GB</div></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Video</span>
+<label style="padding:8px 10px;border-radius:var(--radius-md);box-shadow:0 0 0 1px var(--color-accent);background:color-mix(in srgb,var(--color-accent) 10%,transparent);display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px;color:var(--color-accent-200)">MP4 (H.264 + AAC)</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">El más compatible: abre en cualquier reproductor, editor o celular.</span></label>
+<label style="padding:8px 10px;border-radius:var(--radius-md);box-shadow:0 0 0 1px var(--color-divider);display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px">WebM (VP9 + Opus)</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Para la web. Archivos chicos; conversión lenta.</span></label>
+<label style="padding:8px 10px;border-radius:var(--radius-md);box-shadow:0 0 0 1px var(--color-divider);display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px">MOV (H.264 + AAC)</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Para editores de video (Premiere, Final Cut, DaVinci).</span></label>
+<span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent);padding-left:2px">+ MKV, AVI</span></div>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Animación</span>
+<label style="padding:8px 10px;border-radius:var(--radius-md);box-shadow:0 0 0 1px var(--color-divider);display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px">GIF animado</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Un fragmento corto, sin sonido.</span></label></div>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Solo audio</span>
+<label style="padding:8px 10px;border-radius:var(--radius-md);box-shadow:0 0 0 1px var(--color-divider);display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px">MP3</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Solo el audio. Abre en cualquier lado.</span></label>
+<label style="padding:8px 10px;border-radius:var(--radius-md);box-shadow:0 0 0 1px var(--color-divider);display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px">M4A (AAC)</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Mejor calidad que MP3 al mismo tamaño.</span></label>
+<span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent);padding-left:2px">+ WAV</span></div>
+</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Resolución</span><div class="seg"><label class="seg-opt"><input type="radio" name="r2e">Mantener (1080p)</label><label class="seg-opt"><input type="radio" name="r2e" defaultChecked="{{ true }}">720p</label><label class="seg-opt"><input type="radio" name="r2e">480p</label><label class="seg-opt"><input type="radio" name="r2e">360p</label></div>
+<button class="btn btn-ghost" style="margin-left:auto;font-size:13px">Usar este formato en todos</button></div>
+</div>
+</div>
+</main></div></div>
+
+<div class="dv-opt" id="2f"><div class="dv-olabel"><a class="dv-oid" href="#2f">2f</a>Vacío y arrastrando</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<div class="dv-card" style="width:440px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:22px;display:flex;flex-direction:column;gap:12px">
+<div class="card-kicker">Vacío</div>
+<div style="padding:30px 16px;border:1.5px dashed var(--color-divider);border-radius:var(--radius-md);display:flex;flex-direction:column;align-items:flex-start;gap:8px"><i class="ph ph-files" style="font-size:26px;color:var(--color-neutral-600)"></i><span style="font-size:14px">Arrastrá uno o varios archivos acá</span><span style="font-size:12.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">O elegí del <a href="#2f">historial</a>. Máximo 4 GB por archivo.</span><button class="btn btn-primary" style="margin-top:6px">Elegir archivos</button></div>
+</div>
+<div class="dv-card" style="width:440px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:22px;display:flex;flex-direction:column;gap:12px">
+<div class="card-kicker">Soltando 3 archivos</div>
+<div style="padding:30px 16px;border:1.5px dashed var(--color-accent);border-radius:var(--radius-md);background:radial-gradient(120% 90% at 0% 0%,color-mix(in srgb,var(--color-accent) 14%,transparent),transparent 70%);display:flex;flex-direction:column;align-items:flex-start;gap:6px"><i class="ph ph-arrow-down" style="font-size:26px;color:var(--color-accent)"></i><span style="font-size:14px;color:var(--color-accent-200)">Soltá para agregar 3 archivos</span><span style="font-size:12.5px;color:oklch(0.82 0.11 85)">1 pesa 5,2 GB y el máximo es 4 GB: no se va a subir.</span></div>
+</div>
+</div></div>
+</div>
+
+<p class="dv-sub">Grabar pantalla · elegir pantalla o ventana</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2g"><div class="dv-olabel"><a class="dv-oid" href="#2g">2g</a>Denso · tipo de fuente, vista previa y opciones en una vista</div>
+<div class="dv-card" style="width:1120px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
+<header style="display:flex;align-items:center;gap:22px;padding:10px 22px;box-shadow:inset 0 -1px 0 var(--color-divider)">
+<span style="display:flex;align-items:center;gap:9px;font-size:16px;font-weight:500"><img src="assets/logo-128.png" alt="" width="30" height="30" style="border-radius:6px">STI-Catcher</span>
+<nav style="display:flex;gap:4px;font-size:13.5px">
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Descargar</span>
+<span style="padding:6px 11px;border-radius:var(--radius-md);color:var(--color-accent);background:var(--color-accent-900)">Grabar pantalla</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Convertir</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Historial</span>
+<span style="padding:6px 11px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Estado</span>
+</nav></header>
+<main style="padding:22px 22px 28px;display:flex;flex-direction:column;gap:16px">
+<div><h1 style="font-size:24px;margin:0 0 4px">Grabar pantalla</h1><p style="margin:0;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Una pantalla, una ventana o una pestaña, con el sonido del sistema y el micrófono.</p></div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+<label style="padding:10px 12px;border-radius:var(--radius-md);display:flex;gap:10px;align-items:center;box-shadow:0 0 0 1px var(--color-divider)"><i class="ph ph-monitor" style="font-size:20px;color:var(--color-neutral-400)"></i><span style="display:flex;flex-direction:column"><span style="font-size:13.5px">Pantalla completa</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Todo lo que se ve</span></span></label>
+<label style="padding:10px 12px;border-radius:var(--radius-md);display:flex;gap:10px;align-items:center;box-shadow:0 0 0 1px var(--color-accent);background:color-mix(in srgb,var(--color-accent) 10%,transparent)"><i class="ph ph-app-window" style="font-size:20px;color:var(--color-accent)"></i><span style="display:flex;flex-direction:column"><span style="font-size:13.5px;color:var(--color-accent-200)">Ventana</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Un solo programa</span></span></label>
+<label style="padding:10px 12px;border-radius:var(--radius-md);display:flex;gap:10px;align-items:center;box-shadow:0 0 0 1px var(--color-divider)"><i class="ph ph-browser" style="font-size:20px;color:var(--color-neutral-400)"></i><span style="display:flex;flex-direction:column"><span style="font-size:13.5px">Pestaña</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Con su sonido</span></span></label>
+</div>
+<div style="position:relative;aspect-ratio:16/9;border-radius:var(--radius-md);background:linear-gradient(160deg,var(--color-neutral-900),var(--color-bg));box-shadow:var(--shadow-sm);display:grid;place-items:center;overflow:hidden">
+<span style="display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--color-neutral-600);font-size:12.5px"><i class="ph ph-app-window" style="font-size:34px"></i>Vista previa en vivo de la ventana elegida</span>
+<div style="position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-md);background:color-mix(in srgb,var(--color-bg) 85%,transparent);box-shadow:var(--shadow-sm)">
+<i class="ph ph-app-window" style="color:var(--color-accent)"></i><span style="font-size:13px">Ventana · Planilla de guardias — Excel</span><span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">1600x900 · sin sonido de la ventana</span>
+<button class="btn btn-secondary" style="margin-left:auto;padding:4px 10px;font-size:12.5px"><i class="ph ph-swap"></i>Cambiar</button></div>
+</div>
+<p style="margin:0;font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">«Cambiar» vuelve a abrir el selector del navegador en la solapa del tipo elegido. Todavía no se está grabando.</p>
+</div>
+<div class="card elev-sm" style="padding:14px;gap:12px">
+<div class="field"><label>Título (opcional)</label><input class="input" placeholder="Grabación 30-10-2026 10.14"></div>
+<div style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Cuadros por segundo</span><div class="seg" style="display:flex"><label class="seg-opt" style="flex:1"><input type="radio" name="fps2g" defaultChecked="{{ true }}">30 · documentos</label><label class="seg-opt" style="flex:1"><input type="radio" name="fps2g">60 · movimiento</label></div></div>
+<label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent);margin-top:3px"><span>Sonido del sistema o de la pestaña<span style="display:block;font-size:11.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Hay que tildar «Compartir audio» al elegir.</span></span></label>
+<label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)">Micrófono</label>
+<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius-sm);background:var(--color-neutral-900)"><i class="ph ph-microphone" style="color:var(--color-neutral-400)"></i><div style="flex:1;height:4px;border-radius:99px;background:var(--color-neutral-800);overflow:hidden"><div style="width:38%;height:100%;background:var(--color-accent)"></div></div></div>
+<button class="btn btn-primary btn-block" style="height:40px;font-size:14.5px"><span style="width:10px;height:10px;border-radius:50%;background:oklch(0.68 0.17 25)"></span>Empezar a grabar</button>
+</div>
+</div>
+</main></div></div>
+
+<div class="dv-opt" id="2h"><div class="dv-olabel"><a class="dv-oid" href="#2h">2h</a>Cómodo · en pasos, grabando</div>
+<div class="dv-card" style="width:1120px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);display:flex">
+<aside style="width:196px;flex:none;padding:16px 12px;display:flex;flex-direction:column;gap:3px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));box-shadow:inset -1px 0 0 var(--color-divider)">
+<span style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:500;padding:0 6px 16px"><img src="assets/logo-128.png" alt="" width="28" height="28" style="border-radius:6px">STI-Catcher</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-download-simple" style="font-size:16px"></i>Descargar</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--radius-md);font-size:13.5px;color:var(--color-accent-200);background:var(--color-accent-900)"><i class="ph ph-record" style="font-size:16px;color:var(--color-accent)"></i>Grabar pantalla<span style="margin-left:auto;width:7px;height:7px;border-radius:50%;background:oklch(0.68 0.17 25);animation:pulse 1.2s ease-in-out infinite"></span></span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-arrows-left-right" style="font-size:16px"></i>Convertir</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-clock-counter-clockwise" style="font-size:16px"></i>Historial</span>
+<span style="display:flex;align-items:center;gap:9px;padding:7px 9px;font-size:13.5px;color:color-mix(in srgb,var(--color-text) 62%,transparent)"><i class="ph ph-pulse" style="font-size:16px"></i>Estado</span>
+<span style="margin-top:auto;padding:16px 6px 0;font-size:11px;line-height:1.45;color:color-mix(in srgb,var(--color-text) 45%,transparent)">Usar solo con contenido propio o con autorización.</span>
+</aside>
+<main style="flex:1;min-width:0;padding:24px 26px 28px;display:flex;flex-direction:column;gap:18px">
+<div><h1 style="font-size:24px;margin:0 0 4px">Grabar pantalla</h1></div>
+<ol style="list-style:none;margin:0;padding:0;display:flex;gap:10px;align-items:center;font-size:13px">
+<li style="display:flex;align-items:center;gap:7px;color:color-mix(in srgb,var(--color-text) 70%,transparent)"><span style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--color-accent-800);color:var(--color-accent-100);font-size:11px"><i class="ph ph-check"></i></span>Qué grabar</li>
+<li style="width:40px;height:1px;background:var(--color-divider)"></li>
+<li style="display:flex;align-items:center;gap:7px;color:color-mix(in srgb,var(--color-text) 70%,transparent)"><span style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--color-accent-800);color:var(--color-accent-100);font-size:11px"><i class="ph ph-check"></i></span>Sonido y calidad</li>
+<li style="width:40px;height:1px;background:var(--color-divider)"></li>
+<li style="display:flex;align-items:center;gap:7px;color:var(--color-accent-200)"><span style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;box-shadow:0 0 0 1px var(--color-accent);color:var(--color-accent);font-size:11px">3</span>Grabar</li>
+</ol>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;align-items:start">
+<div style="position:relative;aspect-ratio:16/9;border-radius:var(--radius-lg);background:linear-gradient(160deg,var(--color-neutral-900),var(--color-bg));box-shadow:0 0 0 1px color-mix(in srgb,oklch(0.68 0.17 25) 55%,transparent),0 0 40px color-mix(in srgb,oklch(0.68 0.17 25) 12%,transparent);display:grid;place-items:center;overflow:hidden">
+<span style="display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--color-neutral-600);font-size:12.5px"><i class="ph ph-monitor" style="font-size:34px"></i>Vista previa en vivo · Pantalla 2</span>
+<div style="position:absolute;left:12px;top:12px;display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:99px;background:color-mix(in srgb,var(--color-bg) 85%,transparent);font-size:13px;font-variant-numeric:tabular-nums"><span style="width:9px;height:9px;border-radius:50%;background:oklch(0.68 0.17 25);animation:pulse 1.2s ease-in-out infinite"></span>Grabando 04:12</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div class="card elev-sm" style="padding:12px;gap:8px">
+<div class="card-kicker">Fuente</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:13.5px"><i class="ph ph-monitor" style="color:var(--color-accent)"></i>Pantalla 2 · 1920x1080</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:color-mix(in srgb,var(--color-text) 65%,transparent)"><i class="ph ph-speaker-high"></i>Sistema<i class="ph ph-microphone" style="margin-left:8px"></i>Micrófono<span style="margin-left:auto">30 cuadros/s</span></div>
+</div>
+<div class="card elev-sm" style="padding:12px;gap:6px">
+<div class="card-kicker">Subida</div>
+<div style="font-size:13.5px">152 MB subidos</div>
+<div style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Se manda un fragmento cada 2 s. Si se cierra el navegador, lo que llegó se procesa igual.</div>
+</div>
+<button class="btn" style="height:42px;font-size:14.5px;color:oklch(0.8 0.12 25);border-color:oklch(0.68 0.17 25)"><i class="ph-fill ph-stop"></i>Detener grabación</button>
+</div>
+</div>
+</main></div></div>
+
+<div class="dv-opt" id="2i"><div class="dv-olabel"><a class="dv-oid" href="#2i">2i</a>Paso 1 de <a class="dv-oid" href="#2h">2h</a> y estados</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<div class="dv-card" style="width:440px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:22px;display:flex;flex-direction:column;gap:12px">
+<div class="card-kicker">Paso 1 · Qué grabar</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="padding:12px;border-radius:var(--radius-md);display:flex;gap:12px;align-items:center;box-shadow:0 0 0 1px var(--color-accent);background:color-mix(in srgb,var(--color-accent) 10%,transparent)"><i class="ph ph-monitor" style="font-size:24px;color:var(--color-accent)"></i><span style="display:flex;flex-direction:column"><span style="font-size:14px;color:var(--color-accent-200)">Pantalla completa</span><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Si tenés dos monitores, elegís cuál en el paso siguiente.</span></span></div>
+<div style="padding:12px;border-radius:var(--radius-md);display:flex;gap:12px;align-items:center;box-shadow:0 0 0 1px var(--color-divider)"><i class="ph ph-app-window" style="font-size:24px;color:var(--color-neutral-400)"></i><span style="display:flex;flex-direction:column"><span style="font-size:14px">Una ventana</span><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Solo ese programa, aunque lo tapes.</span></span></div>
+<div style="padding:12px;border-radius:var(--radius-md);display:flex;gap:12px;align-items:center;box-shadow:0 0 0 1px var(--color-divider)"><i class="ph ph-browser" style="font-size:24px;color:var(--color-neutral-400)"></i><span style="display:flex;flex-direction:column"><span style="font-size:14px">Una pestaña del navegador</span><span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">La mejor opción para grabar el sonido de un video.</span></span></div>
+</div>
+<button class="btn btn-primary" style="align-self:flex-start">Elegir pantalla…</button>
+</div>
+<div class="dv-card" style="width:440px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:22px;display:flex;flex-direction:column;gap:10px">
+<div class="card-kicker">Error · aviso</div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);background:color-mix(in srgb,oklch(0.74 0.13 25) 12%,transparent);color:oklch(0.86 0.07 25);font-size:13px">No se dio permiso para usar el micrófono.</div>
+<div style="padding:10px 12px;border-radius:var(--radius-md);background:color-mix(in srgb,oklch(0.82 0.11 85) 10%,transparent);color:oklch(0.88 0.07 85);font-size:13px;line-height:1.5">El navegador no compartió el sonido del sistema. En Chrome/Edge hay que tildar «Compartir audio» al elegir la pantalla o la pestaña.</div>
+</div>
+<div class="dv-card" style="width:440px;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding:22px;display:flex;flex-direction:column;gap:10px">
+<div class="card-kicker">Terminado</div>
+<div style="aspect-ratio:16/9;border-radius:var(--radius-md);background:var(--color-neutral-900);display:grid;place-items:center;color:var(--color-neutral-600)"><i class="ph-fill ph-play-circle" style="font-size:36px"></i></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn btn-primary"><i class="ph ph-download-simple"></i>Descargar MP4</button><button class="btn btn-secondary">Convertir</button><button class="btn btn-ghost">Ver en el historial</button></div>
+<span style="font-size:12px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">04:12 · 1920x1080 · 158 MB</span>
+</div>
+</div></div>
+</div>
+<p class="dv-next">Probá: «tabla de <a class="dv-oid" href="#2a">2a</a> con la barra lateral de <a class="dv-oid" href="#2b">2b</a>» · «unificar Descargar y Convertir en una sola cola» · «<a class="dv-oid" href="#2g">2g</a> con el indicador de grabación de <a class="dv-oid" href="#2h">2h</a>»</p>
+</section>
+
+<section class="dv-turn" id="t1" style="background:#101119">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Interfaz actual (recreada desde el código, modo claro)</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Descargar · después de analizar</div>
+<div class="dv-card" style="width:960px;background:#f6f7f9;color:#1c2128;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;line-height:1.5;display:flex;flex-direction:column">
+<header style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;padding:12px 24px;background:#fff;border-bottom:1px solid #d8dde3">
+<span style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:17.6px"><img src="assets/logo-128.png" alt="" width="44" height="44">STI-Catcher</span>
+<ul style="display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:0;list-style:none">
+<li style="padding:6px 12px;border-radius:8px;color:#fff;background:#1f6feb">Descargar</li><li style="padding:6px 12px;color:#5d6673">Grabar pantalla</li><li style="padding:6px 12px;color:#5d6673">Convertir</li><li style="padding:6px 12px;color:#5d6673">Historial</li><li style="padding:6px 12px;color:#5d6673">Estado</li></ul></header>
+<main style="padding:24px">
+<div style="margin-bottom:16px"><h1 style="margin:0 0 4px;font-size:24px;font-weight:700;letter-spacing:0;font-family:inherit">Descargar video</h1><p style="margin:0;color:#5d6673">YouTube, Instagram, X y otros sitios. Pegá el link del video.</p></div>
+<div style="margin-bottom:16px;padding:16px 20px;background:#fff;border:1px solid #d8dde3;border-radius:8px;display:flex;align-items:flex-end;gap:12px">
+<label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:13.6px;color:#5d6673"><span>Link del video</span><input type="url" value="https://www.youtube.com/watch?v=Qd8pX1ruwJk" style="padding:8px 10px;font:inherit;font-size:16px;color:#1c2128;background:#fff;border:1px solid #d8dde3;border-radius:8px"></label>
+<button style="padding:8px 16px;font:inherit;color:#fff;background:#1f6feb;border:none;border-radius:8px">Analizar</button></div>
+<div style="padding:16px 20px;background:#fff;border:1px solid #d8dde3;border-radius:8px">
+<div style="display:flex;gap:16px;margin-bottom:8px"><div style="width:200px;aspect-ratio:16/9;border-radius:8px;background:#f6f7f9;display:grid;place-items:center;color:#96a0ad;font-size:12px">miniatura</div><div><h2 style="margin:0 0 4px;font-size:17.6px;font-weight:600;letter-spacing:0;font-family:inherit">Maniobras de amarre en puerto — clase 4</h2><p style="margin:4px 0;font-size:13.6px;color:#5d6673">YouTube · Escuela Náutica · 24:10</p></div></div>
+<fieldset style="margin:12px 0;padding:0;border:none"><legend style="margin-bottom:6px;font-weight:600">Formato</legend>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="radio" defaultChecked="{{ true }}"><span><strong>Video (MP4)</strong><span style="color:#5d6673;font-size:13.6px"> — Video con audio.</span></span></label>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="radio"><span><strong>Solo audio (MP3)</strong><span style="color:#5d6673;font-size:13.6px"> — Abre en cualquier lado.</span></span></label>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="radio"><span><strong>Solo audio (M4A)</strong><span style="color:#5d6673;font-size:13.6px"> — Mejor calidad al mismo tamaño.</span></span></label></fieldset>
+<fieldset style="margin:12px 0;padding:0;border:none"><legend style="margin-bottom:6px;font-weight:600">Resolución</legend><select style="padding:7px 10px;font:inherit;color:#1c2128;background:#fff;border:1px solid #d8dde3;border-radius:8px"><option>1080p</option></select></fieldset>
+<fieldset style="margin:12px 0;padding:0;border:none"><legend style="margin-bottom:6px;font-weight:600">Codec</legend>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="radio" defaultChecked="{{ true }}"><span><strong>Compatibilidad máxima</strong> (recomendado)<span style="color:#5d6673;font-size:13.6px"> — H.264 + AAC: abre en cualquier reproductor y editor. Si la resolución elegida no está en H.264, baja la mayor que sí esté.</span></span></label>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="radio"><span><strong>Máxima calidad</strong><span style="color:#5d6673;font-size:13.6px"> — Codec original (VP9/AV1) dentro de MP4. Rápido, pero puede no abrir en editores o reproductores viejos.</span></span></label>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="radio"><span><strong>Recodificar a H.264</strong><span style="color:#5d6673;font-size:13.6px"> — La resolución elegida, convertida a H.264. Lento: usa mucha CPU del servidor.</span></span></label></fieldset>
+<div style="display:flex;gap:12px;margin:12px 0"><button style="padding:8px 16px;font:inherit;color:#fff;background:#1f6feb;border:none;border-radius:8px">Descargar</button></div>
+</div></main>
+<footer style="padding:16px 24px;text-align:center;font-size:13.6px;color:#5d6673;border-top:1px solid #d8dde3">Usar solo con contenido propio o con autorización.</footer>
+</div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Grabar pantalla · inicio</div>
+<div class="dv-card" style="width:960px;background:#f6f7f9;color:#1c2128;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;line-height:1.5">
+<header style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;padding:12px 24px;background:#fff;border-bottom:1px solid #d8dde3">
+<span style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:17.6px"><img src="assets/logo-128.png" alt="" width="44" height="44">STI-Catcher</span>
+<ul style="display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:0;list-style:none">
+<li style="padding:6px 12px;color:#5d6673">Descargar</li><li style="padding:6px 12px;border-radius:8px;color:#fff;background:#1f6feb">Grabar pantalla</li><li style="padding:6px 12px;color:#5d6673">Convertir</li><li style="padding:6px 12px;color:#5d6673">Historial</li><li style="padding:6px 12px;color:#5d6673">Estado</li></ul></header>
+<main style="padding:24px">
+<div style="margin-bottom:16px"><h1 style="margin:0 0 4px;font-size:24px;font-weight:700;letter-spacing:0;font-family:inherit">Grabar pantalla</h1><p style="margin:0;color:#5d6673">Una pantalla, una ventana o una pestaña, con el sonido del sistema y el micrófono.</p></div>
+<div style="padding:16px 20px;background:#fff;border:1px solid #d8dde3;border-radius:8px">
+<fieldset style="margin:12px 0;padding:0;border:none"><legend style="margin-bottom:6px;font-weight:600">Opciones</legend>
+<label style="display:flex;flex-direction:column;gap:4px;font-size:13.6px;color:#5d6673"><span>Título (opcional)</span><input type="text" placeholder="Grabación 30-10-2026 10.14" style="width:100%;padding:8px 10px;font:inherit;font-size:16px;color:#1c2128;background:#fff;border:1px solid #d8dde3;border-radius:8px"></label>
+<div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin:12px 0">
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="radio" defaultChecked="{{ true }}"><span><strong>30 cuadros/s</strong><span style="color:#5d6673;font-size:13.6px"> — presentaciones y documentos</span></span></label>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="radio"><span><strong>60 cuadros/s</strong><span style="color:#5d6673;font-size:13.6px"> — videos y movimiento</span></span></label></div>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="checkbox" defaultChecked="{{ true }}"><span>Sonido del sistema o de la pestaña<span style="color:#5d6673;font-size:13.6px"> — hay que tildar «Compartir audio» al elegir</span></span></label>
+<label style="display:flex;gap:8px;align-items:baseline;margin:6px 0"><input type="checkbox"><span>Micrófono</span></label></fieldset>
+<div style="display:flex;gap:12px;margin:12px 0"><button style="padding:8px 16px;font:inherit;color:#fff;background:#1f6feb;border:none;border-radius:8px">Elegir pantalla y grabar</button></div>
+</div></main>
+<footer style="padding:16px 24px;text-align:center;font-size:13.6px;color:#5d6673;border-top:1px solid #d8dde3">Usar solo con contenido propio o con autorización.</footer>
+</div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Convertir · sin archivo</div>
+<div class="dv-card" style="width:960px;background:#f6f7f9;color:#1c2128;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;line-height:1.5">
+<header style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;padding:12px 24px;background:#fff;border-bottom:1px solid #d8dde3">
+<span style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:17.6px"><img src="assets/logo-128.png" alt="" width="44" height="44">STI-Catcher</span>
+<ul style="display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:0;list-style:none">
+<li style="padding:6px 12px;color:#5d6673">Descargar</li><li style="padding:6px 12px;color:#5d6673">Grabar pantalla</li><li style="padding:6px 12px;border-radius:8px;color:#fff;background:#1f6feb">Convertir</li><li style="padding:6px 12px;color:#5d6673">Historial</li><li style="padding:6px 12px;color:#5d6673">Estado</li></ul></header>
+<main style="padding:24px">
+<div style="margin-bottom:16px"><h1 style="margin:0 0 4px;font-size:24px;font-weight:700;letter-spacing:0;font-family:inherit">Convertir archivos</h1><p style="margin:0;color:#5d6673">Video y audio entre MP4, WebM, MKV, MOV, AVI, GIF, MP3, M4A y WAV.</p></div>
+<div style="padding:16px 20px;background:#fff;border:1px solid #d8dde3;border-radius:8px">
+<h2 style="margin:0 0 12px;font-size:16px;font-weight:600;letter-spacing:0;font-family:inherit">Archivo de origen</h2>
+<p style="margin:4px 0;font-size:13.6px;color:#5d6673">Subí un archivo de video o audio, o elegí uno del <span style="color:#1f6feb;text-decoration:underline">historial</span> con el botón «Convertir».</p>
+<div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:12px;padding:28px 16px;text-align:center;border:2px dashed #d8dde3;border-radius:8px">
+<p style="margin:0">Arrastrá un archivo acá o</p><button style="padding:8px 16px;font:inherit;color:#fff;background:#1f6feb;border:none;border-radius:8px">Elegir archivo</button><p style="margin:0;font-size:13.6px;color:#5d6673">Máximo 4 GB.</p></div>
+</div></main>
+<footer style="padding:16px 24px;text-align:center;font-size:13.6px;color:#5d6673;border-top:1px solid #d8dde3">Usar solo con contenido propio o con autorización.</footer>
+</div></div>
+</div>
+</section>
+</x-dc>
+</body>
+</html>

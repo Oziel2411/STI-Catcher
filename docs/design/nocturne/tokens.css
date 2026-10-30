@@ -1,0 +1,69 @@
+/*
+ * STI-Catcher × Nocturne — reemplaza el bloque :root y el @media (prefers-color-scheme: dark)
+ * al principio de apps/web/src/styles.css. Mantiene los nombres de variable existentes
+ * (--bg, --surface, --text, --muted, --border, --accent, --ok, --warn, --error…) para que
+ * el resto del CSS siga andando, y agrega las nuevas que usan las pantallas rediseñadas.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  /* Claro */
+  --bg: #f3f5fe;               /* neutral-100 */
+  --surface: #fafbff;
+  --surface-2: #e4e7f5;        /* neutral-200: miniaturas, pistas de barra */
+  --text: #161826;
+  --muted: #595d6c;            /* neutral-700 */
+  --faint: #75798c;            /* neutral-600: "—", textos terciarios */
+  --border: #cfd3e5;           /* neutral-300 */
+  --divider: color-mix(in srgb, #161826 14%, transparent);
+  --accent: #796cbf;           /* accent-600 (contraste en claro) */
+  --accent-strong: #5d5294;    /* accent-700: texto sobre tinte */
+  --accent-tint: #e7e5fe;      /* accent-200: item de nav activo, opción elegida */
+  --accent-text: var(--accent); /* botones primarios son contorno, no relleno */
+  --ok: oklch(0.5 0.11 155);
+  --ok-bg: oklch(0.93 0.04 155);
+  --warn: oklch(0.52 0.1 85);
+  --warn-bg: oklch(0.94 0.05 85);
+  --error: oklch(0.52 0.16 25);
+  --error-bg: oklch(0.94 0.04 25);
+  --rec: oklch(0.6 0.19 25);   /* punto de grabación */
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 0 0 1px var(--border);
+  --font: 'Inter', system-ui, sans-serif;
+  --mono: 'Cascadia Mono', Consolas, ui-monospace, monospace;
+  --sidebar-w: 196px;
+
+  color-scheme: light dark;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Oscuro = Nocturne */
+    --bg: #161826;
+    --surface: #232532;
+    --surface-2: #292b31;      /* neutral-900 */
+    --text: #e9e9ed;
+    --muted: color-mix(in srgb, #e9e9ed 55%, transparent);
+    --faint: color-mix(in srgb, #e9e9ed 45%, transparent);
+    --border: color-mix(in srgb, #e9e9ed 16%, transparent);
+    --divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+    --accent: #9184d9;
+    --accent-strong: #e7e5fe;  /* accent-200 */
+    --accent-tint: #2b2741;    /* accent-900 */
+    --ok: oklch(0.9 0.06 155);
+    --ok-bg: oklch(0.32 0.05 155);
+    --warn: oklch(0.88 0.07 85);
+    --warn-bg: color-mix(in srgb, oklch(0.82 0.11 85) 10%, transparent);
+    --error: oklch(0.86 0.07 25);
+    --error-bg: color-mix(in srgb, oklch(0.74 0.13 25) 12%, transparent);
+    --rec: oklch(0.68 0.17 25);
+    --shadow-sm: 0 0 0 1px #3f424d;
+  }
+}

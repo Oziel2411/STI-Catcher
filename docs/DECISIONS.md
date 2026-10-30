@@ -481,6 +481,20 @@ El soporte terminó en octubre de 2025 y las actualizaciones extendidas para usu
 
 ---
 
+## Interfaz
+
+### D-090 — Rediseño Nocturne por etapas · Etapa 1 · Vigente
+
+Los mockups están en `docs/design/nocturne/` (README con las medidas, `tokens.css`, el HTML de referencia). Se aplican en 5 etapas, cada una con su commit: 1) tokens, barra lateral y componentes globales; 2) grabar con vista previa de la fuente; 3) convertir varios archivos; 4) conversión encadenada a la descarga (server); 5) descargar varios links.
+
+Cambios respecto del handoff:
+
+- **Inter incluida en la app** (`@fontsource/inter`, solo 400 y 500) en vez de Google Fonts: las PCs de la red pueden no tener internet, y cada visita avisaría a Google. El navegador baja solo el subconjunto latino (~48 KB).
+- **Íconos con los nombres `*Icon`** de Phosphor 2.1 (los nombres sin sufijo están marcados como obsoletos). Vite deja en el bundle solo los usados (+11 KB).
+- **`strong`, `b` y `th` en 500**: sin esto el navegador sintetiza una negrita que no existe.
+- **Contadores y punto de grabación en la barra lateral:** quedan para las etapas 2, 3 y 5. Necesitan saber qué trabajos son de este navegador y siguen en curso, y hoy la grabación se corta al cambiar de página.
+- `docs/design/` está excluida de ESLint y Prettier (el `support.js` del mockup no es código de la app).
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

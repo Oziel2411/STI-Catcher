@@ -79,6 +79,7 @@ Detalle en `docs/DECISIONS.md`.
 - Conversión: presets cerrados en shared → `buildConversionArgs` (pura); copia sin recodificar cuando el origen ya cumple; solo se ofrecen los presets que tienen sentido para el archivo (ffprobe); subida en streaming como `application/octet-stream`.
 - Grabación: MediaRecorder en el navegador → fragmentos de 2 s numerados (`?seq=N`, reintento idempotente) a una **sesión** (tabla `recordings`, crudo en `STORAGE_DIR\recordings`, fuera de `tmp`). Al detener (o tras `RECORDING_IDLE_MINUTES` sin fragmentos) se crea el job `recording`, que deja MP4 H.264 + AAC (copia si ya cumple). Sin contexto seguro la página explica que hace falta HTTPS.
 - Despliegue: WinSW 2.12 con XML generado por `install-service.ps1` (`stopparentprocessfirst`: Node corta los jobs antes que mueran sus hijos); ACLs con SIDs (Windows en español); certificado con mkcert, CA en el perfil del admin. Retención cada hora: archivos de jobs viejos → `expired`, huérfanos de `files/` y crudos de `recordings/`.
+- UI: estilo Nocturne (`docs/design/nocturne/`, se aplica por etapas: D-090). Barra lateral (arriba en <760 px), botones primarios de contorno, Inter local (`@fontsource/inter` 400/500, nunca más grueso), íconos `@phosphor-icons/react` con nombres `*Icon`.
 - TypeScript fijado en 6.0.x (typescript-eslint no soporta 7).
 
 ## API
