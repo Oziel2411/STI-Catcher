@@ -492,8 +492,28 @@ Cambios respecto del handoff:
 - **Inter incluida en la app** (`@fontsource/inter`, solo 400 y 500) en vez de Google Fonts: las PCs de la red pueden no tener internet, y cada visita avisaría a Google. El navegador baja solo el subconjunto latino (~48 KB).
 - **Íconos con los nombres `*Icon`** de Phosphor 2.1 (los nombres sin sufijo están marcados como obsoletos). Vite deja en el bundle solo los usados (+11 KB).
 - **`strong`, `b` y `th` en 500**: sin esto el navegador sintetiza una negrita que no existe.
-- **Contadores y punto de grabación en la barra lateral:** quedan para las etapas 2, 3 y 5. Necesitan saber qué trabajos son de este navegador y siguen en curso, y hoy la grabación se corta al cambiar de página.
+- **Contadores en la barra lateral:** quedan para las etapas 3 y 5 (necesitan saber qué trabajos son de este navegador y siguen en curso). El punto de "grabando" no se agrega: la grabación se corta al salir de la página, así que solo se vería estando en Grabar, donde ya está el indicador.
 - `docs/design/` está excluida de ESLint y Prettier (el `support.js` del mockup no es código de la app).
+
+### D-091 — Grabar: elegir la fuente antes de grabar · Etapa 2 · Vigente
+
+Una página no puede listar ventanas ni pantallas: elegir siempre lo hace el selector del navegador. El cambio es el orden:
+
+1. Se elige el tipo (pantalla, ventana o pestaña).
+2. `getDisplayMedia` se abre con `displaySurface` de ese tipo (Chrome y Edge abren esa solapa; Firefox lo ignora), sin ofrecer la propia pestaña de STI-Catcher (`selfBrowserSurface: exclude`).
+3. Se ve en vivo lo compartido, con nombre, tamaño y si trae sonido. «Cambiar» vuelve a abrir el selector; si se cancela, queda lo anterior.
+4. Recién entonces se graba, sobre el mismo stream.
+
+Detalles:
+
+- **Se muestra lo elegido de verdad** (`track.getSettings().displaySurface`), no lo pedido, y se marca ese tipo.
+- **El nombre de la ventana:** Chrome a veces da un identificador interno (`screen:0:0`, `window:1234:0`). En ese caso se muestra solo el tipo (`friendlyTrackLabel`).
+- **El aviso de «no se compartió el sonido» aparece en la vista previa**, antes de grabar, con la sugerencia de usar «Cambiar».
+- **El micrófono se pide al tildarlo** (`useMicrophone`). El medidor muestra el nivel real antes de grabar y al empezar no aparece otro permiso. Se libera al destildarlo, al terminar la grabación o al salir de la página.
+- **Cambiar los cuadros por segundo** con la vista previa abierta se aplica con `applyConstraints`, sin volver a elegir.
+- **Si se deja de compartir desde la barra del navegador** durante la vista previa, se vuelve al inicio; durante la grabación, se detiene como antes.
+
+Verificado con una fuente simulada (canvas 1600x900 + tono de 440 Hz como sonido del sistema, oscilador de 220 Hz como micrófono): MP4 1600x900 de 6,5 s con los dos tonos mezclados en una pista AAC estéreo.
 
 ## Deuda técnica
 
