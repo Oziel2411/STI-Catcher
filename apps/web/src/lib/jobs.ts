@@ -1,4 +1,28 @@
-import type { HistoryItem, Job, JobEvent, JobPhase, JobStatus, JobType } from '@sti-catcher/shared';
+import type {
+  HistoryItem,
+  Job,
+  JobEvent,
+  JobPhase,
+  JobProgress,
+  JobStatus,
+  JobType,
+} from '@sti-catcher/shared';
+import { formatBytes, formatEta, formatSpeedRatio } from './format.ts';
+
+/** Partes de la línea de progreso: fase, porcentaje, velocidad y tiempo restante. */
+export function progressDetails(progress: JobProgress | null): string[] {
+  const details: string[] = [progress ? PHASE_LABELS[progress.phase] : 'Iniciando'];
+  if (progress?.percent != null) details.push(`${progress.percent.toFixed(0)} %`);
+  if (progress?.speedBytesPerSecond != null && progress.speedBytesPerSecond > 0) {
+    details.push(`${formatBytes(progress.speedBytesPerSecond)}/s`);
+  }
+  // En los primeros segundos ffmpeg todavía no avanzó: "0x" confunde más de lo que informa.
+  if (progress?.speedRatio != null && progress.speedRatio > 0) {
+    details.push(`velocidad ${formatSpeedRatio(progress.speedRatio)}`);
+  }
+  if (progress?.etaSeconds != null) details.push(`faltan ${formatEta(progress.etaSeconds)}`);
+  return details;
+}
 
 export const STATUS_LABELS: Record<JobStatus, string> = {
   queued: 'En cola',

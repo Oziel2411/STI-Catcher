@@ -515,6 +515,21 @@ Detalles:
 
 Verificado con una fuente simulada (canvas 1600x900 + tono de 440 Hz como sonido del sistema, oscilador de 220 Hz como micrófono): MP4 1600x900 de 6,5 s con los dos tonos mezclados en una pista AAC estéreo.
 
+### D-092 — Convertir varios archivos · Etapa 3 · Vigente
+
+Sin cambios en el server: cada archivo usa los mismos endpoints de la fase 5 (`/api/uploads`, `/api/conversion/sources/:id`, `/api/jobs/convert`).
+
+- **Lista + detalle (2e).** Cada archivo tiene su propio formato (preset, resolución, GIF). Los formatos que no tienen sentido para ese archivo no se ofrecen, igual que antes.
+- **«Usar este formato en todos»** copia el formato a los demás solo donde vale. Un audio no recibe un video, y no se sube la resolución de un archivo más chico. Los que no pueden quedan como estaban.
+- **Subidas de a una**, en orden. Así cada subida usa todo el ancho de banda, se respeta `MAX_UPLOAD_MB` por archivo, y quitar un archivo de la lista corta solo su subida. Los que superan el máximo no se agregan; un aviso dice cuáles.
+- **«Convertir N»** crea un trabajo por archivo listo; la cola del server decide cuántos corren a la vez. El progreso llega por un solo stream SSE (`/api/events?jobIds=`).
+- **La lista se guarda en `sessionStorage`** (sin los `File`). Al recargar, lo subido se vuelve a analizar y lo que se estaba subiendo se pierde (el navegador avisa antes de salir mientras sube).
+- **Desde el historial o Grabar:** `?origen=id1,id2`. Los que ya están en la lista no se repiten, y después se limpia la URL.
+- **Al arrastrar se muestra solo la cantidad de archivos**, no los nombres ni el tamaño: el navegador no los da hasta soltarlos (2f).
+- Ids locales con un contador y no con `crypto.randomUUID`, que solo existe en contexto seguro (Convertir también se usa por `http://` en desarrollo).
+
+Verificado con archivos reales: dos soltados en la página y tres desde `?origen=` (MOV H.264, M4A, WebM de MediaRecorder, MOV HEVC). Probé WebM 360p aplicado a todos (el audio quedó en MP3 y el WebM de 240p sin cambio de resolución), las conversiones con progreso en vivo, un GIF, la recarga y la vista de celular.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

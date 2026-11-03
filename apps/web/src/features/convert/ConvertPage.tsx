@@ -1,360 +1,557 @@
+import { ArrowDownIcon, ArrowsLeftRightIcon, FilesIcon, PlusIcon } from '@phosphor-icons/react';
 import {
   CONVERSION_PRESETS,
   conversionOptionsResponseSchema,
-  conversionSourceResponseSchema,
-  createJobResponseSchema,
   isActiveStatus,
-  jobResponseSchema,
 } from '@sti-catcher/shared';
 import type {
   ConversionOptionsResponse,
   ConversionPresetId,
-  ConversionSourceResponse,
-  GifOptions,
+  GifLimits,
   Job,
 } from '@sti-catcher/shared';
 import { useEffect, useRef, useState } from 'react';
-import type { DragEvent } from 'react';
+import type { DragEvent, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { apiGet, apiPost } from '../../api/client.ts';
-import { uploadFile } from '../../api/upload.ts';
-import type { UploadHandle, UploadProgress } from '../../api/upload.ts';
+import { apiGet } from '../../api/client.ts';
 import { JobProgress } from '../../components/JobProgress.tsx';
-import { useTrackedJob } from '../../hooks/useTrackedJob.ts';
+import { gifFpsOptions, isScalable, scaleOptions } from '../../lib/convert.ts';
 import {
-  defaultGif,
-  defaultPreset,
-  gifFpsOptions,
-  gifProblems,
-  gifWidthOptions,
-  isScalable,
-  PRESET_GROUPS,
-  scaleOptions,
-} from '../../lib/convert.ts';
+  formatTag,
+  isConverting,
+  itemGifWidths,
+  itemMeta,
+  itemProblems,
+  parseOrigin,
+} from '../../lib/convert-batch.ts';
+import type { ConvertItem } from '../../lib/convert-batch.ts';
 import { formatBytes, formatDuration } from '../../lib/format.ts';
-import { TYPE_LABELS } from '../../lib/jobs.ts';
+import { progressDetails, STATUS_LABELS, TYPE_LABELS } from '../../lib/jobs.ts';
+import { useConvertBatch } from './useConvertBatch.ts';
+import type { ConvertBatch } from './useConvertBatch.ts';
 
-const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : 'Error desconocido.';
+/** Columnas de formatos: los principales a la vista, el resto detrás de "+ …". */
+const PRESET_COLUMNS: { title: string; main: ConversionPresetId[]; more: ConversionPresetId[] }[] =
+  [
+    { title: 'Video', main: ['mp4', 'webm', 'mov'], more: ['mkv', 'avi'] },
+    { title: 'Animación', main: ['gif'], more: [] },
+    { title: 'Solo audio', main: ['mp3', 'm4a'], more: ['wav'] },
+  ];
+
+const SHORT: Record<ConversionPresetId, string> = {
+  mp4: 'MP4',
+  webm: 'WebM',
+  mkv: 'MKV',
+  mov: 'MOV',
+  avi: 'AVI',
+  gif: 'GIF',
+  mp3: 'MP3',
+  m4a: 'M4A',
+  wav: 'WAV',
+};
+
+/** Arrastrar desde el escritorio (no texto ni links). */
+const isFileDrag = (event: DragEvent) => event.dataTransfer.types.includes('Files');
 
 /**
- * Conversión (SPEC §7). El origen es un archivo subido o uno del historial
- * (?origen=<jobId>, el link "Convertir" del historial). El server analiza el
- * archivo y dice qué formatos tienen sentido: solo esos se muestran.
+ * Convertir (SPEC §7, mockups 2e y 2f). Varios archivos a la vez: cada uno
+ * con su formato de salida. Se suben de a uno, el server analiza cada uno y
+ * solo se ofrecen los formatos que tienen sentido para ese archivo. También
+ * se pueden traer del historial (?origen=<id>[,<id>…]).
  */
 export function ConvertPage() {
-  const [params, setParams] = useSearchParams();
-  const sourceId = params.get('origen');
   const [options, setOptions] = useState<ConversionOptionsResponse | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const batch = useConvertBatch(options);
+  const [params, setParams] = useSearchParams();
+  const origin = params.get('origen');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragFiles, setDragFiles] = useState<number | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     apiGet('/api/conversion/options', conversionOptionsResponseSchema, controller.signal)
       .then(setOptions)
-      .catch(() => {
-        // Sin opciones se usa el límite que informe el server al subir.
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setLoadError(
+            error instanceof Error ? error.message : 'No se pudo consultar el servidor.',
+          );
+        }
       });
     return () => {
       controller.abort();
     };
   }, []);
 
-  const chooseSource = (jobId: string | null) => {
-    setParams(jobId === null ? {} : { origen: jobId });
+  // Links "Convertir" del historial: se suman a la lista y se limpia la URL.
+  const { addFromHistory } = batch;
+  useEffect(() => {
+    const ids = parseOrigin(origin);
+    if (ids.length === 0) return;
+    addFromHistory(ids);
+    setParams({}, { replace: true });
+  }, [origin, addFromHistory, setParams]);
+
+  const onDragOver = (event: DragEvent) => {
+    if (!isFileDrag(event) || !options) return;
+    event.preventDefault();
+    // El navegador no dice el tamaño hasta soltar: solo cuántos son.
+    setDragFiles(event.dataTransfer.items.length);
+  };
+  const onDragLeave = (event: DragEvent) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setDragFiles(null);
+  };
+  const onDrop = (event: DragEvent) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    setDragFiles(null);
+    batch.addFiles(event.dataTransfer.files);
   };
 
+  const empty = batch.items.length === 0;
+  const pick = () => inputRef.current?.click();
+
   return (
-    <section className="page">
+    <section className="page" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
       <header className="page-header">
         <div>
           <h1>Convertir archivos</h1>
           <p className="muted">
-            Video y audio entre MP4, WebM, MKV, MOV, AVI, GIF, MP3, M4A y WAV.
+            {empty
+              ? 'Video y audio entre MP4, WebM, MKV, MOV, AVI, GIF, MP3, M4A y WAV.'
+              : 'Elegí un archivo de la lista para cambiar su formato de salida.'}
           </p>
         </div>
+        {!empty && (
+          <div className="page-actions">
+            <button type="button" className="button button-secondary" onClick={pick}>
+              <PlusIcon size={16} aria-hidden="true" />
+              Agregar archivos
+            </button>
+            <button
+              type="button"
+              className="button"
+              disabled={batch.convertibleCount === 0 || batch.submitting}
+              onClick={() => void batch.convertReady()}
+            >
+              <ArrowsLeftRightIcon size={16} aria-hidden="true" />
+              {batch.submitting ? 'Creando…' : `Convertir ${String(batch.convertibleCount)}`}
+            </button>
+          </div>
+        )}
       </header>
 
-      {sourceId === null ? (
-        <UploadCard
-          maxUploadBytes={options?.maxUploadBytes ?? null}
-          onUploaded={(jobId) => {
-            chooseSource(jobId);
-          }}
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept="video/*,audio/*,.mkv,.avi,.mov"
+        hidden
+        onChange={(e) => {
+          if (e.target.files) batch.addFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
+
+      {loadError && (
+        <div className="alert alert-error" role="alert">
+          {loadError}
+        </div>
+      )}
+      {batch.notices.length > 0 && (
+        <div className="alert alert-warn notice-list" role="status">
+          {batch.notices.map((notice) => (
+            <p key={notice}>{notice}</p>
+          ))}
+          <button type="button" className="button button-ghost" onClick={batch.dismissNotices}>
+            Entendido
+          </button>
+        </div>
+      )}
+
+      {(empty || dragFiles !== null) && options && (
+        <Dropzone
+          dragFiles={dragFiles}
+          maxUploadBytes={options.maxUploadBytes}
+          compact={!empty}
+          onPick={pick}
         />
-      ) : (
-        options && (
-          <ConvertSource
-            key={sourceId}
-            sourceId={sourceId}
-            options={options}
-            onChangeSource={() => {
-              chooseSource(null);
-            }}
-          />
-        )
+      )}
+      {!options && !loadError && <p className="muted">Consultando el servidor…</p>}
+
+      {!empty && options && (
+        <div className="batch">
+          <ul className="batch-list" aria-label="Archivos">
+            {batch.items.map((item) => (
+              <BatchListItem
+                key={item.id}
+                item={item}
+                selected={batch.selected?.id === item.id}
+                onSelect={() => {
+                  batch.select(item.id);
+                }}
+              />
+            ))}
+          </ul>
+          {batch.selected && (
+            <ItemDetail
+              key={batch.selected.id}
+              item={batch.selected}
+              batch={batch}
+              limits={options.gif}
+            />
+          )}
+        </div>
       )}
     </section>
   );
 }
 
-function UploadCard({
+function Dropzone({
+  dragFiles,
   maxUploadBytes,
-  onUploaded,
+  compact,
+  onPick,
 }: {
-  maxUploadBytes: number | null;
-  onUploaded: (jobId: string) => void;
+  dragFiles: number | null;
+  maxUploadBytes: number;
+  compact: boolean;
+  onPick: () => void;
 }) {
-  const [progress, setProgress] = useState<UploadProgress | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const handleRef = useRef<UploadHandle | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(
-    () => () => {
-      handleRef.current?.abort();
-    },
-    [],
-  );
-
-  const start = (file: File) => {
-    setError(null);
-    if (maxUploadBytes !== null && file.size > maxUploadBytes) {
-      setError(
-        `El archivo pesa ${formatBytes(file.size)} y el máximo es ${formatBytes(maxUploadBytes)}.`,
-      );
-      return;
-    }
-    setFileName(file.name);
-    setProgress({ loadedBytes: 0, totalBytes: file.size });
-    const handle = uploadFile(file, setProgress);
-    handleRef.current = handle;
-    handle.promise
-      .then(({ jobId }) => {
-        onUploaded(jobId);
-      })
-      .catch((e: unknown) => {
-        setError(errorMessage(e));
-        setProgress(null);
-      })
-      .finally(() => {
-        handleRef.current = null;
-      });
-  };
-
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setDragging(false);
-    const file = event.dataTransfer.files[0];
-    if (file && progress === null) start(file);
-  };
-
-  const uploading = progress !== null;
-  const percent =
-    progress && progress.totalBytes > 0 ? (progress.loadedBytes / progress.totalBytes) * 100 : 0;
-
+  const dragging = dragFiles !== null;
   return (
-    <div className="card">
-      <h2>Archivo de origen</h2>
-      <p className="muted small">
-        Subí un archivo de video o audio, o elegí uno del <Link to="/historial">historial</Link> con
-        el botón «Convertir».
-      </p>
-      <div
-        className={`dropzone ${dragging ? 'dropzone-active' : ''}`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (!uploading) setDragging(true);
-        }}
-        onDragLeave={() => {
-          setDragging(false);
-        }}
-        onDrop={onDrop}
-      >
-        {uploading ? (
-          <>
-            <p className="small">
-              Subiendo <strong>{fileName}</strong>: {formatBytes(progress.loadedBytes)} de{' '}
-              {formatBytes(progress.totalBytes)}
-            </p>
-            <div
-              className="meter"
-              role="progressbar"
-              aria-label="Subida"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(percent)}
-            >
-              <div className="meter-fill" style={{ width: `${String(percent)}%` }} />
-            </div>
-            {percent >= 100 && <p className="small muted">Analizando el archivo…</p>}
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => handleRef.current?.abort()}
-            >
-              Cancelar subida
-            </button>
-          </>
-        ) : (
-          <>
-            <p>Arrastrá un archivo acá o</p>
-            <button type="button" className="button" onClick={() => inputRef.current?.click()}>
-              Elegir archivo
-            </button>
-            {maxUploadBytes !== null && (
-              <p className="small muted">Máximo {formatBytes(maxUploadBytes)}.</p>
-            )}
-          </>
-        )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept="video/*,audio/*,.mkv,.avi,.mov"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = '';
-            if (file) start(file);
-          }}
-        />
-      </div>
-      {error && (
-        <div className="alert alert-error" role="alert">
-          {error}
-        </div>
+    <div
+      className={`dropzone ${dragging ? 'dropzone-active' : ''} ${compact ? 'dropzone-compact' : ''}`}
+    >
+      {dragging ? (
+        <>
+          <ArrowDownIcon size={26} aria-hidden="true" className="dropzone-icon" />
+          <span className="dropzone-title">
+            Soltá para agregar {dragFiles === 1 ? 'el archivo' : `${String(dragFiles)} archivos`}
+          </span>
+          <span className="small muted">
+            Máximo {formatBytes(maxUploadBytes)} por archivo: los más grandes no se suben.
+          </span>
+        </>
+      ) : (
+        <>
+          <FilesIcon size={26} aria-hidden="true" className="dropzone-icon" />
+          <span className="dropzone-title">Arrastrá uno o varios archivos acá</span>
+          <span className="small muted">
+            O elegí del <Link to="/historial">historial</Link>. Máximo {formatBytes(maxUploadBytes)}{' '}
+            por archivo.
+          </span>
+          <button type="button" className="button" onClick={onPick}>
+            Elegir archivos
+          </button>
+        </>
       )}
     </div>
   );
 }
 
-type SourceState =
-  | { kind: 'loading' }
-  | { kind: 'error'; message: string }
-  | { kind: 'ready'; data: ConversionSourceResponse };
-
-function ConvertSource({
-  sourceId,
-  options,
-  onChangeSource,
-}: {
-  sourceId: string;
-  options: ConversionOptionsResponse;
-  onChangeSource: () => void;
-}) {
-  const [state, setState] = useState<SourceState>({ kind: 'loading' });
-
-  useEffect(() => {
-    const controller = new AbortController();
-    apiGet(
-      `/api/conversion/sources/${encodeURIComponent(sourceId)}`,
-      conversionSourceResponseSchema,
-      controller.signal,
-    )
-      .then((data) => {
-        setState({ kind: 'ready', data });
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setState({ kind: 'error', message: errorMessage(error) });
-      });
-    return () => {
-      controller.abort();
-    };
-  }, [sourceId]);
-
-  if (state.kind === 'loading') return <p className="muted">Analizando el archivo…</p>;
-  if (state.kind === 'error') {
-    return (
-      <>
-        <div className="alert alert-error" role="alert">
-          {state.message}
-        </div>
-        <button type="button" className="button button-secondary" onClick={onChangeSource}>
-          Elegir otro archivo
-        </button>
-      </>
-    );
+/** Etiqueta de estado de un ítem: el formato elegido mientras se puede elegir. */
+function ItemTag({ item }: { item: ConvertItem }) {
+  if (item.status === 'failed') return <span className="badge badge-error">Falló</span>;
+  if (item.status === 'uploading') return <span className="badge">Subiendo</span>;
+  if (item.status === 'analyzing') return <span className="badge">Analizando</span>;
+  if (item.status === 'ready') {
+    return <span className="badge badge-accent">{formatTag(item.preset, item.maxHeight)}</span>;
   }
-  return <ConvertForm source={state.data} options={options} onChangeSource={onChangeSource} />;
+  const job = item.job;
+  if (!job || isActiveStatus(job.status)) {
+    return <span className="badge">{formatTag(item.preset, item.maxHeight)}</span>;
+  }
+  const tone = job.status === 'done' ? 'badge-ok' : job.status === 'failed' ? 'badge-error' : '';
+  return <span className={`badge ${tone}`}>{STATUS_LABELS[job.status]}</span>;
 }
 
-function ConvertForm({
-  source,
-  options,
-  onChangeSource,
+function BatchListItem({
+  item,
+  selected,
+  onSelect,
 }: {
-  source: ConversionSourceResponse;
-  options: ConversionOptionsResponse;
-  onChangeSource: () => void;
+  item: ConvertItem;
+  selected: boolean;
+  onSelect: () => void;
 }) {
-  const { job: sourceJob, media, presets } = source;
-  const [preset, setPreset] = useState<ConversionPresetId | null>(defaultPreset(presets));
-  const [maxHeight, setMaxHeight] = useState<number | null>(null);
-  const [gif, setGif] = useState<GifOptions>(() => defaultGif(media, options.gif));
-  const [trackedId, setTrackedId] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { job, connected } = useTrackedJob(trackedId);
-  const active = job !== null && isActiveStatus(job.status);
+  const job = item.job;
+  const failed = item.status === 'failed' || job?.status === 'failed';
+  const uploadPercent =
+    item.status === 'uploading' && item.sizeBytes
+      ? (item.uploadedBytes / item.sizeBytes) * 100
+      : null;
+  const running = job?.status === 'running';
+  const percent = running ? (job.progress?.percent ?? null) : null;
 
-  const problems = preset === 'gif' ? gifProblems(gif, media, options.gif) : [];
-  const heights = scaleOptions(media.height);
+  let line = itemMeta(item);
+  if (item.status === 'uploading' && item.sizeBytes !== null) {
+    line = `Subiendo ${formatBytes(item.uploadedBytes)} de ${formatBytes(item.sizeBytes)}`;
+  } else if (running) {
+    line = progressDetails(job.progress)
+      .filter((part) => !part.startsWith('velocidad'))
+      .join(' · ');
+  } else if (job?.status === 'done') {
+    line = [SHORT[item.preset ?? 'mp4'], job.sizeBytes !== null ? formatBytes(job.sizeBytes) : null]
+      .filter(Boolean)
+      .join(' · ');
+  } else if (failed) {
+    line = item.error ?? job?.error ?? 'No se pudo convertir.';
+  }
 
-  const convert = () => {
-    if (preset === null) return;
-    setSubmitting(true);
-    setError(null);
-    apiPost('/api/jobs/convert', createJobResponseSchema, {
-      sourceJobId: sourceJob.id,
-      preset,
-      maxHeight: isScalable(preset) ? maxHeight : null,
-      ...(preset === 'gif' ? { gif } : {}),
-    })
-      .then(({ jobId }) => {
-        setTrackedId(jobId);
-      })
-      .catch((e: unknown) => {
-        setError(errorMessage(e));
-      })
-      .finally(() => {
-        setSubmitting(false);
-      });
-  };
+  return (
+    <li
+      className={`batch-item ${selected ? 'batch-item-selected' : ''} ${failed ? 'batch-item-failed' : ''}`}
+    >
+      <button
+        type="button"
+        className="batch-item-select"
+        onClick={onSelect}
+        aria-current={selected}
+      >
+        <span className="batch-item-line">
+          <span className="batch-item-name">{item.name}</span>
+          <ItemTag item={item} />
+        </span>
+        {(uploadPercent !== null || running) && (
+          <span
+            className={`meter ${uploadPercent !== null ? 'meter-muted' : ''} ${uploadPercent === null && percent === null ? 'meter-indeterminate' : ''}`}
+            aria-hidden="true"
+          >
+            <span
+              className="meter-fill"
+              style={{ width: `${String(uploadPercent ?? percent ?? 0)}%` }}
+            />
+          </span>
+        )}
+        <span className={`batch-item-meta ${failed ? 'text-error' : ''}`}>{line}</span>
+      </button>
+      {job?.status === 'done' && (
+        <a className="batch-item-download" href={`/api/jobs/${job.id}/file`} download>
+          Descargar
+        </a>
+      )}
+    </li>
+  );
+}
 
-  const cancel = () => {
-    if (!job) return;
-    apiPost(`/api/jobs/${job.id}/cancel`, jobResponseSchema).catch((e: unknown) => {
-      setError(errorMessage(e));
-    });
-  };
-
-  const sourceDetails = [
-    TYPE_LABELS[sourceJob.type],
+function sourceDetails(item: ConvertItem): string {
+  if (!item.source) return item.sizeBytes !== null ? formatBytes(item.sizeBytes) : '';
+  const { job, media } = item.source;
+  return [
+    TYPE_LABELS[job.type],
     formatDuration(media.durationSeconds),
     media.width !== null && media.height !== null
       ? `${String(media.width)}x${String(media.height)}`
       : null,
     [media.videoCodec, media.audioCodec].filter(Boolean).join(' + ') || null,
-    sourceJob.sizeBytes !== null ? formatBytes(sourceJob.sizeBytes) : null,
-  ].filter((part): part is string => part !== null && part !== '—');
+    item.sizeBytes !== null ? formatBytes(item.sizeBytes) : null,
+  ]
+    .filter((part): part is string => part !== null && part !== '—')
+    .join(' · ');
+}
 
-  return (
-    <div className="card">
-      <div className="media-summary">
-        <div>
-          <h2 className="media-title">{sourceJob.title ?? 'Archivo'}</h2>
-          <p className="muted small">{sourceDetails.join(' · ')}</p>
+function ItemDetail({
+  item,
+  batch,
+  limits,
+}: {
+  item: ConvertItem;
+  batch: ConvertBatch;
+  limits: GifLimits;
+}) {
+  const header = (
+    <div>
+      <h2 className="detail-title">{item.name}</h2>
+      <p className="muted small detail-meta">{sourceDetails(item)}</p>
+    </div>
+  );
+  const removeButton = (
+    <button
+      type="button"
+      className="button button-secondary"
+      onClick={() => {
+        batch.remove(item.id);
+      }}
+    >
+      Quitar de la lista
+    </button>
+  );
+
+  if (item.status === 'uploading') {
+    const percent = item.sizeBytes ? (item.uploadedBytes / item.sizeBytes) * 100 : 0;
+    return (
+      <div className="card detail">
+        {header}
+        <div
+          className="meter meter-muted"
+          role="progressbar"
+          aria-label="Subida"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(percent)}
+        >
+          <div className="meter-fill" style={{ width: `${String(percent)}%` }} />
+        </div>
+        <p className="small muted">
+          {percent >= 100
+            ? 'Analizando el archivo…'
+            : item.uploadedBytes === 0
+              ? 'Esperando su turno: los archivos se suben de a uno.'
+              : `Subiendo ${formatBytes(item.uploadedBytes)} de ${formatBytes(item.sizeBytes ?? 0)}`}
+        </p>
+        <div className="row">
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={() => {
+              batch.remove(item.id);
+            }}
+          >
+            Cancelar subida
+          </button>
         </div>
       </div>
-      <button
-        type="button"
-        className="button button-secondary"
-        onClick={onChangeSource}
-        disabled={active}
-      >
-        Usar otro archivo
-      </button>
+    );
+  }
+
+  if (item.status === 'analyzing') {
+    return (
+      <div className="card detail">
+        {header}
+        <p className="muted small">Analizando el archivo…</p>
+      </div>
+    );
+  }
+
+  if (item.status === 'failed') {
+    return (
+      <div className="card detail">
+        {header}
+        <div className="alert alert-error" role="alert">
+          {item.error ?? 'No se pudo procesar el archivo.'}
+        </div>
+        <div className="row">
+          {item.sourceJobId && (
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                batch.reanalyze(item);
+              }}
+            >
+              Volver a intentar
+            </button>
+          )}
+          {removeButton}
+        </div>
+      </div>
+    );
+  }
+
+  if (item.status === 'job') {
+    const job = item.job;
+    const active = isConverting(item);
+    return (
+      <div className="card detail">
+        {header}
+        <p className="small">
+          Formato:{' '}
+          <span className="badge badge-accent">{formatTag(item.preset, item.maxHeight)}</span>
+        </p>
+        {job ? (
+          <JobProgress job={job} connected doneContent={<ConvertDone job={job} />} />
+        ) : (
+          <p className="muted small">Conectando…</p>
+        )}
+        {item.error && (
+          <div className="alert alert-error" role="alert">
+            {item.error}
+          </div>
+        )}
+        <div className="row">
+          {active && (
+            <button
+              type="button"
+              className="button button-danger"
+              onClick={() => {
+                batch.cancel(item);
+              }}
+            >
+              Cancelar
+            </button>
+          )}
+          {job && (job.status === 'failed' || job.status === 'cancelled') && (
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                batch.retry(item);
+              }}
+            >
+              Reintentar
+            </button>
+          )}
+          {!active && (
+            <>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => {
+                  batch.convertAgain(item);
+                }}
+              >
+                Convertir a otro formato
+              </button>
+              {removeButton}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ReadyDetail
+      item={item}
+      batch={batch}
+      limits={limits}
+      header={header}
+      removeButton={removeButton}
+    />
+  );
+}
+
+function ReadyDetail({
+  item,
+  batch,
+  limits,
+  header,
+  removeButton,
+}: {
+  item: ConvertItem;
+  batch: ConvertBatch;
+  limits: GifLimits;
+  header: ReactNode;
+  removeButton: ReactNode;
+}) {
+  const source = item.source;
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  if (!source) return null;
+  const { media, presets } = source;
+  const heights = scaleOptions(media.height);
+  const problems = itemProblems(item, limits);
+  const gif = item.gif;
+  const readyCount = batch.items.filter((entry) => entry.status === 'ready').length;
+  const set = (patch: Partial<ConvertItem>) => {
+    batch.update(item.id, patch);
+  };
+
+  return (
+    <div className="card detail">
+      {header}
 
       {!media.hasVideo && (
         <div className="alert alert-warn" role="status">
@@ -367,59 +564,87 @@ function ConvertForm({
         </div>
       )}
 
-      <fieldset className="options" disabled={active || submitting}>
-        <legend>Formato de salida</legend>
-        {PRESET_GROUPS.map((group) => {
-          const ids = group.ids.filter((id) => presets.includes(id));
-          if (ids.length === 0) return null;
+      <div className="preset-columns" role="radiogroup" aria-label="Formato de salida">
+        {PRESET_COLUMNS.map((column) => {
+          const main = column.main.filter((id) => presets.includes(id));
+          const more = column.more.filter((id) => presets.includes(id));
+          if (main.length + more.length === 0) return null;
+          const showMore =
+            expanded.has(column.title) || (item.preset !== null && more.includes(item.preset));
+          const visible = showMore ? [...main, ...more] : main;
           return (
-            <div key={group.title} className="preset-group">
-              <p className="small muted preset-group-title">{group.title}</p>
-              {ids.map((id) => (
-                <label key={id} className="choice">
+            <div key={column.title} className="preset-column">
+              <span className="kicker">{column.title}</span>
+              {visible.map((id) => (
+                <label key={id} className="choice-card">
                   <input
                     type="radio"
-                    name="preset"
-                    value={id}
-                    checked={preset === id}
+                    name={`preset-${item.id}`}
+                    className="visually-hidden"
+                    checked={item.preset === id}
                     onChange={() => {
-                      setPreset(id);
+                      set({
+                        preset: id,
+                        maxHeight: CONVERSION_PRESETS[id].scalable ? item.maxHeight : null,
+                      });
                     }}
                   />
-                  <span>
-                    <strong>{CONVERSION_PRESETS[id].label}</strong>
-                    <span className="muted small"> — {CONVERSION_PRESETS[id].description}</span>
-                  </span>
+                  <span className="choice-card-title">{CONVERSION_PRESETS[id].label}</span>
+                  <span className="choice-card-hint">{CONVERSION_PRESETS[id].description}</span>
                 </label>
               ))}
+              {!showMore && more.length > 0 && (
+                <button
+                  type="button"
+                  className="button button-ghost preset-more"
+                  onClick={() => {
+                    setExpanded(new Set(expanded).add(column.title));
+                  }}
+                >
+                  + {more.map((id) => SHORT[id]).join(', ')}
+                </button>
+              )}
             </div>
           );
         })}
-      </fieldset>
+      </div>
 
-      {preset !== null && isScalable(preset) && heights.length > 0 && (
-        <fieldset className="options" disabled={active || submitting}>
-          <legend>Resolución</legend>
-          <select
-            aria-label="Resolución"
-            value={maxHeight ?? ''}
-            onChange={(e) => {
-              setMaxHeight(e.target.value === '' ? null : Number(e.target.value));
-            }}
-          >
-            <option value="">Mantener ({String(media.height)}p)</option>
+      {item.preset !== null && isScalable(item.preset) && heights.length > 0 && (
+        <div className="detail-row">
+          <span className="field-label" id={`res-${item.id}`}>
+            Resolución
+          </span>
+          <div className="seg" role="radiogroup" aria-labelledby={`res-${item.id}`}>
+            <label className="seg-opt">
+              <input
+                type="radio"
+                name={`res-${item.id}`}
+                checked={item.maxHeight === null}
+                onChange={() => {
+                  set({ maxHeight: null });
+                }}
+              />
+              Mantener ({String(media.height)}p)
+            </label>
             {heights.map((height) => (
-              <option key={height} value={height}>
-                Reducir a {height}p
-              </option>
+              <label key={height} className="seg-opt">
+                <input
+                  type="radio"
+                  name={`res-${item.id}`}
+                  checked={item.maxHeight === height}
+                  onChange={() => {
+                    set({ maxHeight: height });
+                  }}
+                />
+                {height}p
+              </label>
             ))}
-          </select>
-        </fieldset>
+          </div>
+        </div>
       )}
 
-      {preset === 'gif' && (
-        <fieldset className="options gif-options" disabled={active || submitting}>
-          <legend>GIF</legend>
+      {item.preset === 'gif' && gif && (
+        <div className="gif-options">
           <div className="row">
             <label className="field">
               <span>Inicio (s)</span>
@@ -429,7 +654,7 @@ function ConvertForm({
                 step={0.1}
                 value={gif.startSeconds}
                 onChange={(e) => {
-                  setGif({ ...gif, startSeconds: Number(e.target.value) });
+                  set({ gif: { ...gif, startSeconds: Number(e.target.value) } });
                 }}
               />
             </label>
@@ -441,7 +666,7 @@ function ConvertForm({
                 step={0.1}
                 value={gif.endSeconds}
                 onChange={(e) => {
-                  setGif({ ...gif, endSeconds: Number(e.target.value) });
+                  set({ gif: { ...gif, endSeconds: Number(e.target.value) } });
                 }}
               />
             </label>
@@ -450,10 +675,10 @@ function ConvertForm({
               <select
                 value={gif.fps}
                 onChange={(e) => {
-                  setGif({ ...gif, fps: Number(e.target.value) });
+                  set({ gif: { ...gif, fps: Number(e.target.value) } });
                 }}
               >
-                {gifFpsOptions(options.gif).map((fps) => (
+                {gifFpsOptions(limits).map((fps) => (
                   <option key={fps} value={fps}>
                     {fps}
                   </option>
@@ -465,10 +690,10 @@ function ConvertForm({
               <select
                 value={gif.width}
                 onChange={(e) => {
-                  setGif({ ...gif, width: Number(e.target.value) });
+                  set({ gif: { ...gif, width: Number(e.target.value) } });
                 }}
               >
-                {gifWidthOptions(options.gif, media.width).map((width) => (
+                {itemGifWidths(item, limits).map((width) => (
                   <option key={width} value={width}>
                     {width} px
                   </option>
@@ -481,43 +706,36 @@ function ConvertForm({
             {Math.max(0, gif.endSeconds - gif.startSeconds)
               .toFixed(1)
               .replace('.', ',')}{' '}
-            s (máximo {options.gif.maxSeconds} s). Sin sonido.
+            s (máximo {limits.maxSeconds} s). Sin sonido.
           </p>
           {problems.map((problem) => (
             <p key={problem} className="small text-error">
               {problem}
             </p>
           ))}
-        </fieldset>
-      )}
-
-      {error && (
-        <div className="alert alert-error" role="alert">
-          {error}
         </div>
       )}
 
-      <div className="row">
-        {active ? (
-          <button type="button" className="button button-danger" onClick={cancel}>
-            Cancelar
-          </button>
-        ) : (
+      {item.error && (
+        <div className="alert alert-error" role="alert">
+          {item.error}
+        </div>
+      )}
+
+      <div className="detail-actions">
+        {removeButton}
+        {readyCount > 1 && (
           <button
             type="button"
-            className="button"
-            onClick={convert}
-            disabled={preset === null || submitting || problems.length > 0}
+            className="button button-ghost"
+            onClick={() => {
+              batch.applyToAll(item.id);
+            }}
           >
-            {submitting ? 'Creando…' : 'Convertir'}
+            Usar este formato en todos
           </button>
         )}
       </div>
-
-      {trackedId !== null && job === null && <p className="muted small">Conectando…</p>}
-      {job && (
-        <JobProgress job={job} connected={connected} doneContent={<ConvertDone job={job} />} />
-      )}
     </div>
   );
 }
