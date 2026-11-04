@@ -611,6 +611,20 @@ Verificado con una fuente simulada: programada para el minuto siguiente con cort
 
 Verificado: con la base de prueba (28 trabajos), un trabajo nuevo quedó como «SISTEMAS2-PC» y los viejos como 127.0.0.1; filtrar por grabaciones dio 4, por SISTEMAS2-PC 1 y desde el 4/11 15; un rango invertido avisa; «Limpiar filtros» vuelve a los 28.
 
+### D-099 — Aviso por mail al terminar una grabación · Vigente
+
+Pensado para las grabaciones programadas (D-097), que se dejan solas: al terminar bien una grabación se manda un mail a direcciones fijas.
+
+- **Destinatarios fijos** (`MAIL_TO`, separados por comas), configurados en el server. No hay login para saber el mail de cada uno.
+- **Solo grabaciones terminadas.** Las descargas y conversiones no avisan (serían muchos mails, y quien las pide está mirando la pantalla). Tampoco avisan las fallas: se decidió así para empezar.
+- **SMTP con nodemailer** (10.1.7, sin dependencias, licencia MIT-0, con tipos propios). Se usó la versión publicada hace más de dos semanas, no la última. La casilla `soporte-notificaciones@capitanes.ar` está en Ferozo, con SSL en el puerto 465 (`SMTP_SECURITY=ssl`; también se admite `starttls` en el 587).
+- **La contraseña solo va en el `.env` del server.** No se loguea; los errores de nodemailer se traducen a mensajes en español sin datos de la cuenta (`EAUTH` → usuario o contraseña, `ESOCKET`/`ECONNECTION` → host o puerto, `EENVELOPE` → destinatarios). Las direcciones de MAIL_TO tampoco salen por la API: solo cuántas son.
+- **No demora la cola:** el envío va en segundo plano desde `onDone`. Si falla, queda en el log (la grabación igual está en el Historial).
+- **Mail en texto plano:** título, duración, resolución, tamaño, PC que la pidió, inicio y fin (hora del server, 24 h). Sin link: se decidió que la grabación se busque en el Historial.
+- **Página Estado:** muestra si está activo, el remitente y cuántos destinatarios hay, más un botón «Mandar mail de prueba» (`POST /api/mail/test`; 409 si falta configurar, 502 con el motivo si el servidor de correo falla).
+
+Verificado con un SMTP falso local con SSL y una CA de prueba: el mail de prueba y el aviso de una grabación de 5 s llegaron con el remitente, el asunto y los dos destinatarios. Con una contraseña mala, nodemailer devolvió `EAUTH` sin la contraseña en el error, y la contraseña no apareció en los logs. Falta probarlo con la casilla real (lo hace quien cargue la contraseña).
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

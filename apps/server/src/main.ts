@@ -29,6 +29,9 @@ import { createDownloadRunner } from './modules/download/download-runner.ts';
 import { createDownloadService } from './modules/download/download-service.ts';
 import { createFollowUps } from './modules/download/follow-up.ts';
 import { createHostResolver } from './adapters/host-resolver.ts';
+import { createSmtpMailer } from './adapters/mailer.ts';
+import { createMailService } from './modules/notifications/mail-service.ts';
+import { createRecordingNotice } from './modules/notifications/recording-notice.ts';
 import { createJobFiles } from './modules/files/job-files.ts';
 import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
@@ -159,7 +162,10 @@ async function main(): Promise<void> {
     minFreeDiskBytes: config.limits.minFreeDiskBytes,
     readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,
     // La conversión encadenada necesita el servicio de conversión, que necesita la cola.
-    onDone: (record) => followUps(record),
+    onDone: async (record) => {
+      notifyRecording(record);
+      await followUps(record);
+    },
     resolveHost: createHostResolver(),
     logger,
   });
@@ -213,6 +219,24 @@ async function main(): Promise<void> {
     gifLimits,
   });
   const followUps = createFollowUps({ conversion, queue, repo, logger });
+  // Aviso por mail al terminar una grabación (D-099). Sin SMTP o sin MAIL_TO, nada.
+  const sendMail = config.mail ? createSmtpMailer(config.mail) : null;
+  const mail = createMailService({
+    send: sendMail,
+    from: config.mail?.from ?? null,
+    to: config.mail?.to ?? [],
+  });
+  const notifyRecording = sendMail
+    ? createRecordingNotice({ send: sendMail, to: config.mail?.to ?? [], logger })
+    : () => undefined;
+  if (config.mail) {
+    logger.info(
+      { host: config.mail.host, port: config.mail.port, recipients: config.mail.to.length },
+      config.mail.to.length > 0
+        ? 'Aviso por mail de grabaciones activo'
+        : 'Mail configurado sin destinatarios (MAIL_TO): no se mandan avisos',
+    );
+  }
   const upload = createUploadService({
     tempDir: storage.tempDir,
     filesDir: storage.filesDir,
@@ -257,6 +281,7 @@ async function main(): Promise<void> {
       upload,
       conversionOptions,
       recordings,
+      mail,
     },
     filesDir: storage.filesDir,
     webDistDir: config.nodeEnv === 'production' ? path.join(repoRoot, 'apps', 'web', 'dist') : null,

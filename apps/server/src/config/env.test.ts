@@ -123,3 +123,47 @@ describe('resolveEnvFilePath', () => {
     expect(resolveEnvFilePath(BASE, { STI_ENV_FILE: 'E:\\sti\\.env' })).toBe('E:\\sti\\.env');
   });
 });
+
+describe('mail (D-099)', () => {
+  const smtp = {
+    ...minimal,
+    SMTP_HOST: 'c1831749.ferozo.com',
+    SMTP_USER: 'avisos@capitanes.ar',
+    SMTP_PASSWORD: 'secreta',
+  };
+
+  it('sin SMTP_HOST no hay mail', () => {
+    expect(parseConfig(minimal, BASE).mail).toBeNull();
+  });
+
+  it('SSL en el 465 por defecto; el remitente es la casilla; destinatarios separados por comas', () => {
+    const config = parseConfig({ ...smtp, MAIL_TO: 'a@capitanes.ar; b@capitanes.ar , ' }, BASE);
+    expect(config.mail).toEqual({
+      host: 'c1831749.ferozo.com',
+      port: 465,
+      secure: true,
+      auth: { user: 'avisos@capitanes.ar', password: 'secreta' },
+      from: 'avisos@capitanes.ar',
+      to: ['a@capitanes.ar', 'b@capitanes.ar'],
+    });
+  });
+
+  it('STARTTLS en otro puerto; MAIL_TO vacío = nadie', () => {
+    const config = parseConfig(
+      { ...smtp, SMTP_PORT: '587', SMTP_SECURITY: 'starttls', MAIL_TO: '' },
+      BASE,
+    );
+    expect(config.mail).toMatchObject({ port: 587, secure: false, to: [] });
+  });
+
+  it('rechaza un destinatario inválido o un usuario sin contraseña, sin mostrar la contraseña', () => {
+    expect(
+      errorOf(() => parseConfig({ ...smtp, MAIL_TO: 'a@capitanes.ar, juanpi' }, BASE)).message,
+    ).toContain('«juanpi» no es una dirección de mail');
+    const error = errorOf(() => parseConfig({ ...smtp, SMTP_PASSWORD: '' }, BASE));
+    expect(error.message).toContain('SMTP_PASSWORD');
+    expect(errorOf(() => parseConfig({ ...smtp, MAIL_TO: 'x' }, BASE)).message).not.toContain(
+      'secreta',
+    );
+  });
+});

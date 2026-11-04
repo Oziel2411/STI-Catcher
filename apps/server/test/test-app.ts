@@ -22,6 +22,9 @@ import { createUploadService } from '../src/modules/conversion/upload-service.ts
 import { createRecordingService } from '../src/modules/recording/recording-service.ts';
 import { createDownloadService } from '../src/modules/download/download-service.ts';
 import { createFollowUps } from '../src/modules/download/follow-up.ts';
+import type { MailMessage, SendMail } from '../src/adapters/mailer.ts';
+import { createMailService } from '../src/modules/notifications/mail-service.ts';
+import { createRecordingNotice } from '../src/modules/notifications/recording-notice.ts';
 import { createJobFiles } from '../src/modules/files/job-files.ts';
 import { createHistoryService } from '../src/modules/history/history-service.ts';
 import type { HealthService } from '../src/modules/health/health-service.ts';
@@ -51,6 +54,10 @@ export type TestAppOptions = {
   maxUploadBytes?: number;
   /** IP → nombre de la PC (por defecto no se resuelve). */
   resolveHost?: (ip: string) => Promise<string | null>;
+  /** Destinatarios del aviso por mail. Los mails no salen: quedan en `sentMails`. */
+  mailTo?: string[];
+  /** Simula un servidor de correo que falla. */
+  sendMail?: SendMail;
 };
 
 export const sampleVideoMedia: MediaInfo = {
@@ -107,7 +114,10 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     readFreeDiskBytes: () => Promise.resolve(options.freeDiskBytes ?? 1024 ** 4),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     progressIntervalMs: 0,
-    onDone: (record) => followUps(record),
+    onDone: async (record) => {
+      notifyRecording(record);
+      await followUps(record);
+    },
     ...(options.resolveHost ? { resolveHost: options.resolveHost } : {}),
   });
   queue.start();
@@ -145,6 +155,24 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     gifLimits: testGifLimits,
   });
   const followUps = createFollowUps({ conversion, queue, repo, logger: { warn: vi.fn() } });
+  const sentMails: MailMessage[] = [];
+  const sendMail: SendMail =
+    options.sendMail ??
+    ((message) => {
+      sentMails.push(message);
+      return Promise.resolve();
+    });
+  const mailTo = options.mailTo ?? [];
+  const notifyRecording = createRecordingNotice({
+    send: sendMail,
+    to: mailTo,
+    logger: { info: vi.fn(), warn: vi.fn() },
+  });
+  const mail = createMailService({
+    send: options.mailTo ? sendMail : null,
+    from: options.mailTo ? 'avisos@capitanes.ar' : null,
+    to: mailTo,
+  });
   mkdirSync(path.join(storageDir, 'tmp'), { recursive: true });
   mkdirSync(filesDir, { recursive: true });
   const upload = createUploadService({
@@ -191,6 +219,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       upload,
       conversionOptions,
       recordings,
+      mail,
     },
     filesDir,
     webDistDir: options.webDistDir ?? null,
@@ -213,6 +242,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     recordingsRepo,
     recordingsDir,
     clock,
+    sentMails,
   };
 }
 

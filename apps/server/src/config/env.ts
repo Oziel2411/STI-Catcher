@@ -32,6 +32,19 @@ const requiredPath = z
   .min(1, { error: 'Es obligatoria.' });
 
 const optionalPath = z.preprocess(emptyToUndefined, z.string().trim().optional());
+const optionalText = optionalPath;
+
+/** "a@x.com, b@y.com" → lista validada (vacío = nadie). */
+const emailList = z.preprocess(
+  (value) =>
+    typeof value === 'string'
+      ? value
+          .split(/[,;]/)
+          .map((part) => part.trim())
+          .filter((part) => part !== '')
+      : [],
+  z.array(z.email({ error: (issue) => `«${String(issue.input)}» no es una dirección de mail.` })),
+);
 
 const rawEnvSchema = z
   .object({
@@ -78,8 +91,34 @@ const rawEnvSchema = z
 
     // Grabación: sin fragmentos nuevos durante este tiempo se da por terminada (D-032).
     RECORDING_IDLE_MINUTES: intInRange(1, 60, 2),
+
+    // Aviso por mail al terminar una grabación (D-099). Sin SMTP_HOST o sin
+    // MAIL_TO no se manda nada.
+    SMTP_HOST: optionalText,
+    SMTP_PORT: intInRange(1, 65_535, 465),
+    /** ssl: TLS desde el principio (puerto 465). starttls: texto y después TLS (587). */
+    SMTP_SECURITY: z.enum(['ssl', 'starttls']).default('ssl'),
+    SMTP_USER: optionalText,
+    SMTP_PASSWORD: z.preprocess(emptyToUndefined, z.string().optional()),
+    MAIL_FROM: optionalText,
+    MAIL_TO: emailList,
   })
   .superRefine((env, ctx) => {
+    if (env.SMTP_USER !== undefined && env.SMTP_PASSWORD === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SMTP_PASSWORD'],
+        message: 'Con SMTP_USER hace falta SMTP_PASSWORD (la contraseña de la casilla).',
+      });
+    }
+    const from = env.MAIL_FROM ?? env.SMTP_USER;
+    if (env.SMTP_HOST !== undefined && from !== undefined && !z.email().safeParse(from).success) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MAIL_FROM'],
+        message: `«${from}» no es una dirección de mail (MAIL_FROM, o SMTP_USER si no hay MAIL_FROM).`,
+      });
+    }
     const hasCert = env.HTTPS_CERT_PATH !== undefined;
     const hasKey = env.HTTPS_KEY_PATH !== undefined;
     if (hasCert !== hasKey) {
@@ -134,6 +173,15 @@ export type Config = {
   recording: {
     idleMinutes: number;
   };
+  /** null si falta SMTP_HOST. Ver D-099. */
+  mail: {
+    host: string;
+    port: number;
+    secure: boolean;
+    auth: { user: string; password: string } | null;
+    from: string;
+    to: string[];
+  } | null;
   gif: {
     maxSeconds: number;
     maxFps: number;
@@ -207,6 +255,20 @@ export function parseConfig(raw: Record<string, string | undefined>, baseDir: st
     recording: {
       idleMinutes: env.RECORDING_IDLE_MINUTES,
     },
+    mail:
+      env.SMTP_HOST === undefined
+        ? null
+        : {
+            host: env.SMTP_HOST,
+            port: env.SMTP_PORT,
+            secure: env.SMTP_SECURITY === 'ssl',
+            auth:
+              env.SMTP_USER !== undefined && env.SMTP_PASSWORD !== undefined
+                ? { user: env.SMTP_USER, password: env.SMTP_PASSWORD }
+                : null,
+            from: env.MAIL_FROM ?? env.SMTP_USER ?? `sti-catcher@${env.SMTP_HOST}`,
+            to: env.MAIL_TO,
+          },
     gif: {
       maxSeconds: env.GIF_MAX_SECONDS,
       maxFps: env.GIF_MAX_FPS,

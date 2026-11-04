@@ -66,6 +66,21 @@ LOG_DIR=C:\STI-Catcher\logs
 
 Volvé a correr `.\scripts\setup.ps1` para que cree las carpetas nuevas.
 
+### Aviso por mail de grabaciones (opcional)
+
+Para que llegue un mail cuando termina una grabación, completá en el `.env` la casilla que manda y los destinatarios (D-099):
+
+```ini
+SMTP_HOST=c1831749.ferozo.com
+SMTP_PORT=465
+SMTP_SECURITY=ssl
+SMTP_USER=soporte-notificaciones@capitanes.ar
+SMTP_PASSWORD=          # la contraseña de la casilla: escribila solo acá
+MAIL_TO=nombre@capitanes.ar, otro@capitanes.ar
+```
+
+Reiniciá el servicio y probalo en **Estado → Aviso por mail → Mandar mail de prueba**. Si falla, el mensaje dice qué revisar (usuario y contraseña, host o puerto, destinatarios).
+
 ## 4. Compilar
 
 ```powershell

@@ -24,6 +24,8 @@ import { registerHealthRoutes } from './routes/health.ts';
 import { registerJobRoutes } from './routes/jobs.ts';
 import { registerRecordingRoutes } from './routes/recordings.ts';
 import { registerMediaRoutes } from './routes/media.ts';
+import { registerMailRoutes } from './routes/mail.ts';
+import type { MailService } from './modules/notifications/mail-service.ts';
 
 export type AppServices = {
   health: HealthService;
@@ -36,6 +38,7 @@ export type AppServices = {
   upload: UploadService;
   conversionOptions: ConversionOptionsResponse;
   recordings: RecordingService;
+  mail: MailService;
 };
 
 export type BuildAppOptions = {
@@ -126,6 +129,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     upload: options.services.upload,
     options: options.services.conversionOptions,
   });
+  registerMailRoutes(app, options.services.mail, app.log);
   registerEventRoutes(app, {
     queue: options.services.jobs,
     bus: options.services.events,
