@@ -5,6 +5,7 @@ import {
   MonitorIcon,
   StopIcon,
   SwapIcon,
+  TimerIcon,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import { isActiveStatus, RECORDING_FPS } from '@sti-catcher/shared';
@@ -21,7 +22,15 @@ import {
   SOURCE_KINDS,
 } from '../../lib/recording.ts';
 import type { RecordingSupport, SourceKind } from '../../lib/recording.ts';
-import { previewOf, useElapsedSeconds, useRecorder } from './recorder-context.ts';
+import {
+  describeSchedule,
+  describeTime,
+  formatCountdown,
+  MAX_SCHEDULE_MINUTES,
+  scheduleProblems,
+} from '../../lib/recording-schedule.ts';
+import type { RecordingSchedule, StartMode, StopMode } from '../../lib/recording-schedule.ts';
+import { previewOf, useClock, useElapsedSeconds, useRecorder } from './recorder-context.ts';
 import type { Fps, Preview } from './recorder-context.ts';
 
 const SOURCE_ICONS: Record<SourceKind, Icon> = {
@@ -96,8 +105,8 @@ function Unsupported({ support }: { support: Exclude<RecordingSupport, { ok: tru
 
 function Recorder() {
   const recorder = useRecorder();
-  const { settings, phase, upload, error, warning, mic, attachPage } = recorder;
-  const { sourceKind, fps, systemAudio, microphone, title } = settings;
+  const { settings, phase, upload, error, warning, notice, mic, attachPage } = recorder;
+  const { sourceKind, fps, systemAudio, microphone, title, schedule } = settings;
 
   // Con la página abierta, el micrófono muestra su nivel; al irse, una vista
   // previa sin grabar se deja de compartir. Una grabación sigue (D-094).
@@ -110,9 +119,13 @@ function Recorder() {
   const elapsed = useElapsedSeconds(phase.kind === 'recording' ? phase.startedAt : null);
   const locked =
     phase.kind === 'choosing' ||
+    phase.kind === 'scheduled' ||
     phase.kind === 'starting' ||
     recording ||
     phase.kind === 'finishing';
+  const timed = phase.kind === 'scheduled' || (phase.kind === 'recording' && phase.stopAt !== null);
+  const now = useClock(timed);
+  const micMissing = microphone && mic.stream === null;
 
   const noSystemAudio =
     preview !== null && systemAudio && preview.stream.getAudioTracks().length === 0;
@@ -127,6 +140,11 @@ function Recorder() {
       {warning && (
         <div className="alert alert-warn" role="status">
           {warning}
+        </div>
+      )}
+      {notice && (
+        <div className="alert alert-info" role="status">
+          {notice}
         </div>
       )}
       {noSystemAudio && phase.kind !== 'choosing' && (
@@ -182,6 +200,28 @@ function Recorder() {
                 {upload.pending > 2 && ` · ${String(upload.pending)} fragmentos esperando`}
                 {upload.retrying && ' · problemas de red, reintentando…'}
               </span>
+              {phase.stopAt !== null && (
+                <span className="schedule-line">
+                  <TimerIcon size={14} aria-hidden="true" />
+                  Se detiene {describeTime(phase.stopAt, new Date(now))} · faltan{' '}
+                  {formatCountdown((phase.stopAt - now) / 1000)}
+                </span>
+              )}
+            </div>
+          )}
+          {phase.kind === 'scheduled' && (
+            <div className="scheduled-status" aria-live="polite">
+              <p>
+                <TimerIcon size={16} aria-hidden="true" />
+                <strong>
+                  Empieza {describeTime(phase.startAt, new Date(now))} · faltan{' '}
+                  {formatCountdown((phase.startAt - now) / 1000)}
+                </strong>
+              </p>
+              <p className="muted small">
+                Dejá esta pestaña abierta y la PC sin suspender (la pantalla puede quedar
+                bloqueada). Podés ir a otras secciones: la grabación empieza igual.
+              </p>
             </div>
           )}
           {phase.kind === 'finishing' && (
@@ -290,6 +330,8 @@ function Recorder() {
             </div>
           )}
 
+          <ScheduleOptions schedule={schedule} disabled={locked} onChange={recorder.setSchedule} />
+
           {recording ? (
             <button
               type="button"
@@ -299,11 +341,40 @@ function Recorder() {
               <StopIcon size={14} weight="fill" aria-hidden="true" />
               Detener grabación
             </button>
+          ) : phase.kind === 'scheduled' ? (
+            <div className="schedule-actions">
+              <button
+                type="button"
+                className="button button-block"
+                disabled={micMissing}
+                onClick={() => void recorder.startRecording()}
+              >
+                <span className="rec-dot" aria-hidden="true" />
+                Empezar ahora
+              </button>
+              <button
+                type="button"
+                className="button button-secondary button-block"
+                onClick={recorder.cancelSchedule}
+              >
+                Cancelar programación
+              </button>
+            </div>
+          ) : schedule.startMode === 'at' ? (
+            <button
+              type="button"
+              className="button button-block"
+              disabled={phase.kind !== 'previewing' || micMissing}
+              onClick={recorder.scheduleStart}
+            >
+              <TimerIcon size={14} aria-hidden="true" />
+              Programar grabación
+            </button>
           ) : (
             <button
               type="button"
               className="button button-block"
-              disabled={phase.kind !== 'previewing' || (microphone && mic.stream === null)}
+              disabled={phase.kind !== 'previewing' || micMissing}
               onClick={() => void recorder.startRecording()}
             >
               <span className="rec-dot" aria-hidden="true" />
@@ -313,6 +384,119 @@ function Recorder() {
         </div>
       </div>
     </>
+  );
+}
+
+const START_OPTIONS: { value: StartMode; label: string }[] = [
+  { value: 'now', label: 'Al tocar el botón' },
+  { value: 'at', label: 'A una hora' },
+];
+
+const STOP_OPTIONS: { value: StopMode; label: string }[] = [
+  { value: 'manual', label: 'Al detener' },
+  { value: 'after', label: 'Por minutos' },
+  { value: 'at', label: 'A una hora' },
+];
+
+/** Inicio y corte automáticos (D-097). */
+function ScheduleOptions({
+  schedule,
+  disabled,
+  onChange,
+}: {
+  schedule: RecordingSchedule;
+  disabled: boolean;
+  onChange: (patch: Partial<RecordingSchedule>) => void;
+}) {
+  // Se recalcula cada medio minuto: "hoy" o "mañana" depende de la hora actual.
+  const now = new Date(Math.floor(useClock(true) / 30_000) * 30_000);
+  const summary = describeSchedule(schedule, now);
+  const problems =
+    schedule.startMode === 'now' && schedule.stopMode === 'manual'
+      ? []
+      : scheduleProblems(schedule, now);
+  return (
+    <fieldset className="schedule" disabled={disabled}>
+      <legend>Programar</legend>
+      <div className="field">
+        <span id="start-label">Empezar</span>
+        <div className="seg seg-block" role="radiogroup" aria-labelledby="start-label">
+          {START_OPTIONS.map((option) => (
+            <label key={option.value} className="seg-opt">
+              <input
+                type="radio"
+                name="start-mode"
+                checked={schedule.startMode === option.value}
+                onChange={() => {
+                  onChange({ startMode: option.value });
+                }}
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
+        {schedule.startMode === 'at' && (
+          <input
+            type="time"
+            aria-label="Hora de inicio"
+            value={schedule.startAt}
+            onChange={(e) => {
+              onChange({ startAt: e.target.value });
+            }}
+          />
+        )}
+      </div>
+      <div className="field">
+        <span id="stop-label">Terminar</span>
+        <div className="seg seg-block" role="radiogroup" aria-labelledby="stop-label">
+          {STOP_OPTIONS.map((option) => (
+            <label key={option.value} className="seg-opt">
+              <input
+                type="radio"
+                name="stop-mode"
+                checked={schedule.stopMode === option.value}
+                onChange={() => {
+                  onChange({ stopMode: option.value });
+                }}
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
+        {schedule.stopMode === 'after' && (
+          <label className="inline-field">
+            <input
+              type="number"
+              min={1}
+              max={MAX_SCHEDULE_MINUTES}
+              step={1}
+              aria-label="Minutos de grabación"
+              value={Number.isFinite(schedule.stopAfterMinutes) ? schedule.stopAfterMinutes : ''}
+              onChange={(e) => {
+                onChange({ stopAfterMinutes: e.target.valueAsNumber });
+              }}
+            />
+            minutos
+          </label>
+        )}
+        {schedule.stopMode === 'at' && (
+          <input
+            type="time"
+            aria-label="Hora de fin"
+            value={schedule.stopAt}
+            onChange={(e) => {
+              onChange({ stopAt: e.target.value });
+            }}
+          />
+        )}
+      </div>
+      {summary && <p className="small schedule-summary">{summary}</p>}
+      {problems.map((problem) => (
+        <p key={problem} className="small text-error">
+          {problem}
+        </p>
+      ))}
+    </fieldset>
   );
 }
 

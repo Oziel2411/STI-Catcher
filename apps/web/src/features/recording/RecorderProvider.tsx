@@ -6,12 +6,21 @@ import type { UploaderState } from '../../api/chunk-uploader.ts';
 import { chunkSender, createRecording, finishRecording } from '../../api/recordings.ts';
 import { useMicrophone } from '../../hooks/useMicrophone.ts';
 import {
+  DEFAULT_SCHEDULE,
+  formatClock,
+  plannedStart,
+  plannedStop,
+  scheduleProblems,
+} from '../../lib/recording-schedule.ts';
+import type { RecordingSchedule } from '../../lib/recording-schedule.ts';
+import {
   defaultRecordingTitle,
   displayMediaOptions,
   pickMimeType,
   sourceKindFromSurface,
 } from '../../lib/recording.ts';
 import type { SourceKind } from '../../lib/recording.ts';
+import { keepScreenAwake, startBackgroundClock } from './background-clock.ts';
 import { previewOf, RecorderContext, stopPreview } from './recorder-context.ts';
 import type {
   Fps,
@@ -51,11 +60,13 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     systemAudio: true,
     microphone: false,
     title: '',
+    schedule: DEFAULT_SCHEDULE,
   });
   const [phase, setPhaseState] = useState<RecorderPhase>({ kind: 'idle' });
   const [upload, setUpload] = useState<UploaderState>(EMPTY_UPLOAD);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pageOpen, setPageOpen] = useState(false);
   // Copias para los eventos del navegador (track "ended", selector que vuelve tarde).
   const phaseRef = useRef<RecorderPhase>(phase);
@@ -75,9 +86,10 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     setError(message);
     setSettings((current) => ({ ...current, microphone: false }));
   }, []);
-  // El micrófono se usa con la página abierta (medidor) o mientras se graba,
-  // y se suelta al terminar: no queda encendido mientras se procesa.
-  const grabbing = phase.kind === 'starting' || phase.kind === 'recording';
+  // El micrófono se usa con la página abierta (medidor), mientras se graba o
+  // se espera la hora de inicio, y se suelta al terminar.
+  const grabbing =
+    phase.kind === 'scheduled' || phase.kind === 'starting' || phase.kind === 'recording';
   const mic = useMicrophone(
     settings.microphone &&
       (pageOpen || grabbing) &&
@@ -86,9 +98,11 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     onMicError,
   );
 
-  // Cerrar la pestaña mientras se graba o se suben los últimos fragmentos pierde el final.
+  // Cerrar la pestaña mientras se graba (o se espera para grabar) pierde la grabación.
   useEffect(() => {
-    if (phase.kind !== 'recording' && phase.kind !== 'finishing') return;
+    if (phase.kind !== 'recording' && phase.kind !== 'finishing' && phase.kind !== 'scheduled') {
+      return;
+    }
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
     };
@@ -117,6 +131,10 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     } else if (current.kind === 'previewing' && current.preview === ended) {
       stopPreview(ended);
       setPhase({ kind: 'idle' });
+    } else if (current.kind === 'scheduled' && current.preview === ended) {
+      stopPreview(ended);
+      setPhase({ kind: 'idle' });
+      setError('Se dejó de compartir la pantalla: se canceló la grabación programada.');
     }
   };
 
@@ -202,11 +220,19 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
 
   const startRecording = async () => {
     const current = phaseRef.current;
-    if (current.kind !== 'previewing') return;
+    if (current.kind !== 'previewing' && current.kind !== 'scheduled') return;
     const { preview } = current;
-    const { fps, systemAudio, microphone, title } = settings;
+    const { fps, systemAudio, microphone, title, schedule } = settings;
+    // Al empezar a mano solo importa el corte (el inicio programado ya pasó o no hay).
+    const problems = scheduleProblems({ ...schedule, startMode: 'now' }, new Date());
+    if (problems.length > 0) {
+      setPhase({ kind: 'previewing', preview });
+      setError(problems.join(' '));
+      return;
+    }
     setError(null);
     setWarning(null);
+    setNotice(null);
     setUpload(EMPTY_UPLOAD);
     setPhase({ kind: 'starting', preview });
     let audioContext: AudioContext | null = null;
@@ -262,7 +288,13 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
         void finish(session);
       };
       recorder.start(RECORDING_CHUNK_INTERVAL_MS);
-      setPhase({ kind: 'recording', preview, startedAt: Date.now() });
+      const startedAt = Date.now();
+      setPhase({
+        kind: 'recording',
+        preview,
+        startedAt,
+        stopAt: plannedStop(schedule, startedAt),
+      });
     } catch (e) {
       void audioContext?.close();
       setPhase({ kind: 'previewing', preview });
@@ -274,6 +306,58 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     const recorder = sessionRef.current?.recorder;
     if (recorder && recorder.state !== 'inactive') recorder.stop();
   };
+
+  /** Con la vista previa abierta, queda esperando la hora de inicio. */
+  const scheduleStart = () => {
+    const current = phaseRef.current;
+    if (current.kind !== 'previewing') return;
+    const now = new Date();
+    const problems = scheduleProblems(settings.schedule, now);
+    const startAt = plannedStart(settings.schedule, now);
+    if (problems.length > 0 || startAt === null) {
+      setError(problems.join(' ') || 'Indicá a qué hora empieza.');
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    setPhase({ kind: 'scheduled', preview: current.preview, startAt });
+  };
+
+  const cancelSchedule = () => {
+    const current = phaseRef.current;
+    if (current.kind === 'scheduled') setPhase({ kind: 'previewing', preview: current.preview });
+  };
+
+  // Reloj de lo programado: arranca a la hora o corta a la hora. Lee el estado
+  // por refs porque el tic viene de un Worker, fuera del ciclo de React.
+  const tickRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    tickRef.current = () => {
+      const current = phaseRef.current;
+      const now = Date.now();
+      if (current.kind === 'scheduled' && now >= current.startAt) {
+        setNotice('La grabación programada empezó sola.');
+        void startRecording();
+      } else if (current.kind === 'recording' && current.stopAt !== null && now >= current.stopAt) {
+        setNotice(`Se detuvo automáticamente a las ${formatClock(current.stopAt)}.`);
+        stop();
+      }
+    };
+  });
+  const timed = phase.kind === 'scheduled' || (phase.kind === 'recording' && phase.stopAt !== null);
+  useEffect(() => {
+    if (!timed) return;
+    return startBackgroundClock(() => {
+      tickRef.current();
+    });
+  }, [timed]);
+
+  // Que no se apague la pantalla mientras se espera o se graba.
+  const awake = phase.kind === 'scheduled' || phase.kind === 'recording';
+  useEffect(() => {
+    if (!awake) return;
+    return keepScreenAwake();
+  }, [awake]);
 
   const changeFps = (value: Fps) => {
     patchSettings({ fps: value });
@@ -290,6 +374,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     setUpload(EMPTY_UPLOAD);
     setWarning(null);
     setError(null);
+    setNotice(null);
   };
 
   const value: Recorder = {
@@ -298,6 +383,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     upload,
     error,
     warning,
+    notice,
     mic,
     setSourceKind: (kind: SourceKind) => {
       patchSettings({ sourceKind: kind });
@@ -313,6 +399,11 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       patchSettings({ title });
     },
     changeFps,
+    setSchedule: (patch: Partial<RecordingSchedule>) => {
+      setSettings((current) => ({ ...current, schedule: { ...current.schedule, ...patch } }));
+    },
+    scheduleStart,
+    cancelSchedule,
     chooseSource,
     startRecording,
     stop,

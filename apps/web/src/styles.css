@@ -1690,3 +1690,98 @@ input[type='radio'] {
   font-variant-numeric: tabular-nums;
   color: var(--accent);
 }
+
+/* Grabación programada (D-097). */
+.alert-info {
+  color: var(--accent-strong);
+  background: var(--accent-tint);
+}
+
+.schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 0 0;
+  border: none;
+  border-top: 1px solid var(--divider);
+}
+
+.schedule legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.schedule .field input[type='time'],
+.schedule .inline-field input {
+  width: 120px;
+  min-height: 32px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  color-scheme: light dark;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+}
+
+.inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-field input {
+  width: 90px;
+}
+
+.schedule-summary {
+  margin: 0;
+  color: var(--text);
+}
+
+.schedule p {
+  margin: 0;
+}
+
+.schedule-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.scheduled-status {
+  padding: 10px 12px;
+  background: var(--accent-tint);
+  border-radius: var(--radius);
+}
+
+.scheduled-status p {
+  margin: 0;
+}
+
+.scheduled-status p:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-strong);
+}
+
+.scheduled-status p + p {
+  margin-top: 4px;
+}
+
+.schedule-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

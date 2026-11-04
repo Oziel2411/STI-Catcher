@@ -584,6 +584,19 @@ Cierra lo que había quedado pendiente del handoff (D-090, D-095). Junto a Desca
 
 Verificado: tres conversiones lanzadas desde el navegador; el contador de Convertir pasó de 3 a 1 y desapareció al terminar, sin recargar.
 
+### D-097 — Grabación programada: inicio y corte automáticos · Vigente
+
+Para dejar grabando sin estar en la PC: empezar a una hora y cortar después de N minutos o a una hora.
+
+- **El inicio programado necesita elegir la pantalla antes.** El navegador solo abre el selector con un clic de la persona; ninguna página puede abrirlo sola a una hora. Se elige la fuente, queda la vista previa y «Programar grabación» espera la hora (fase `scheduled`). La página avisa que hay que dejar la pestaña abierta y la PC sin suspender; se puede ir a otras secciones (la grabación vive en el layout, D-094) y la barra lateral muestra la hora.
+- **Corte:** «Al detener» (como antes), «Por minutos» (1 a 1440) o «A una hora». Una hora que ya pasó es la del día siguiente (de 23:00 a 01:00 funciona); el máximo es un día. El resumen dice exactamente qué va a pasar («Empieza hoy a las 14:00 y termina hoy a las 15:30 (1 h 30 min)»).
+- **Reloj en un Web Worker** (`background-clock.ts`): con la pestaña en segundo plano, Chrome frena los `setInterval` de la página hasta uno por minuto; los de un Worker no. Si no se puede crear, se usa `setInterval`.
+- **Wake Lock** mientras se espera o se graba: pide que la pantalla no se apague (solo mientras la pestaña se ve; se vuelve a pedir al volver). No evita que Windows suspenda la PC: eso lo dice la página.
+- Al empezar o cortar solo, queda un aviso («La grabación programada empezó sola», «Se detuvo automáticamente a las 15:49»). Si se deja de compartir la pantalla mientras espera, se cancela con un mensaje.
+- La programación es de esta pestaña: cerrarla o recargarla la pierde (el navegador avisa). No hay programación en el server porque la captura solo existe en el navegador.
+
+Verificado con una fuente simulada: programada para el minuto siguiente con corte a 1 minuto, esperando en Descargar; empezó a las 15:48:00, cortó sola y el MP4 duró 1:00.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

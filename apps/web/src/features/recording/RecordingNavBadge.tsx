@@ -1,5 +1,6 @@
 import { NavCount } from '../../components/NavCount.tsx';
 import { formatDuration } from '../../lib/format.ts';
+import { formatClock } from '../../lib/recording-schedule.ts';
 import { useElapsedSeconds, useRecorder } from './recorder-context.ts';
 
 /**
@@ -15,6 +16,15 @@ export function RecordingNavBadge({ processing }: { processing: number }) {
         <span className="recording-dot" aria-hidden="true" />
         <span className="visually-hidden">Grabando, </span>
         {formatDuration(elapsed)}
+      </span>
+    );
+  }
+  if (phase.kind === 'scheduled') {
+    const clock = formatClock(phase.startAt);
+    return (
+      <span className="nav-rec nav-rec-muted" title={`Grabación programada a las ${clock}`}>
+        <span className="visually-hidden">Programada a las </span>
+        {clock}
       </span>
     );
   }

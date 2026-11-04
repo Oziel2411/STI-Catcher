@@ -1,6 +1,7 @@
 import type { RECORDING_FPS } from '@sti-catcher/shared';
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { UploaderState } from '../../api/chunk-uploader.ts';
+import type { RecordingSchedule } from '../../lib/recording-schedule.ts';
 import type { SourceKind } from '../../lib/recording.ts';
 
 export type Fps = (typeof RECORDING_FPS)[number];
@@ -12,8 +13,11 @@ export type RecorderPhase =
   | { kind: 'idle' }
   | { kind: 'choosing'; previous: Preview | null }
   | { kind: 'previewing'; preview: Preview }
+  /** Fuente elegida y vista previa abierta; empieza sola a `startAt` (D-097). */
+  | { kind: 'scheduled'; preview: Preview; startAt: number }
   | { kind: 'starting'; preview: Preview }
-  | { kind: 'recording'; preview: Preview; startedAt: number }
+  /** `stopAt`: corte automático (ms), o null si se detiene a mano. */
+  | { kind: 'recording'; preview: Preview; startedAt: number; stopAt: number | null }
   | { kind: 'finishing' }
   | { kind: 'tracking'; jobId: string };
 
@@ -23,6 +27,7 @@ export type RecorderSettings = {
   systemAudio: boolean;
   microphone: boolean;
   title: string;
+  schedule: RecordingSchedule;
 };
 
 export type Recorder = {
@@ -31,12 +36,19 @@ export type Recorder = {
   upload: UploaderState;
   error: string | null;
   warning: string | null;
+  /** Aviso informativo (p. ej. "se detuvo automáticamente a las 15:30"). */
+  notice: string | null;
   mic: { stream: MediaStream | null; level: number };
   setSourceKind: (kind: SourceKind) => void;
   setSystemAudio: (value: boolean) => void;
   setMicrophone: (value: boolean) => void;
   setTitle: (value: string) => void;
   changeFps: (value: Fps) => void;
+  setSchedule: (patch: Partial<RecordingSchedule>) => void;
+  /** Con la vista previa abierta: queda esperando la hora de inicio. */
+  scheduleStart: () => void;
+  /** Vuelve a la vista previa sin grabar. */
+  cancelSchedule: () => void;
   chooseSource: () => Promise<void>;
   startRecording: () => Promise<void>;
   stop: () => void;
@@ -58,7 +70,10 @@ export function useRecorder(): Recorder {
 }
 
 export const previewOf = (phase: RecorderPhase): Preview | null =>
-  phase.kind === 'previewing' || phase.kind === 'starting' || phase.kind === 'recording'
+  phase.kind === 'previewing' ||
+  phase.kind === 'scheduled' ||
+  phase.kind === 'starting' ||
+  phase.kind === 'recording'
     ? phase.preview
     : phase.kind === 'choosing'
       ? phase.previous
@@ -81,4 +96,19 @@ export function useElapsedSeconds(startedAt: number | null): number {
     };
   }, [startedAt]);
   return startedAt === null ? 0 : Math.max(0, (now - startedAt) / 1000);
+}
+
+/** La hora actual (ms), actualizada dos veces por segundo mientras `active`. */
+export function useClock(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 500);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [active]);
+  return now;
 }
