@@ -1394,3 +1394,23 @@ input[type='radio'] {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Grabando, desde cualquier sección (D-094). */
+.nav-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--rec);
+}
+
+.nav-rec .recording-dot {
+  width: 7px;
+  height: 7px;
+}
+
+.nav-rec-muted {
+  color: var(--faint);
+}

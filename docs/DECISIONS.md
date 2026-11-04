@@ -545,6 +545,17 @@ Descargar solo baja MP4, MP3 o M4A. Para ofrecer WebM, MOV, MKV, AVI, WAV o GIF 
 
 Verificado con el server real: «Me at the zoo» (YouTube, 19 s) encadenado a un GIF de 4 s a 320 px y a un MP3. Las dos descargas terminaron con `followUpJobId` y las conversiones salieron bien (el MP3 a partir de un M4A). La migración 4 se aplicó sobre una base con datos.
 
+### D-094 — La grabación sigue al cambiar de sección · Vigente
+
+Antes la grabación vivía en la página Grabar: ir a Descargar, Convertir, Historial o Estado la cortaba (lo grabado se procesaba igual). Ahora vive en `RecorderProvider`, montado en el layout por encima de las rutas, y la página solo muestra su estado (`useRecorder`).
+
+- **Sigue al navegar dentro de la app**: MediaRecorder, la subida de fragmentos, el micrófono y el seguimiento del procesamiento. Al volver a Grabar se ve la vista previa, el reloj y el botón Detener.
+- **Indicador en la barra lateral** junto a «Grabar pantalla»: punto rojo y tiempo mientras se graba; «subiendo…» mientras se mandan los últimos fragmentos. Reemplaza lo que D-090 había dejado sin hacer.
+- **Una vista previa sin grabar no queda compartida en segundo plano**: al salir de Grabar se deja de compartir y se suelta el micrófono (la página avisa con `attachPage`). Si se sale con el selector del navegador abierto, lo que se elija se descarta.
+- Recargar o cerrar la pestaña sí corta la grabación (el navegador avisa antes); lo que llegó se procesa igual.
+
+Verificado con una fuente simulada: grabación de 25 s pasando por las cuatro secciones; el MP4 salió de 25 s. La vista previa sin grabar se cortó al ir a Descargar.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5
