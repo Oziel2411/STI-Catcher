@@ -556,6 +556,23 @@ Antes la grabación vivía en la página Grabar: ir a Descargar, Convertir, Hist
 
 Verificado con una fuente simulada: grabación de 25 s pasando por las cuatro secciones; el MP4 salió de 25 s. La vista previa sin grabar se cortó al ir a Descargar.
 
+### D-095 — Descargar varios links · Etapa 5 · Vigente
+
+Descargar pasa a ser una lista (mockup 2a): se pegan uno o varios links y cada fila tiene su formato y su calidad. Sin cambios en el server: usa `POST /api/media/probe` por link y `POST /api/jobs/download` (con `then` cuando hace falta convertir, D-093).
+
+- **Pegar:** uno o varios links por renglón. Se validan con el mismo `httpUrlSchema` del server. Los renglones con algo que no es un link no se agregan y se listan (`renglón 3 · «…»`, 2c); quedan en el cuadro para corregirlos. Los repetidos (en lo pegado o ya en la lista) no se repiten. Ctrl+Enter analiza.
+- **Análisis de a tres** (el server acepta cuatro y otra pestaña puede estar usando uno). Si el server responde 429, la fila sigue en «Analizando…» y se reintenta a los 2,5 s.
+- **Formato por fila** con todos los presets de Convertir. MP4, MP3 y M4A se bajan directo; WebM, MOV, MKV, AVI y WAV se bajan y se convierten; el GIF se baja como mucho a 720p y se convierte con sus opciones (ancho y FPS en la fila; inicio y fin abajo). Lo que no tiene sentido para el video (un GIF de un audio) aparece deshabilitado.
+- **Calidad:** para MP4, resolución y modo (compatibilidad / calidad / recodificar) con los avisos de codec de siempre, ahora debajo de la fila. Para el resto de los videos, la resolución que se baja.
+- **«Descargar N listos»:** los tildados que están listos; si no hay ninguno tildado, todos los listos. «Formato para los seleccionados» cambia el formato de los tildados donde sirve.
+- **Estado de la fila:** sigue la descarga y después la conversión encadenada («Descargado · Convirtiendo a GIF»). Cancelar corta lo que esté en curso. El botón de descarga baja el archivo final (el de la conversión, si hubo).
+- **Reintentar:** un análisis fallido se vuelve a hacer; una conversión fallida se reintenta sin volver a bajar el video; una descarga fallida crea una nueva, que vuelve a encadenar la conversión.
+- **La lista se guarda en `sessionStorage`** (`sti.download.batch`). Al recargar, las descargas se retoman por SSE: el server manda el estado actual de cada una y de su conversión.
+- Una transmisión en vivo queda como «En vivo» y no se puede empezar; «Reintentar» la vuelve a analizar (por si ya terminó).
+- **Pendiente del handoff:** los contadores de trabajos en curso en la barra lateral (Descargar 3, Convertir 2). Necesitan saber qué trabajos son de este navegador desde cualquier sección; quedan para otro cambio.
+
+Verificado con links reales: 3 de YouTube analizados en paralelo, 2 renglones inválidos y 1 repetido avisados; «Me at the zoo» bajado como MP4 (240p), GIF (2–6 s, 320 px) y WAV; las tres terminaron y cada botón bajó el archivo correcto (video/mp4, image/gif, audio/wav). La lista sobrevivió a una recarga, y un video inexistente quedó como «Falló · El video no existe o fue eliminado».
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5
