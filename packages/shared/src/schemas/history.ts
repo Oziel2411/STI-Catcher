@@ -39,6 +39,18 @@ export const historyResponseSchema = z.object({
 });
 export type HistoryResponse = z.infer<typeof historyResponseSchema>;
 
+/**
+ * Trabajos en cola o en curso de este navegador, para los contadores de la
+ * barra lateral. La conversión encadenada a una descarga cuenta como descarga
+ * (en Descargar sigue siendo la misma fila).
+ */
+export const activeJobsResponseSchema = z.object({
+  download: z.number().int().nonnegative(),
+  conversion: z.number().int().nonnegative(),
+  recording: z.number().int().nonnegative(),
+});
+export type ActiveJobsResponse = z.infer<typeof activeJobsResponseSchema>;
+
 export const fileQuerySchema = z.object({
   /** `inline=1`: para reproducir en el navegador; sin él, se descarga como archivo. */
   inline: z

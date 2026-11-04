@@ -1,4 +1,5 @@
 import { jobStatusSchema, jobTypeSchema } from '@sti-catcher/shared';
+import type { JobType } from '@sti-catcher/shared';
 import type {
   HistoryFilter,
   JobFinish,
@@ -156,6 +157,17 @@ export function createJobsRepository(db: Db): JobsRepository {
                         WHERE c.parent_job_id = j.id AND c.status IN ('queued', 'running'))
      ORDER BY j.finished_at
   `);
+  const activeByClientStmt = db.prepare<[string], { kind: string; total: number }>(`
+    SELECT CASE
+             WHEN j.type = 'conversion'
+              AND EXISTS (SELECT 1 FROM jobs d WHERE d.follow_up_job_id = j.id) THEN 'download'
+             ELSE j.type
+           END AS kind,
+           COUNT(*) AS total
+      FROM jobs j
+     WHERE j.client_id = ? AND j.status IN ('queued', 'running')
+     GROUP BY kind
+  `);
   const setFollowUpStmt = db.prepare<[string, string]>(
     'UPDATE jobs SET follow_up_job_id = ? WHERE id = ? AND follow_up_job_id IS NULL',
   );
@@ -294,6 +306,14 @@ export function createJobsRepository(db: Db): JobsRepository {
 
     listExpirable(beforeIso) {
       return expirableStmt.all(beforeIso).map((row) => ({ id: row.id, filePath: row.file_path }));
+    },
+
+    countActiveByClient(clientId) {
+      const counts: Partial<Record<JobType, number>> = {};
+      for (const row of activeByClientStmt.all(clientId)) {
+        counts[jobTypeSchema.parse(row.kind)] = row.total;
+      }
+      return counts;
     },
 
     setFollowUp(id, followUpJobId) {

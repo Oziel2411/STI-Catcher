@@ -1,7 +1,14 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { isActiveStatus } from '@sti-catcher/shared';
-import type { HistoryItem, HistoryResponse, HistoryScope, Job, JobType } from '@sti-catcher/shared';
+import type {
+  ActiveJobsResponse,
+  HistoryItem,
+  HistoryResponse,
+  HistoryScope,
+  Job,
+  JobType,
+} from '@sti-catcher/shared';
 import type { EnqueueInput, JobQueue } from '../../jobs/queue.ts';
 import type { JobRecord, JobsRepository } from '../../jobs/types.ts';
 
@@ -27,7 +34,7 @@ export class HistoryError extends Error {
 export type Requester = { clientId: string; ip: string | null };
 
 export type HistoryServiceDeps = {
-  repo: Pick<JobsRepository, 'get' | 'listHistory'>;
+  repo: Pick<JobsRepository, 'get' | 'listHistory' | 'countActiveByClient'>;
   queue: Pick<JobQueue, 'toApi' | 'expire' | 'remove' | 'enqueue'>;
   storageDir: string;
   filesDir: string;
@@ -52,6 +59,8 @@ export type HistoryService = {
   ) => Promise<HistoryResponse>;
   remove: (id: string, requester: Requester) => Promise<void>;
   retry: (id: string, requester: Requester) => Promise<Job>;
+  /** Contadores de la barra lateral: lo que este navegador tiene en cola o en curso. */
+  activeCounts: (requester: Requester) => ActiveJobsResponse;
 };
 
 /**
@@ -149,6 +158,15 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
         },
         'Trabajo borrado del historial',
       );
+    },
+
+    activeCounts(requester) {
+      const counts = deps.repo.countActiveByClient(requester.clientId);
+      return {
+        download: counts.download ?? 0,
+        conversion: counts.conversion ?? 0,
+        recording: counts.recording ?? 0,
+      };
     },
 
     async retry(id, requester) {

@@ -68,6 +68,14 @@ export function subscribeToJobsEvents(
   return subscribeToStream(`/api/events?jobIds=${query}`, handlers, options);
 }
 
+/** Stream de todos los jobs (contadores de la barra lateral). */
+export function subscribeToAllEvents(
+  handlers: JobEventHandlers,
+  options: SubscribeOptions = {},
+): () => void {
+  return subscribeToStream('/api/events', handlers, options);
+}
+
 function subscribeToStream(
   url: string,
   handlers: JobEventHandlers,

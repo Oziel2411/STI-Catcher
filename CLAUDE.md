@@ -98,6 +98,7 @@ Detalle en `docs/DECISIONS.md`.
 | POST   | `/api/media/probe` `{ url }`                                               | título, resoluciones con codecs, `maxH264Height` · 400 URL inválida o interna · 422 error de yt-dlp traducido · 429 |
 | POST   | `/api/jobs/download` `{ url, format, maxHeight, videoMode, title, then? }` | 202 `{ jobId }` · 400 · 507. `then: { preset, maxHeight?, gif? }` convierte al terminar (`followUpJobId`)           |
 | GET    | `/api/jobs/:id/file`                                                       | el archivo (RFC 5987, Range) · 409 sin terminar · 410 ya no está                                                    |
+| GET    | `/api/active-jobs`                                                         | `{ download, conversion, recording }`: trabajos propios en cola o en curso (contadores de la barra lateral)         |
 | GET    | `/api/history?scope=all&q=…&page=n`                                        | `{ items (job + isMine), total, page, pageSize }`; `scope` es `mine` (por defecto) o `all`                          |
 | DELETE | `/api/jobs/:id`                                                            | 204 · 403 no es tuyo · 409 en curso                                                                                 |
 | POST   | `/api/jobs/:id/retry`                                                      | 202 `{ jobId }` (trabajo nuevo) · 409                                                                               |

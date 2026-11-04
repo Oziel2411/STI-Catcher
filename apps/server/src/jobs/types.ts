@@ -92,6 +92,11 @@ export type JobsRepository = {
    * Excluye los que son origen de una conversión en cola o en curso.
    */
   listExpirable(beforeIso: string): { id: string; filePath: string }[];
+  /**
+   * Trabajos en cola o en curso de un navegador, por tipo. Las conversiones
+   * encadenadas a una descarga cuentan como 'download'.
+   */
+  countActiveByClient(clientId: string): Partial<Record<JobType, number>>;
   /** Vincula la conversión encadenada. false si ya tenía una (no se pisa). */
   setFollowUp(id: string, followUpJobId: string): boolean;
   /** Rutas relativas (`files/<id>.<ext>`) de los archivos de jobs `done`. */

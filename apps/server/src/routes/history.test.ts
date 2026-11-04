@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
   apiErrorSchema,
   createJobResponseSchema,
+  activeJobsResponseSchema,
   historyResponseSchema,
   jobEventSchema,
 } from '@sti-catcher/shared';
@@ -307,5 +308,54 @@ describe('GET /api/jobs/:id/file?inline=1', () => {
     });
     expect(response.statusCode).toBe(410);
     expect(testApp.repo.get(jobId)?.status).toBe('expired');
+  });
+});
+
+describe('GET /api/active-jobs', () => {
+  it('cuenta lo propio en cola o en curso; la conversión encadenada cuenta como descarga', async () => {
+    const testApp = await app();
+    const insert = (type: 'download' | 'conversion' | 'recording', clientId: string) =>
+      testApp.repo.insert({
+        id: crypto.randomUUID(),
+        type,
+        params: {},
+        clientId,
+        createdAt: now(),
+      });
+
+    // De este navegador: dos descargas (una ya terminó y tiene su conversión en curso),
+    // una conversión hecha a mano y una grabación procesándose.
+    const queued = insert('download', CLIENT_A);
+    const downloaded = insert('download', CLIENT_A);
+    const followUp = insert('conversion', CLIENT_A);
+    testApp.repo.markRunning(downloaded.id, now());
+    testApp.repo.finish(downloaded.id, { status: 'done', finishedAt: now() });
+    testApp.repo.setFollowUp(downloaded.id, followUp.id);
+    insert('conversion', CLIENT_A);
+    const recording = insert('recording', CLIENT_A);
+    testApp.repo.markRunning(recording.id, now());
+    // Terminados y de otro navegador: no cuentan.
+    const done = insert('conversion', CLIENT_A);
+    testApp.repo.finish(done.id, { status: 'cancelled', finishedAt: now() });
+    insert('download', CLIENT_B);
+    expect(queued.status).toBe('queued');
+
+    const response = await testApp.app.inject({
+      method: 'GET',
+      url: '/api/active-jobs',
+      headers: cookie(CLIENT_A),
+    });
+    expect(response.statusCode).toBe(200);
+    expect(activeJobsResponseSchema.parse(response.json())).toEqual({
+      download: 2,
+      conversion: 1,
+      recording: 1,
+    });
+  });
+
+  it('un navegador nuevo ve todo en cero', async () => {
+    const testApp = await app();
+    const response = await testApp.app.inject({ method: 'GET', url: '/api/active-jobs' });
+    expect(response.json()).toEqual({ download: 0, conversion: 0, recording: 0 });
   });
 });

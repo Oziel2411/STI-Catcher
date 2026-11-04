@@ -569,9 +569,20 @@ Descargar pasa a ser una lista (mockup 2a): se pegan uno o varios links y cada f
 - **Reintentar:** un análisis fallido se vuelve a hacer; una conversión fallida se reintenta sin volver a bajar el video; una descarga fallida crea una nueva, que vuelve a encadenar la conversión.
 - **La lista se guarda en `sessionStorage`** (`sti.download.batch`). Al recargar, las descargas se retoman por SSE: el server manda el estado actual de cada una y de su conversión.
 - Una transmisión en vivo queda como «En vivo» y no se puede empezar; «Reintentar» la vuelve a analizar (por si ya terminó).
-- **Pendiente del handoff:** los contadores de trabajos en curso en la barra lateral (Descargar 3, Convertir 2). Necesitan saber qué trabajos son de este navegador desde cualquier sección; quedan para otro cambio.
+- **Contadores de la barra lateral:** se hicieron aparte (D-096).
 
 Verificado con links reales: 3 de YouTube analizados en paralelo, 2 renglones inválidos y 1 repetido avisados; «Me at the zoo» bajado como MP4 (240p), GIF (2–6 s, 320 px) y WAV; las tres terminaron y cada botón bajó el archivo correcto (video/mp4, image/gif, audio/wav). La lista sobrevivió a una recarga, y un video inexistente quedó como «Falló · El video no existe o fue eliminado».
+
+### D-096 — Contadores de trabajos en la barra lateral · Vigente
+
+Cierra lo que había quedado pendiente del handoff (D-090, D-095). Junto a Descargar y Convertir se ve cuántos trabajos **de este navegador** están en cola o en curso; junto a Grabar pantalla, las grabaciones que se están procesando (mientras se graba sigue el punto rojo con el tiempo, D-094).
+
+- **Los cuenta el server** (`GET /api/active-jobs`): sabe de quién es cada trabajo por la cookie anónima de "Mis trabajos" (D-041), que JavaScript no puede leer. Responde solo números, nunca ids ni datos de otros.
+- **La conversión encadenada a una descarga cuenta como descarga:** en Descargar sigue siendo la misma fila.
+- **Se actualiza con eventos:** la barra lateral escucha `/api/events` (todos los trabajos) y vuelve a pedir los números cuando un trabajo cambia de estado o se borra, esperando 400 ms para juntar varios cambios en un pedido. El progreso no dispara pedidos.
+- En cero no se muestra nada.
+
+Verificado: tres conversiones lanzadas desde el navegador; el contador de Convertir pasó de 3 a 1 y desapareció al terminar, sin recargar.
 
 ## Deuda técnica
 

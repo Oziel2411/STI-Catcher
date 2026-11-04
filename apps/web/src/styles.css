@@ -1682,3 +1682,11 @@ input[type='radio'] {
 .col-actions .row-cancel {
   color: var(--error);
 }
+
+/* Trabajos propios en curso, junto a cada sección (D-096). */
+.nav-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}

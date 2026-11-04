@@ -6,14 +6,23 @@ import {
   RecordIcon,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
+import type { ActiveJobsResponse } from '@sti-catcher/shared';
 import { NavLink, Outlet } from 'react-router';
 import { RecorderProvider } from '../features/recording/RecorderProvider.tsx';
 import { RecordingNavBadge } from '../features/recording/RecordingNavBadge.tsx';
+import { useActiveJobCounts } from '../hooks/useActiveJobCounts.ts';
+import { NavCount } from './NavCount.tsx';
 
-const NAV_ITEMS: readonly { to: string; label: string; icon: Icon }[] = [
-  { to: '/descargar', label: 'Descargar', icon: DownloadSimpleIcon },
+const NAV_ITEMS: readonly {
+  to: string;
+  label: string;
+  icon: Icon;
+  /** Qué trabajos en curso se cuentan junto al nombre. */
+  count?: keyof ActiveJobsResponse;
+}[] = [
+  { to: '/descargar', label: 'Descargar', icon: DownloadSimpleIcon, count: 'download' },
   { to: '/grabar', label: 'Grabar pantalla', icon: RecordIcon },
-  { to: '/convertir', label: 'Convertir', icon: ArrowsLeftRightIcon },
+  { to: '/convertir', label: 'Convertir', icon: ArrowsLeftRightIcon, count: 'conversion' },
   { to: '/historial', label: 'Historial', icon: ClockCounterClockwiseIcon },
   { to: '/estado', label: 'Estado', icon: PulseIcon },
 ];
@@ -23,6 +32,7 @@ const NAV_ITEMS: readonly { to: string; label: string; icon: Icon }[] = [
  * La grabación vive acá (`RecorderProvider`) para que siga al cambiar de sección.
  */
 export function Layout() {
+  const counts = useActiveJobCounts();
   return (
     <RecorderProvider>
       <div className="layout">
@@ -39,12 +49,16 @@ export function Layout() {
           </span>
           <nav aria-label="Secciones">
             <ul className="nav">
-              {NAV_ITEMS.map(({ to, label, icon: ItemIcon }) => (
+              {NAV_ITEMS.map(({ to, label, icon: ItemIcon, count }) => (
                 <li key={to}>
                   <NavLink to={to} className="nav-link">
                     <ItemIcon size={16} aria-hidden="true" className="nav-icon" />
                     {label}
-                    {to === '/grabar' && <RecordingNavBadge />}
+                    {to === '/grabar' ? (
+                      <RecordingNavBadge processing={counts.recording} />
+                    ) : (
+                      count !== undefined && <NavCount value={counts[count]} />
+                    )}
                   </NavLink>
                 </li>
               ))}
