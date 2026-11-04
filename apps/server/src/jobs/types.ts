@@ -24,6 +24,8 @@ export type JobRecord = {
   clientIp: string | null;
   clientId: string | null;
   parentJobId: string | null;
+  /** Conversión encadenada a esta descarga (D-093). */
+  followUpJobId: string | null;
 };
 
 export type NewJob = Pick<JobRecord, 'id' | 'type' | 'params' | 'createdAt'> &
@@ -90,6 +92,8 @@ export type JobsRepository = {
    * Excluye los que son origen de una conversión en cola o en curso.
    */
   listExpirable(beforeIso: string): { id: string; filePath: string }[];
+  /** Vincula la conversión encadenada. false si ya tenía una (no se pisa). */
+  setFollowUp(id: string, followUpJobId: string): boolean;
   /** Rutas relativas (`files/<id>.<ext>`) de los archivos de jobs `done`. */
   listLiveFilePaths(): string[];
 };

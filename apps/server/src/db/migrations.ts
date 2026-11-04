@@ -94,4 +94,14 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX recordings_status ON recordings (status, last_chunk_at);
     `,
   },
+  {
+    version: 4,
+    name: 'add-follow-up-job',
+    sql: /* sql */ `
+      -- Descarga con conversión encadenada (D-093): la conversión que se creó al
+      -- terminar. No alcanza con parent_job_id: un archivo puede tener varias
+      -- conversiones hechas a mano desde el historial.
+      ALTER TABLE jobs ADD COLUMN follow_up_job_id TEXT REFERENCES jobs (id) ON DELETE SET NULL;
+    `,
+  },
 ];

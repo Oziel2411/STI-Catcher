@@ -45,6 +45,7 @@ const job = (patch: Partial<Job> = {}): Job => ({
   videoCodec: 'hevc',
   audioCodec: 'aac',
   parentJobId: null,
+  followUpJobId: null,
   progress: null,
   ...patch,
 });

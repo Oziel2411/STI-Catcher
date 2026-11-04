@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { conversionPresetIdSchema, CONVERSION_PRESETS } from '../presets/conversion.ts';
+import type { ConversionPresetId } from '../presets/conversion.ts';
+import { gifOptionsSchema } from './conversion.ts';
 
 /** Familia de codec de video, para avisar compatibilidad en la UI. */
 export const VIDEO_CODEC_FAMILIES = ['h264', 'h265', 'vp9', 'av1', 'other'] as const;
@@ -60,6 +63,32 @@ export const VIDEO_MODES = ['compat', 'quality', 'recode'] as const;
 export const videoModeSchema = z.enum(VIDEO_MODES);
 export type VideoMode = z.infer<typeof videoModeSchema>;
 
+/**
+ * Conversión que se encadena a la descarga (D-093): al terminar bien, el server
+ * crea la conversión con estas opciones, igual que `POST /api/jobs/convert`.
+ */
+export const downloadFollowUpSchema = z
+  .object({
+    preset: conversionPresetIdSchema,
+    /** Escalar hacia abajo a esta altura (solo presets de video). null = mantener. */
+    maxHeight: z.number().int().min(100).max(4320).nullable().default(null),
+    /** Obligatorio para el GIF. La duración se valida al terminar la descarga. */
+    gif: gifOptionsSchema.optional(),
+  })
+  .refine((then) => then.preset !== 'gif' || then.gif !== undefined, {
+    error: 'Para el GIF hay que indicar inicio, fin, FPS y ancho.',
+    path: ['gif'],
+  });
+export type DownloadFollowUp = z.infer<typeof downloadFollowUpSchema>;
+
+/**
+ * Qué se descarga cuando hay una conversión encadenada: el mejor origen para
+ * ese preset. Audio → M4A (sin pérdida extra antes de MP3/WAV); video y GIF → MP4.
+ */
+export function followUpDownloadFormat(preset: ConversionPresetId): DownloadFormat {
+  return CONVERSION_PRESETS[preset].needs === 'audio' ? 'm4a' : 'mp4';
+}
+
 export const downloadRequestSchema = z.object({
   url: httpUrlSchema,
   format: downloadFormatSchema.default('mp4'),
@@ -71,5 +100,10 @@ export const downloadRequestSchema = z.object({
    * terminar se reemplaza por el que informa yt-dlp.
    */
   title: z.string().trim().max(500).nullable().default(null),
+  /**
+   * Convertir al terminar (D-093). Si se indica, `format` y `videoMode` se
+   * ignoran: se descarga lo que conviene para ese preset (`followUpDownloadFormat`).
+   */
+  then: downloadFollowUpSchema.nullable().default(null),
 });
 export type DownloadRequest = z.input<typeof downloadRequestSchema>;

@@ -31,6 +31,7 @@ type JobRow = {
   client_ip: string | null;
   client_id: string | null;
   parent_job_id: string | null;
+  follow_up_job_id: string | null;
 };
 
 function parseParams(json: string): unknown {
@@ -64,6 +65,7 @@ function toRecord(row: JobRow): JobRecord {
     clientIp: row.client_ip,
     clientId: row.client_id,
     parentJobId: row.parent_job_id,
+    followUpJobId: row.follow_up_job_id,
   };
 }
 
@@ -154,6 +156,9 @@ export function createJobsRepository(db: Db): JobsRepository {
                         WHERE c.parent_job_id = j.id AND c.status IN ('queued', 'running'))
      ORDER BY j.finished_at
   `);
+  const setFollowUpStmt = db.prepare<[string, string]>(
+    'UPDATE jobs SET follow_up_job_id = ? WHERE id = ? AND follow_up_job_id IS NULL',
+  );
   const liveFilePathsStmt = db.prepare<[], { file_path: string }>(
     "SELECT file_path FROM jobs WHERE status = 'done' AND file_path IS NOT NULL",
   );
@@ -289,6 +294,10 @@ export function createJobsRepository(db: Db): JobsRepository {
 
     listExpirable(beforeIso) {
       return expirableStmt.all(beforeIso).map((row) => ({ id: row.id, filePath: row.file_path }));
+    },
+
+    setFollowUp(id, followUpJobId) {
+      return setFollowUpStmt.run(followUpJobId, id).changes === 1;
     },
 
     listLiveFilePaths() {

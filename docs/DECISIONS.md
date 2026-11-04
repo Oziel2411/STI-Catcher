@@ -530,6 +530,21 @@ Sin cambios en el server: cada archivo usa los mismos endpoints de la fase 5 (`/
 
 Verificado con archivos reales: dos soltados en la página y tres desde `?origen=` (MOV H.264, M4A, WebM de MediaRecorder, MOV HEVC). Probé WebM 360p aplicado a todos (el audio quedó en MP3 y el WebM de 240p sin cambio de resolución), las conversiones con progreso en vivo, un GIF, la recarga y la vista de celular.
 
+### D-093 — Descargar y convertir en un paso · Etapa 4 · Vigente
+
+Descargar solo baja MP4, MP3 o M4A. Para ofrecer WebM, MOV, MKV, AVI, WAV o GIF (etapa 5), la descarga puede pedir una conversión que se encadena: `POST /api/jobs/download { …, then: { preset, maxHeight?, gif? } }`.
+
+- **Qué se baja:** lo que mejor sirve de origen. M4A para presets de audio (no se pasa por MP3 antes de un WAV), MP4 en modo compatible para video y GIF. Con `then`, `format` y `videoMode` se ignoran; `maxHeight` se respeta.
+- **Cuándo se crea la conversión:** cuando la descarga termina bien. La cola llama a `onDone` antes de publicar el estado final; la conversión se crea por el mismo camino que `POST /api/jobs/convert` (mismas validaciones contra el archivo real). Así el evento `done` de la descarga ya trae `followUpJobId`, y la UI sigue el segundo trabajo sin pedir nada más.
+- **Vínculo propio** (`jobs.follow_up_job_id`, migración 4). `parent_job_id` no alcanza: un archivo puede tener varias conversiones hechas a mano desde el historial.
+- **Si las opciones no sirven para lo que se bajó** (p. ej. el GIF termina después del final del video, que recién se conoce al bajarlo), queda una conversión **fallida con el motivo** (`queue.recordFailed`), vinculada igual. El usuario lo ve en la misma fila en vez de que no pase nada.
+- **Si la descarga falla o se cancela,** no se crea la conversión. Cancelar una conversión en curso es la misma acción de siempre, sobre `followUpJobId`.
+- **Reintentar** una descarga fallida vuelve a encadenar: `then` se guarda en los parámetros del job.
+- **Riesgo aceptado:** si el server se corta justo entre que la descarga queda `done` y se crea la conversión (milisegundos), la descarga queda sin conversión; se puede convertir desde el historial.
+- La conversión queda del mismo navegador que la descarga (`client_id`), así aparece en "Mis trabajos".
+
+Verificado con el server real: «Me at the zoo» (YouTube, 19 s) encadenado a un GIF de 4 s a 320 px y a un MP3. Las dos descargas terminaron con `followUpJobId` y las conversiones salieron bien (el MP3 a partir de un M4A). La migración 4 se aplicó sobre una base con datos.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

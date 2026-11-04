@@ -39,6 +39,12 @@ export type JobQueueDeps = {
   logger: QueueLogger;
   now?: () => Date;
   newId?: () => string;
+  /**
+   * Se llama cuando un job termina bien, antes de publicar su estado final
+   * (así el evento ya lleva lo que haga, p. ej. `followUpJobId`). Sus errores
+   * se loguean y no cambian el resultado del job.
+   */
+  onDone?: (record: JobRecord) => Promise<void>;
   /** Mínimo entre dos eventos de progreso del mismo job. */
   progressIntervalMs?: number;
   /** Cuánto esperar a que los jobs corten al detener el server. */
@@ -82,6 +88,12 @@ export type JobQueue = {
     input: EnqueueInput & { id: string },
     result: Omit<JobFinish, 'status' | 'finishedAt'>,
   ): Job;
+  /**
+   * Registra un job que falló antes de poder encolarse (p. ej. la conversión
+   * encadenada a una descarga cuyas opciones no sirven para el archivo bajado),
+   * para que el usuario vea el motivo. Queda `failed` y se publica.
+   */
+  recordFailed(input: EnqueueInput, error: string): Job;
   /** Empieza a procesar la cola (incluye los queued que quedaron de antes de un reinicio). */
   start(): void;
   /** Corta los jobs en curso (quedan failed "interrumpido") y deja de tomar nuevos. */
@@ -139,6 +151,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
     videoCodec: record.videoCodec,
     audioCodec: record.audioCodec,
     parentJobId: record.parentJobId,
+    followUpJobId: record.followUpJobId,
     progress: record.status === 'running' ? (progress.get(record.id) ?? null) : null,
   });
 
@@ -251,6 +264,14 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
     running.delete(id);
     clearProgress(id);
     repo.finish(id, finish);
+    if (finish.status === 'done' && deps.onDone) {
+      const record = repo.get(id);
+      try {
+        if (record) await deps.onDone(record);
+      } catch (error) {
+        logger.error({ jobId: id, err: error }, 'Error al procesar el fin de un job');
+      }
+    }
     publishUpdated(id);
     logger.info({ jobId: id, status: finish.status }, 'Job terminado');
   };
@@ -408,6 +429,24 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
       if (!record) throw new Error(`No se pudo leer el job registrado ${input.id}`);
       bus.publish({ type: 'job.updated', job: toApi(record) });
       return toApi(record);
+    },
+
+    recordFailed(input, error) {
+      const record = repo.insert({
+        id: newId(),
+        createdAt: now().toISOString(),
+        type: input.type,
+        params: input.params,
+        title: input.title ?? null,
+        sourceUrl: input.sourceUrl ?? null,
+        clientIp: input.clientIp ?? null,
+        clientId: input.clientId ?? null,
+        parentJobId: input.parentJobId ?? null,
+      });
+      repo.finish(record.id, { status: 'failed', finishedAt: now().toISOString(), error });
+      const failed = repo.get(record.id) ?? record;
+      bus.publish({ type: 'job.updated', job: toApi(failed) });
+      return toApi(failed);
     },
 
     start() {

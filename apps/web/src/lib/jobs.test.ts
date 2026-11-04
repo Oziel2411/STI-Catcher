@@ -19,6 +19,7 @@ describe('applyEventToList', () => {
     videoCodec: null,
     audioCodec: null,
     parentJobId: null,
+    followUpJobId: null,
     progress: null,
   };
   const a = {
@@ -75,6 +76,7 @@ const job: Job = {
   videoCodec: null,
   audioCodec: null,
   parentJobId: null,
+  followUpJobId: null,
   progress: null,
 };
 

@@ -27,6 +27,7 @@ import { createConversionService } from './modules/conversion/conversion-service
 import { createUploadService } from './modules/conversion/upload-service.ts';
 import { createDownloadRunner } from './modules/download/download-runner.ts';
 import { createDownloadService } from './modules/download/download-service.ts';
+import { createFollowUps } from './modules/download/follow-up.ts';
 import { createJobFiles } from './modules/files/job-files.ts';
 import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
@@ -156,6 +157,8 @@ async function main(): Promise<void> {
     maxConcurrent: config.limits.maxConcurrentJobs,
     minFreeDiskBytes: config.limits.minFreeDiskBytes,
     readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,
+    // La conversión encadenada necesita el servicio de conversión, que necesita la cola.
+    onDone: (record) => followUps(record),
     logger,
   });
 
@@ -207,6 +210,7 @@ async function main(): Promise<void> {
     queue,
     gifLimits,
   });
+  const followUps = createFollowUps({ conversion, queue, repo, logger });
   const upload = createUploadService({
     tempDir: storage.tempDir,
     filesDir: storage.filesDir,

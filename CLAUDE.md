@@ -76,6 +76,7 @@ Detalle en `docs/DECISIONS.md`.
 - Descarga: `-f bv[height<=H]+ba/b[height<=H]/bv+ba/b`; compat `-S vcodec:h264,res:H,channels:2,acodec:aac`. "Recodificar" lo hace nuestro ffmpeg (con progreso), no yt-dlp. Archivo en disco `<jobId>.<ext>`; el título solo va en `Content-Disposition`.
 - `vite.config.ts` lee el `.env` directo (no `loadEnv`): una herramienta que define `PORT` apuntaba el proxy a sí mismo.
 - Historial: cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
+- Descarga + conversión encadenada (`then`): al terminar bien, la cola (`onDone`) crea la conversión por el camino normal y la vincula en `follow_up_job_id`; si las opciones no sirven, queda una conversión fallida con el motivo.
 - Conversión: presets cerrados en shared → `buildConversionArgs` (pura); copia sin recodificar cuando el origen ya cumple; solo se ofrecen los presets que tienen sentido para el archivo (ffprobe); subida en streaming como `application/octet-stream`.
 - Grabación: MediaRecorder en el navegador → fragmentos de 2 s numerados (`?seq=N`, reintento idempotente) a una **sesión** (tabla `recordings`, crudo en `STORAGE_DIR\recordings`, fuera de `tmp`). Al detener (o tras `RECORDING_IDLE_MINUTES` sin fragmentos) se crea el job `recording`, que deja MP4 H.264 + AAC (copia si ya cumple). Sin contexto seguro la página explica que hace falta HTTPS.
 - Despliegue: WinSW 2.12 con XML generado por `install-service.ps1` (`stopparentprocessfirst`: Node corta los jobs antes que mueran sus hijos); ACLs con SIDs (Windows en español); certificado con mkcert, CA en el perfil del admin. Retención cada hora: archivos de jobs viejos → `expired`, huérfanos de `files/` y crudos de `recordings/`.
@@ -84,25 +85,25 @@ Detalle en `docs/DECISIONS.md`.
 
 ## API
 
-| Método | Ruta                                                                | Respuesta                                                                                                           |
-| ------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/health`                                                       | versiones, disco, trabajos (`?refresh=1` fuerza versiones)                                                          |
-| GET    | `/api/jobs?status=a,b&type=x&limit=n`                               | `{ jobs }`                                                                                                          |
-| GET    | `/api/jobs/:id`                                                     | `{ job }`                                                                                                           |
-| POST   | `/api/jobs/selftest` `{ durationSeconds? }`                         | 202 `{ jobId }` · 507 sin disco                                                                                     |
-| POST   | `/api/jobs/:id/cancel`                                              | 200 / 202 `{ job }` · 404 · 409                                                                                     |
-| GET    | `/api/jobs/:id/events`                                              | SSE de un job; se cierra al terminar                                                                                |
-| GET    | `/api/events?jobIds=a,b`                                            | SSE de varios jobs (o todos)                                                                                        |
-| POST   | `/api/media/probe` `{ url }`                                        | título, resoluciones con codecs, `maxH264Height` · 400 URL inválida o interna · 422 error de yt-dlp traducido · 429 |
-| POST   | `/api/jobs/download` `{ url, format, maxHeight, videoMode, title }` | 202 `{ jobId }` · 400 · 507                                                                                         |
-| GET    | `/api/jobs/:id/file`                                                | el archivo (RFC 5987, Range) · 409 sin terminar · 410 ya no está                                                    |
-| GET    | `/api/history?scope=all&q=…&page=n`                                 | `{ items (job + isMine), total, page, pageSize }`; `scope` es `mine` (por defecto) o `all`                          |
-| DELETE | `/api/jobs/:id`                                                     | 204 · 403 no es tuyo · 409 en curso                                                                                 |
-| POST   | `/api/jobs/:id/retry`                                               | 202 `{ jobId }` (trabajo nuevo) · 409                                                                               |
-| GET    | `/api/conversion/options`                                           | topes del GIF y `maxUploadBytes`                                                                                    |
-| POST   | `/api/uploads` (cuerpo binario, header `x-file-name`)               | 201 `{ jobId }` (job `upload` terminado) · 413 · 415 · 422 · 507                                                    |
-| GET    | `/api/conversion/sources/:id`                                       | `{ job, media, presets }` · 409 · 410                                                                               |
-| POST   | `/api/jobs/convert` `{ sourceJobId, preset, maxHeight?, gif? }`     | 202 `{ jobId }` · 422 preset sin sentido o GIF inválido                                                             |
-| POST   | `/api/recordings` `{ mimeType, fps, title }`                        | 201 `{ recordingId, maxChunkBytes }` · 507                                                                          |
-| POST   | `/api/recordings/:id/chunks?seq=N` (cuerpo binario)                 | `{ nextSeq }` · 403 · 409 fuera de orden o cerrada · 413 · 415 · 507                                                |
-| POST   | `/api/recordings/:id/finish`                                        | 202 `{ jobId }` (idempotente) · 409 vacía                                                                           |
+| Método | Ruta                                                                       | Respuesta                                                                                                           |
+| ------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/health`                                                              | versiones, disco, trabajos (`?refresh=1` fuerza versiones)                                                          |
+| GET    | `/api/jobs?status=a,b&type=x&limit=n`                                      | `{ jobs }`                                                                                                          |
+| GET    | `/api/jobs/:id`                                                            | `{ job }`                                                                                                           |
+| POST   | `/api/jobs/selftest` `{ durationSeconds? }`                                | 202 `{ jobId }` · 507 sin disco                                                                                     |
+| POST   | `/api/jobs/:id/cancel`                                                     | 200 / 202 `{ job }` · 404 · 409                                                                                     |
+| GET    | `/api/jobs/:id/events`                                                     | SSE de un job; se cierra al terminar                                                                                |
+| GET    | `/api/events?jobIds=a,b`                                                   | SSE de varios jobs (o todos)                                                                                        |
+| POST   | `/api/media/probe` `{ url }`                                               | título, resoluciones con codecs, `maxH264Height` · 400 URL inválida o interna · 422 error de yt-dlp traducido · 429 |
+| POST   | `/api/jobs/download` `{ url, format, maxHeight, videoMode, title, then? }` | 202 `{ jobId }` · 400 · 507. `then: { preset, maxHeight?, gif? }` convierte al terminar (`followUpJobId`)           |
+| GET    | `/api/jobs/:id/file`                                                       | el archivo (RFC 5987, Range) · 409 sin terminar · 410 ya no está                                                    |
+| GET    | `/api/history?scope=all&q=…&page=n`                                        | `{ items (job + isMine), total, page, pageSize }`; `scope` es `mine` (por defecto) o `all`                          |
+| DELETE | `/api/jobs/:id`                                                            | 204 · 403 no es tuyo · 409 en curso                                                                                 |
+| POST   | `/api/jobs/:id/retry`                                                      | 202 `{ jobId }` (trabajo nuevo) · 409                                                                               |
+| GET    | `/api/conversion/options`                                                  | topes del GIF y `maxUploadBytes`                                                                                    |
+| POST   | `/api/uploads` (cuerpo binario, header `x-file-name`)                      | 201 `{ jobId }` (job `upload` terminado) · 413 · 415 · 422 · 507                                                    |
+| GET    | `/api/conversion/sources/:id`                                              | `{ job, media, presets }` · 409 · 410                                                                               |
+| POST   | `/api/jobs/convert` `{ sourceJobId, preset, maxHeight?, gif? }`            | 202 `{ jobId }` · 422 preset sin sentido o GIF inválido                                                             |
+| POST   | `/api/recordings` `{ mimeType, fps, title }`                               | 201 `{ recordingId, maxChunkBytes }` · 507                                                                          |
+| POST   | `/api/recordings/:id/chunks?seq=N` (cuerpo binario)                        | `{ nextSeq }` · 403 · 409 fuera de orden o cerrada · 413 · 415 · 507                                                |
+| POST   | `/api/recordings/:id/finish`                                               | 202 `{ jobId }` (idempotente) · 409 vacía                                                                           |

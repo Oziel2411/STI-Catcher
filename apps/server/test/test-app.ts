@@ -21,6 +21,7 @@ import { createConversionService } from '../src/modules/conversion/conversion-se
 import { createUploadService } from '../src/modules/conversion/upload-service.ts';
 import { createRecordingService } from '../src/modules/recording/recording-service.ts';
 import { createDownloadService } from '../src/modules/download/download-service.ts';
+import { createFollowUps } from '../src/modules/download/follow-up.ts';
 import { createJobFiles } from '../src/modules/files/job-files.ts';
 import { createHistoryService } from '../src/modules/history/history-service.ts';
 import type { HealthService } from '../src/modules/health/health-service.ts';
@@ -104,6 +105,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     readFreeDiskBytes: () => Promise.resolve(options.freeDiskBytes ?? 1024 ** 4),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     progressIntervalMs: 0,
+    onDone: (record) => followUps(record),
   });
   queue.start();
 
@@ -139,6 +141,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     queue,
     gifLimits: testGifLimits,
   });
+  const followUps = createFollowUps({ conversion, queue, repo, logger: { warn: vi.fn() } });
   mkdirSync(path.join(storageDir, 'tmp'), { recursive: true });
   mkdirSync(filesDir, { recursive: true });
   const upload = createUploadService({

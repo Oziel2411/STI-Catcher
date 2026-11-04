@@ -1,5 +1,5 @@
 import type { DownloadRequest, Job, ProbeResponse } from '@sti-catcher/shared';
-import { downloadRequestSchema } from '@sti-catcher/shared';
+import { downloadRequestSchema, followUpDownloadFormat } from '@sti-catcher/shared';
 import { UrlBlockedError, UrlResolveError } from '../../adapters/url-guard.ts';
 import type { UrlGuard } from '../../adapters/url-guard.ts';
 import { YtdlpError } from '../../adapters/ytdlp.ts';
@@ -84,12 +84,16 @@ export function createDownloadService(deps: DownloadServiceDeps): DownloadServic
     async enqueue(request, requester) {
       const parsed = downloadRequestSchema.parse(request);
       await assertUrlAllowed(parsed.url);
-      const isVideo = parsed.format === 'mp4';
+      // Con conversión encadenada se baja lo que mejor sirve de origen, en
+      // modo compatible: la conversión hace el resto (D-093).
+      const format = parsed.then ? followUpDownloadFormat(parsed.then.preset) : parsed.format;
+      const isVideo = format === 'mp4';
       const params: DownloadParams = {
         url: parsed.url,
-        format: parsed.format,
+        format,
         maxHeight: isVideo ? parsed.maxHeight : null,
-        videoMode: parsed.videoMode,
+        videoMode: parsed.then ? 'compat' : parsed.videoMode,
+        then: parsed.then,
       };
       return deps.enqueue({
         type: 'download',

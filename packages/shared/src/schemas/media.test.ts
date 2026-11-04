@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { downloadRequestSchema, probeRequestSchema } from './media.ts';
+import { downloadRequestSchema, followUpDownloadFormat, probeRequestSchema } from './media.ts';
 
 describe('probeRequestSchema', () => {
   it('acepta http y https, y recorta espacios', () => {
@@ -34,6 +34,7 @@ describe('downloadRequestSchema', () => {
       maxHeight: null,
       videoMode: 'compat',
       title: null,
+      then: null,
     });
   });
 
@@ -44,5 +45,30 @@ describe('downloadRequestSchema', () => {
     expect(
       downloadRequestSchema.safeParse({ url: 'https://a.com', videoMode: 'turbo' }).success,
     ).toBe(false);
+  });
+});
+
+describe('then (conversión encadenada)', () => {
+  const parse = (then: unknown) => downloadRequestSchema.safeParse({ url: 'https://a.com', then });
+
+  it('acepta un preset con altura por defecto null', () => {
+    const result = parse({ preset: 'webm' });
+    expect(result.success && result.data.then).toEqual({ preset: 'webm', maxHeight: null });
+  });
+
+  it('el GIF exige sus opciones; un preset desconocido se rechaza', () => {
+    expect(parse({ preset: 'gif' }).success).toBe(false);
+    expect(
+      parse({ preset: 'gif', gif: { startSeconds: 0, endSeconds: 5, fps: 10, width: 480 } })
+        .success,
+    ).toBe(true);
+    expect(parse({ preset: 'exe' }).success).toBe(false);
+  });
+
+  it('baja M4A para presets de audio y MP4 para video y GIF', () => {
+    expect(followUpDownloadFormat('mp3')).toBe('m4a');
+    expect(followUpDownloadFormat('wav')).toBe('m4a');
+    expect(followUpDownloadFormat('webm')).toBe('mp4');
+    expect(followUpDownloadFormat('gif')).toBe('mp4');
   });
 });

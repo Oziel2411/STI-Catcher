@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { downloadFormatSchema, videoModeSchema } from '@sti-catcher/shared';
+import { downloadFollowUpSchema, downloadFormatSchema, videoModeSchema } from '@sti-catcher/shared';
 import { z } from 'zod';
 import type { FileOps } from '../../adapters/files.ts';
 import { buildRecodeArgs, FfmpegError } from '../../adapters/ffmpeg.ts';
@@ -17,6 +17,8 @@ export const downloadParamsSchema = z.object({
   format: downloadFormatSchema,
   maxHeight: z.number().int().positive().nullable(),
   videoMode: videoModeSchema,
+  /** Conversión a crear al terminar (D-093). La usa el follow-up, no este runner. */
+  then: downloadFollowUpSchema.nullable().default(null),
 });
 export type DownloadParams = z.infer<typeof downloadParamsSchema>;
 

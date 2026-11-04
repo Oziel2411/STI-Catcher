@@ -298,4 +298,48 @@ describe('createJobQueue', () => {
     expect(sent()).toEqual([1, 3]);
     expect(job.id).toBeDefined();
   });
+
+  it('onDone se llama solo para los jobs exitosos, antes de publicar el estado final', async () => {
+    const seen: string[] = [];
+    const { queue, calls, events } = setup({
+      onDone: (record) => {
+        // Lo publicado hasta acá todavía no incluye el "done".
+        const published = events.some(
+          (e) => e.type === 'job.updated' && e.job.id === record.id && e.job.status === 'done',
+        );
+        seen.push(`${record.id}:${record.status}:${String(published)}`);
+        return Promise.resolve();
+      },
+    });
+    queue.start();
+    const ok = await queue.enqueue(selftest);
+    const failed = await queue.enqueue(selftest);
+    await flush();
+    calls[0]?.resolve({ output: null });
+    calls[1]?.reject(new JobError('No anduvo.'));
+    await waitForFinal(events, ok.id);
+    await waitForFinal(events, failed.id);
+    expect(seen).toEqual([`${ok.id}:done:false`]);
+  });
+
+  it('si onDone falla, el job igual queda terminado y el error va al log', async () => {
+    const { queue, calls, events, logger } = setup({
+      onDone: () => Promise.reject(new Error('boom')),
+    });
+    queue.start();
+    const job = await queue.enqueue(selftest);
+    await flush();
+    calls[0]?.resolve({ output: null });
+    expect((await waitForFinal(events, job.id)).status).toBe('done');
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it('recordFailed registra un job fallido con su motivo y lo publica', () => {
+    const { queue, events, calls } = setup();
+    queue.start();
+    const job = queue.recordFailed({ ...selftest, title: 'Prueba' }, 'No se pudo.');
+    expect(job).toMatchObject({ status: 'failed', error: 'No se pudo.', title: 'Prueba' });
+    expect(events).toContainEqual({ type: 'job.updated', job });
+    expect(calls).toHaveLength(0);
+  });
 });

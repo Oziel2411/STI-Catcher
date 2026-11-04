@@ -65,6 +65,11 @@ export const jobSchema = z.object({
   videoCodec: z.string().nullable(),
   audioCodec: z.string().nullable(),
   parentJobId: z.uuid().nullable(),
+  /**
+   * Descargas con conversión encadenada (`then`): la conversión que se creó al
+   * terminar la descarga. null mientras no existe (o si se borró).
+   */
+  followUpJobId: z.uuid().nullable(),
   /** Solo mientras el job está `running`. */
   progress: jobProgressSchema.nullable(),
 });
