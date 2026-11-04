@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { apiErrorSchema, healthResponseSchema } from '@sti-catcher/shared';
@@ -63,5 +63,23 @@ describe('rutas desconocidas', () => {
 
     const api = await app.inject({ method: 'GET', url: '/api/no-existe' });
     expect(api.statusCode).toBe(404);
+  });
+
+  it('sirve archivos de un build hecho con el server andando; un asset que falta es 404', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'sti-web-'));
+    tempDirs.push(dir);
+    writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>STI</title>');
+    const { app } = await makeTestApp({ webDistDir: dir });
+
+    // Nuevo build: aparece un JS con otro hash después de arrancar.
+    mkdirSync(path.join(dir, 'assets'));
+    writeFileSync(path.join(dir, 'assets', 'index-nuevo.js'), 'console.log(1);');
+    const asset = await app.inject({ method: 'GET', url: '/assets/index-nuevo.js' });
+    expect(asset.statusCode).toBe(200);
+    expect(asset.headers['content-type']).toContain('javascript');
+
+    const missing = await app.inject({ method: 'GET', url: '/assets/index-viejo.js' });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.headers['content-type']).not.toContain('text/html');
   });
 });

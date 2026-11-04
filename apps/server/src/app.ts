@@ -138,14 +138,20 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       : null;
   if (webDir !== null) {
     // Segunda instancia: sirve la web. decorateReply false porque la primera ya decoró reply.
-    await app.register(fastifyStatic, { root: webDir, wildcard: false, decorateReply: false });
+    // Con wildcard (el default) busca cada archivo en disco al pedirlo: con
+    // `wildcard: false` arma la lista al arrancar, y un `npm run build` con el
+    // server andando dejaba la página en blanco (los nombres con hash cambian).
+    await app.register(fastifyStatic, { root: webDir, decorateReply: false });
   }
 
   app.setNotFoundHandler((request, reply) => {
     const isApi = request.url === '/api' || request.url.startsWith('/api/');
+    // Un JS o CSS que no está es un 404 de verdad: devolver index.html en su
+    // lugar deja la página en blanco con un error de MIME que confunde.
+    const isAsset = request.url.startsWith('/assets/');
     // SPA: cualquier ruta GET que no sea de la API devuelve index.html y el
     // router de React decide qué mostrar.
-    if (!isApi && webDir !== null && request.method === 'GET') {
+    if (!isApi && !isAsset && webDir !== null && request.method === 'GET') {
       return reply.type('text/html').sendFile('index.html', webDir);
     }
     return reply.status(404).send(apiError('NOT_FOUND', 'Recurso no encontrado.'));
