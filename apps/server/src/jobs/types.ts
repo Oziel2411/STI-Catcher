@@ -23,6 +23,8 @@ export type JobRecord = {
   error: string | null;
   clientIp: string | null;
   clientId: string | null;
+  /** Nombre de la PC (D-098); null mientras se resuelve o si no se encontró. */
+  clientHost: string | null;
   parentJobId: string | null;
   /** Conversión encadenada a esta descarga (D-093). */
   followUpJobId: string | null;
@@ -65,6 +67,11 @@ export type HistoryFilter = {
   clientId: string | null;
   /** Texto a buscar en el título (se normaliza sin tildes). */
   search: string | null;
+  /** Creados desde (inclusive) / hasta (exclusive), ISO. */
+  from?: string | null;
+  to?: string | null;
+  /** PC (o IP) que lo pidió, como lo da listRequesters. */
+  requester?: string | null;
   limit: number;
   offset: number;
 };
@@ -97,6 +104,13 @@ export type JobsRepository = {
    * encadenadas a una descarga cuentan como 'download'.
    */
   countActiveByClient(clientId: string): Partial<Record<JobType, number>>;
+  /** Guarda el nombre de la PC que hizo el pedido. */
+  setClientHost(id: string, host: string): void;
+  /**
+   * Quiénes pidieron trabajos de esos tipos: nombre de la PC (o IP si no se
+   * resolvió), con cuántos trabajos, del más reciente al más viejo.
+   */
+  listRequesters(types: readonly JobType[]): { value: string; total: number }[];
   /** Vincula la conversión encadenada. false si ya tenía una (no se pisa). */
   setFollowUp(id: string, followUpJobId: string): boolean;
   /** Rutas relativas (`files/<id>.<ext>`) de los archivos de jobs `done`. */

@@ -65,7 +65,7 @@ export function applyJobEvent(job: Job | null, event: JobEvent): Job | null {
 }
 
 /**
- * Aplica un evento SSE a la lista del historial. Conserva `isMine` y `parentTitle` (los
+ * Aplica un evento SSE a la lista del historial. Conserva `isMine`, `parentTitle` y `requester` (los
  * eventos no lo traen: depende de quién mira) y quita los borrados.
  * Devuelve la misma lista si nada cambió, para no re-renderizar.
  */
@@ -79,7 +79,12 @@ export function applyEventToList(items: HistoryItem[], event: JobEvent): History
     const updated = applyJobEvent(item, event);
     return updated === item
       ? item
-      : { ...updated, isMine: item.isMine, parentTitle: item.parentTitle };
+      : {
+          ...updated,
+          isMine: item.isMine,
+          parentTitle: item.parentTitle,
+          requester: item.requester,
+        };
   });
   return next.some((item, index) => item !== items[index]) ? next : items;
 }

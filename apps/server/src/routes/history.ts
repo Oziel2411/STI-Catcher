@@ -19,6 +19,8 @@ export function registerHistoryRoutes(app: FastifyInstance, history: HistoryServ
     return history.list(query, requesterOf(request));
   });
 
+  app.get('/api/history/requesters', () => history.requesters());
+
   app.get('/api/active-jobs', (request) => history.activeCounts(requesterOf(request)));
 
   // Solo los trabajos propios (mismo navegador). Borra el registro y el archivo.

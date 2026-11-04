@@ -31,6 +31,7 @@ type JobRow = {
   error: string | null;
   client_ip: string | null;
   client_id: string | null;
+  client_host: string | null;
   parent_job_id: string | null;
   follow_up_job_id: string | null;
 };
@@ -65,6 +66,7 @@ function toRecord(row: JobRow): JobRecord {
     error: row.error,
     clientIp: row.client_ip,
     clientId: row.client_id,
+    clientHost: row.client_host,
     parentJobId: row.parent_job_id,
     followUpJobId: row.follow_up_job_id,
   };
@@ -168,6 +170,9 @@ export function createJobsRepository(db: Db): JobsRepository {
      WHERE j.client_id = ? AND j.status IN ('queued', 'running')
      GROUP BY kind
   `);
+  const setClientHostStmt = db.prepare<[string, string]>(
+    'UPDATE jobs SET client_host = ? WHERE id = ?',
+  );
   const setFollowUpStmt = db.prepare<[string, string]>(
     'UPDATE jobs SET follow_up_job_id = ? WHERE id = ? AND follow_up_job_id IS NULL',
   );
@@ -187,6 +192,19 @@ export function createJobsRepository(db: Db): JobsRepository {
     if (search !== '') {
       where.push("title_search LIKE ? ESCAPE '\\'");
       args.push(`%${escapeLike(search)}%`);
+    }
+    // ISO en UTC con el mismo formato: se comparan como texto.
+    if (filter.from) {
+      where.push('created_at >= ?');
+      args.push(filter.from);
+    }
+    if (filter.to) {
+      where.push('created_at < ?');
+      args.push(filter.to);
+    }
+    if (filter.requester) {
+      where.push('COALESCE(client_host, client_ip) = ?');
+      args.push(filter.requester);
     }
     return { sql: where.join(' AND '), args };
   };
@@ -314,6 +332,25 @@ export function createJobsRepository(db: Db): JobsRepository {
         counts[jobTypeSchema.parse(row.kind)] = row.total;
       }
       return counts;
+    },
+
+    setClientHost(id, host) {
+      setClientHostStmt.run(host, id);
+    },
+
+    listRequesters(types) {
+      if (types.length === 0) return [];
+      return db
+        .prepare<string[], { value: string; total: number }>(
+          `SELECT COALESCE(client_host, client_ip) AS value, COUNT(*) AS total
+             FROM jobs
+            WHERE type IN (${types.map(() => '?').join(', ')})
+              AND COALESCE(client_host, client_ip) IS NOT NULL
+            GROUP BY value
+            ORDER BY MAX(created_at) DESC
+            LIMIT 200`,
+        )
+        .all(...types);
     },
 
     setFollowUp(id, followUpJobId) {

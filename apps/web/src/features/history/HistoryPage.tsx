@@ -1,15 +1,22 @@
 import {
   createJobResponseSchema,
+  historyRequestersResponseSchema,
   historyResponseSchema,
   isActiveStatus,
   jobResponseSchema,
 } from '@sti-catcher/shared';
-import type { HistoryItem, HistoryResponse, HistoryScope } from '@sti-catcher/shared';
+import type {
+  HistoryItem,
+  HistoryRequestersResponse,
+  HistoryResponse,
+  HistoryScope,
+} from '@sti-catcher/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { apiDelete, apiGet, apiPost } from '../../api/client.ts';
 import { subscribeToJobsEvents } from '../../api/events.ts';
 import { formatBytes, formatDateTime, formatDuration } from '../../lib/format.ts';
+import { dayRange, invalidRange, ORIGIN_OPTIONS } from '../../lib/history-filters.ts';
 import { applyEventToList, PHASE_LABELS, STATUS_LABELS, TYPE_LABELS } from '../../lib/jobs.ts';
 
 const PAGE_SIZE = 20;
@@ -24,14 +31,21 @@ type LoadState =
   | { kind: 'ready'; data: HistoryResponse };
 
 /**
- * Historial (SPEC §8). El filtro, la búsqueda y la página viven en la URL
- * (?scope=all&q=…&page=2): recargar o compartir el link mantiene la vista.
+ * Historial (SPEC §8). Los filtros, la búsqueda y la página viven en la URL
+ * (?scope=all&q=…&desde=…&hasta=…&tipo=…&usuario=…&page=2): recargar o
+ * compartir el link mantiene la vista. Filtros de fecha, origen y usuario: D-098.
  */
 export function HistoryPage() {
   const [params, setParams] = useSearchParams();
   const scope: HistoryScope = params.get('scope') === 'all' ? 'all' : 'mine';
   const q = params.get('q') ?? '';
   const page = Math.max(1, Number(params.get('page')) || 1);
+  const from = params.get('desde');
+  const to = params.get('hasta');
+  const origin = params.get('tipo');
+  const user = params.get('usuario');
+  const filtered = Boolean(from ?? to ?? origin ?? user);
+  const [requesters, setRequesters] = useState<HistoryRequestersResponse['requesters']>([]);
 
   const [searchInput, setSearchInput] = useState(q);
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
@@ -71,6 +85,11 @@ export function HistoryPage() {
     const controller = new AbortController();
     const query = new URLSearchParams({ scope, page: String(page), pageSize: String(PAGE_SIZE) });
     if (q) query.set('q', q);
+    const range = dayRange(from, to);
+    if (range.from) query.set('from', range.from);
+    if (range.to) query.set('to', range.to);
+    if (origin) query.set('type', origin);
+    if (user) query.set('user', user);
     apiGet(`/api/history?${query.toString()}`, historyResponseSchema, controller.signal)
       .then((data) => {
         setState({ kind: 'ready', data });
@@ -81,7 +100,22 @@ export function HistoryPage() {
     return () => {
       controller.abort();
     };
-  }, [scope, q, page, reloadKey]);
+  }, [scope, q, page, reloadKey, from, to, origin, user]);
+
+  // Valores del filtro "Usuario" (PCs que pidieron trabajos).
+  useEffect(() => {
+    const controller = new AbortController();
+    apiGet('/api/history/requesters', historyRequestersResponseSchema, controller.signal)
+      .then((data) => {
+        setRequesters(data.requesters);
+      })
+      .catch(() => {
+        // Sin la lista, el filtro queda solo con "Todos".
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [reloadKey]);
 
   const items = state.kind === 'ready' ? state.data.items : null;
 
@@ -180,6 +214,89 @@ export function HistoryPage() {
         </label>
       </div>
 
+      <div className="history-filters">
+        <label className="filter-field">
+          <span>Desde</span>
+          <input
+            type="date"
+            value={from ?? ''}
+            max={to ?? undefined}
+            onChange={(e) => {
+              updateParams({ desde: e.target.value, page: null });
+            }}
+          />
+        </label>
+        <label className="filter-field">
+          <span>Hasta</span>
+          <input
+            type="date"
+            value={to ?? ''}
+            min={from ?? undefined}
+            onChange={(e) => {
+              updateParams({ hasta: e.target.value, page: null });
+            }}
+          />
+        </label>
+        <label className="filter-field">
+          <span>Origen</span>
+          <select
+            className="select-compact"
+            value={origin ?? ''}
+            onChange={(e) => {
+              updateParams({ tipo: e.target.value, page: null });
+            }}
+          >
+            <option value="">Todos</option>
+            {ORIGIN_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="filter-field">
+          <span>Usuario</span>
+          <select
+            className="select-compact"
+            value={user ?? ''}
+            onChange={(e) => {
+              // Ver los de otra PC solo tiene sentido en "Todos".
+              updateParams({
+                usuario: e.target.value,
+                ...(e.target.value ? { scope: 'all' } : {}),
+                page: null,
+              });
+            }}
+          >
+            <option value="">Todos</option>
+            {user && !requesters.some((entry) => entry.value === user) && (
+              <option value={user}>{user}</option>
+            )}
+            {requesters.map((entry) => (
+              <option key={entry.value} value={entry.value}>
+                {entry.label} ({entry.total})
+              </option>
+            ))}
+          </select>
+        </label>
+        {filtered && (
+          <button
+            type="button"
+            className="button button-ghost"
+            onClick={() => {
+              updateParams({ desde: null, hasta: null, tipo: null, usuario: null, page: null });
+            }}
+          >
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+      {invalidRange(from, to) && (
+        <p className="small text-warn">
+          «Desde» es posterior a «Hasta»: no puede haber resultados.
+        </p>
+      )}
+
       {actionError && (
         <div className="alert alert-error" role="alert">
           {actionError}
@@ -194,11 +311,13 @@ export function HistoryPage() {
       )}
       {state.kind === 'ready' && state.data.items.length === 0 && (
         <p className="muted">
-          {q
-            ? `No hay trabajos que coincidan con «${q}».`
-            : scope === 'mine'
-              ? 'Todavía no hiciste ningún trabajo desde este navegador.'
-              : 'Todavía no hay trabajos.'}
+          {filtered
+            ? 'No hay trabajos con estos filtros.'
+            : q
+              ? `No hay trabajos que coincidan con «${q}».`
+              : scope === 'mine'
+                ? 'Todavía no hiciste ningún trabajo desde este navegador.'
+                : 'Todavía no hay trabajos.'}
         </p>
       )}
 
@@ -274,6 +393,7 @@ function HistoryRow({
   const meta = [
     TYPE_LABELS[item.type],
     formatDateTime(item.createdAt),
+    showOwner ? item.requester : null,
     item.format?.toUpperCase() ?? null,
     item.durationSeconds !== null ? formatDuration(item.durationSeconds) : null,
     item.resolution,

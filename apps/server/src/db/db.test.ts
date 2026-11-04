@@ -20,9 +20,9 @@ function freshDb() {
 describe('migrate', () => {
   it('aplica las pendientes una sola vez', () => {
     const db = openDatabase(':memory:');
-    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1, 2, 3, 4]);
+    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1, 2, 3, 4, 5]);
     expect(migrate(db, migrations)).toEqual([]);
-    expect(db.pragma('user_version', { simple: true })).toBe(4);
+    expect(db.pragma('user_version', { simple: true })).toBe(5);
   });
 
   it('revierte una migración que falla y no avanza la versión', () => {
@@ -44,7 +44,7 @@ describe('migrate', () => {
 
   it('rechaza una base más nueva que el código', () => {
     const db = openDatabase(':memory:');
-    db.pragma('user_version = 5');
+    db.pragma('user_version = 99');
     expect(() => migrate(db, migrations)).toThrow(/más nueva/);
   });
 });
@@ -235,6 +235,44 @@ describe('historial (repositorio)', () => {
     expect(
       ids(repo.listHistory({ types, clientId: null, search: 'acido', limit: 10, offset: 0 })),
     ).toEqual([id(2)]);
+  });
+
+  it('filtra por fecha (desde inclusive, hasta exclusive), tipo y quién lo pidió', () => {
+    const repo = seeded();
+    // 1 y 3 desde la misma PC; 2 sin nombre resuelto (queda la IP).
+    for (const [n, ip] of [
+      [1, '192.168.3.40'],
+      [2, '192.168.3.41'],
+      [3, '192.168.3.40'],
+    ] as const) {
+      repo.insert({
+        id: id(10 + n),
+        type: n === 2 ? 'conversion' : 'recording',
+        params: {},
+        title: `Extra ${String(n)}`,
+        clientIp: ip,
+        createdAt: `2026-10-30T0${String(n)}:00:00.000Z`,
+      });
+    }
+    repo.setClientHost(id(11), 'PC-SALA');
+    repo.setClientHost(id(13), 'PC-SALA');
+    const list = (filter: Partial<Parameters<typeof repo.listHistory>[0]>) =>
+      ids(
+        repo.listHistory({ types, clientId: null, search: null, limit: 20, offset: 0, ...filter }),
+      );
+
+    expect(list({ from: '2026-10-30T02:00:00.000Z' })).toEqual([id(13), id(12)]);
+    expect(list({ from: '2026-10-30T00:00:00.000Z', to: '2026-10-30T02:00:00.000Z' })).toEqual([
+      id(11),
+    ]);
+    expect(list({ types: ['conversion'] })).toEqual([id(12)]);
+    expect(list({ requester: 'PC-SALA' })).toEqual([id(13), id(11)]);
+    expect(list({ requester: '192.168.3.41' })).toEqual([id(12)]);
+
+    expect(repo.listRequesters(types)).toEqual([
+      { value: 'PC-SALA', total: 2 },
+      { value: '192.168.3.41', total: 1 },
+    ]);
   });
 
   it('markExpired solo pasa de done a expired', () => {

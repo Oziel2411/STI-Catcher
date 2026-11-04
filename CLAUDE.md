@@ -75,6 +75,7 @@ Detalle en `docs/DECISIONS.md`.
 - La cola borra los temporales de un job antes de publicar su estado final.
 - Descarga: `-f bv[height<=H]+ba/b[height<=H]/bv+ba/b`; compat `-S vcodec:h264,res:H,channels:2,acodec:aac`. "Recodificar" lo hace nuestro ffmpeg (con progreso), no yt-dlp. Archivo en disco `<jobId>.<ext>`; el título solo va en `Content-Disposition`.
 - `vite.config.ts` lee el `.env` directo (no `loadEnv`): una herramienta que define `PORT` apuntaba el proxy a sí mismo.
+- Historial: filtros fecha/origen/usuario (D-098); usuario = nombre de la PC (`dns.lookupService`, en segundo plano al crear el job, `client_host`) o la IP.
 - Historial: cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
 - Descargar es una lista de links (D-095): análisis de a tres, formato por fila (los que no son MP4/MP3/M4A usan `then`), lista en `sessionStorage`.
 - Descarga + conversión encadenada (`then`): al terminar bien, la cola (`onDone`) crea la conversión por el camino normal y la vincula en `follow_up_job_id`; si las opciones no sirven, queda una conversión fallida con el motivo.
@@ -99,7 +100,8 @@ Detalle en `docs/DECISIONS.md`.
 | POST   | `/api/jobs/download` `{ url, format, maxHeight, videoMode, title, then? }` | 202 `{ jobId }` · 400 · 507. `then: { preset, maxHeight?, gif? }` convierte al terminar (`followUpJobId`)           |
 | GET    | `/api/jobs/:id/file`                                                       | el archivo (RFC 5987, Range) · 409 sin terminar · 410 ya no está                                                    |
 | GET    | `/api/active-jobs`                                                         | `{ download, conversion, recording }`: trabajos propios en cola o en curso (contadores de la barra lateral)         |
-| GET    | `/api/history?scope=all&q=…&page=n`                                        | `{ items (job + isMine), total, page, pageSize }`; `scope` es `mine` (por defecto) o `all`                          |
+| GET    | `/api/history?scope=all&q=…&from=…&to=…&type=a,b&user=…&page=n`            | `{ items (job + isMine + requester), total, page, pageSize }`; `scope` es `mine` (por defecto) o `all`              |
+| GET    | `/api/history/requesters`                                                  | `{ requesters: [{ value, label, total }] }` (filtro Usuario)                                                        |
 | DELETE | `/api/jobs/:id`                                                            | 204 · 403 no es tuyo · 409 en curso                                                                                 |
 | POST   | `/api/jobs/:id/retry`                                                      | 202 `{ jobId }` (trabajo nuevo) · 409                                                                               |
 | GET    | `/api/conversion/options`                                                  | topes del GIF y `maxUploadBytes`                                                                                    |

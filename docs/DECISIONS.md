@@ -597,6 +597,20 @@ Para dejar grabando sin estar en la PC: empezar a una hora y cortar después de 
 
 Verificado con una fuente simulada: programada para el minuto siguiente con corte a 1 minuto, esperando en Descargar; empezó a las 15:48:00, cortó sola y el MP4 duró 1:00.
 
+### D-098 — Filtros del historial: fecha, origen y usuario · Vigente
+
+- **Fecha:** «Desde» y «Hasta» (días completos, en la hora de quien mira). El navegador manda el rango ya pasado a ISO (`from` inclusive, `to` exclusive) y el server compara contra `created_at`.
+- **Origen = tipo de trabajo:** descargas, archivos subidos, conversiones o grabaciones (`type=a,b`).
+- **Usuario = la PC que lo pidió.** No hay login, así que se usa el nombre de la PC; si no se encuentra, la IP. Elegir un usuario pasa a «Todos».
+  - **Cómo se obtiene el nombre:** en la red del Centro no hay DNS inverso (`dns.reverse` → ENOTFOUND) y NetBIOS no responde, pero el resolvedor de Windows sí lo encuentra por LLMNR/mDNS. Node lo usa con `dns.lookupService`: 5–80 ms si la PC responde, unos 4,5 s hasta fallar si no. Por eso se resuelve **en segundo plano al crear el job** (no demora la respuesta), con 6 s de límite y caché (6 h los aciertos, 10 min las fallas). Se guarda el nombre corto en mayúsculas (`SISTEMAS2-PC.CAPITANES.local` → `SISTEMAS2-PC`) en `jobs.client_host` (migración 5).
+  - **Se guarda, no se calcula al mirar:** con DHCP, una IP puede pasar a otra PC.
+  - **Los trabajos anteriores a este cambio quedan con la IP** por la misma razón: hoy esa IP podría ser de otra PC.
+  - **Cambio de criterio:** antes la API no mostraba la IP de nadie. Ahora el historial muestra quién pidió cada trabajo (`requester`), porque es lo que pide el filtro. El `clientId` de la cookie sigue sin salir nunca.
+- `GET /api/history/requesters` da los valores del filtro: cada PC o IP con su cantidad de trabajos, la más reciente primero.
+- Los filtros viven en la URL (`?desde=…&hasta=…&tipo=…&usuario=…`), igual que la búsqueda y la página.
+
+Verificado: con la base de prueba (28 trabajos), un trabajo nuevo quedó como «SISTEMAS2-PC» y los viejos como 127.0.0.1; filtrar por grabaciones dio 4, por SISTEMAS2-PC 1 y desde el 4/11 15; un rango invertido avisa; «Limpiar filtros» vuelve a los 28.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

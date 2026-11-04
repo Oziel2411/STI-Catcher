@@ -1,19 +1,21 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
-import { isActiveStatus } from '@sti-catcher/shared';
+import { HISTORY_JOB_TYPES, isActiveStatus } from '@sti-catcher/shared';
 import type {
   ActiveJobsResponse,
   HistoryItem,
+  HistoryRequestersResponse,
   HistoryResponse,
   HistoryScope,
   Job,
   JobType,
 } from '@sti-catcher/shared';
+import { normalizeIp } from '../../adapters/host-resolver.ts';
 import type { EnqueueInput, JobQueue } from '../../jobs/queue.ts';
 import type { JobRecord, JobsRepository } from '../../jobs/types.ts';
 
 /** Tipos que aparecen en el historial. El selftest no: es una prueba del sistema (D-030). */
-export const HISTORY_TYPES: readonly JobType[] = ['download', 'upload', 'conversion', 'recording'];
+export const HISTORY_TYPES: readonly JobType[] = HISTORY_JOB_TYPES;
 
 /** Tipos que se pueden reintentar con los mismos parámetros. */
 const RETRYABLE_TYPES: readonly JobType[] = ['download', 'conversion', 'recording'];
@@ -34,7 +36,7 @@ export class HistoryError extends Error {
 export type Requester = { clientId: string; ip: string | null };
 
 export type HistoryServiceDeps = {
-  repo: Pick<JobsRepository, 'get' | 'listHistory' | 'countActiveByClient'>;
+  repo: Pick<JobsRepository, 'get' | 'listHistory' | 'countActiveByClient' | 'listRequesters'>;
   queue: Pick<JobQueue, 'toApi' | 'expire' | 'remove' | 'enqueue'>;
   storageDir: string;
   filesDir: string;
@@ -54,9 +56,20 @@ const defaultFileExists = async (filePath: string) => {
 
 export type HistoryService = {
   list: (
-    query: { scope: HistoryScope; q?: string | undefined; page: number; pageSize: number },
+    query: {
+      scope: HistoryScope;
+      q?: string | undefined;
+      from?: string | undefined;
+      to?: string | undefined;
+      type?: readonly JobType[] | undefined;
+      user?: string | undefined;
+      page: number;
+      pageSize: number;
+    },
     requester: Requester,
   ) => Promise<HistoryResponse>;
+  /** Valores del filtro "Usuario". */
+  requesters: () => HistoryRequestersResponse;
   remove: (id: string, requester: Requester) => Promise<void>;
   retry: (id: string, requester: Requester) => Promise<Job>;
   /** Contadores de la barra lateral: lo que este navegador tiene en cola o en curso. */
@@ -99,6 +112,8 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
     // Una consulta por item con origen (a lo sumo una página): más simple que un JOIN.
     parentTitle:
       record.parentJobId === null ? null : (deps.repo.get(record.parentJobId)?.title ?? null),
+    requester:
+      record.clientHost ?? (record.clientIp === null ? null : normalizeIp(record.clientIp)),
   });
 
   const getOrThrow = (id: string): JobRecord => {
@@ -110,11 +125,15 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
   };
 
   return {
-    async list({ scope, q, page, pageSize }, requester) {
+    async list({ scope, q, from, to, type, user, page, pageSize }, requester) {
       const { records, total } = deps.repo.listHistory({
-        types: HISTORY_TYPES,
+        types:
+          type && type.length > 0 ? type.filter((t) => HISTORY_TYPES.includes(t)) : HISTORY_TYPES,
         clientId: scope === 'mine' ? requester.clientId : null,
         search: q ?? null,
+        from: from ?? null,
+        to: to ?? null,
+        requester: user ?? null,
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
@@ -158,6 +177,16 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
         },
         'Trabajo borrado del historial',
       );
+    },
+
+    requesters() {
+      return {
+        requesters: deps.repo.listRequesters(HISTORY_TYPES).map(({ value, total }) => ({
+          value,
+          label: normalizeIp(value),
+          total,
+        })),
+      };
     },
 
     activeCounts(requester) {

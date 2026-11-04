@@ -49,6 +49,8 @@ export type TestAppOptions = {
   /** ffprobe falso para subidas y conversiones (por defecto: video H.264 + AAC de 12 s). */
   ffprobe?: Ffprobe;
   maxUploadBytes?: number;
+  /** IP → nombre de la PC (por defecto no se resuelve). */
+  resolveHost?: (ip: string) => Promise<string | null>;
 };
 
 export const sampleVideoMedia: MediaInfo = {
@@ -106,6 +108,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     progressIntervalMs: 0,
     onDone: (record) => followUps(record),
+    ...(options.resolveHost ? { resolveHost: options.resolveHost } : {}),
   });
   queue.start();
 

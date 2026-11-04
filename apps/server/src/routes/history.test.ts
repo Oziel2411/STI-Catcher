@@ -4,6 +4,7 @@ import {
   apiErrorSchema,
   createJobResponseSchema,
   activeJobsResponseSchema,
+  historyRequestersResponseSchema,
   historyResponseSchema,
   jobEventSchema,
 } from '@sti-catcher/shared';
@@ -120,7 +121,7 @@ describe('GET /api/history', () => {
     });
   });
 
-  it('no expone IPs ni clientIds', async () => {
+  it('nunca expone el clientId; quién lo pidió va solo como PC o IP (D-098)', async () => {
     const testApp = await app();
     createJob(testApp, 'x', CLIENT_A);
     const response = await testApp.app.inject({
@@ -128,8 +129,9 @@ describe('GET /api/history', () => {
       url: '/api/history',
       headers: cookie(CLIENT_A),
     });
-    expect(response.body).not.toContain('10.0.0.7');
     expect(response.body).not.toContain(CLIENT_A);
+    // Sin nombre de PC resuelto, se muestra la IP (es el filtro "Usuario").
+    expect(historyResponseSchema.parse(response.json()).items[0]?.requester).toBe('10.0.0.7');
   });
 
   it('busca sin tildes y pagina', async () => {
@@ -357,5 +359,60 @@ describe('GET /api/active-jobs', () => {
     const testApp = await app();
     const response = await testApp.app.inject({ method: 'GET', url: '/api/active-jobs' });
     expect(response.json()).toEqual({ download: 0, conversion: 0, recording: 0 });
+  });
+});
+
+describe('filtros del historial', () => {
+  it('guarda el nombre de la PC del pedido y filtra por fecha, tipo y usuario', async () => {
+    const testApp = await makeTestApp({
+      resolveHost: (ip) => Promise.resolve(ip === '10.0.0.5' ? 'PC-SALA' : null),
+    });
+    storageDirs.push(testApp.storageDir);
+    const download = async (remoteAddress: string) => {
+      const response = await testApp.app.inject({
+        method: 'POST',
+        url: '/api/jobs/download',
+        payload: { url: 'https://youtu.be/x' },
+        remoteAddress,
+      });
+      return createJobResponseSchema.parse(response.json()).jobId;
+    };
+    const fromSala = await download('10.0.0.5');
+    const unknown = await download('10.0.0.6');
+    // La resolución corre en segundo plano.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(testApp.repo.get(fromSala)?.clientHost).toBe('PC-SALA');
+    expect(testApp.repo.get(unknown)?.clientHost).toBeNull();
+
+    const history = async (query: string) => {
+      const response = await testApp.app.inject({ method: 'GET', url: `/api/history?${query}` });
+      expect(response.statusCode).toBe(200);
+      return historyResponseSchema.parse(response.json()).items;
+    };
+
+    const all = await history('scope=all');
+    expect(all.map((item) => [item.id, item.requester])).toEqual([
+      [unknown, '10.0.0.6'],
+      [fromSala, 'PC-SALA'],
+    ]);
+    expect((await history('scope=all&user=PC-SALA')).map((item) => item.id)).toEqual([fromSala]);
+    expect(await history('scope=all&type=conversion,recording')).toEqual([]);
+    expect(await history('scope=all&type=download')).toHaveLength(2);
+    expect(await history('scope=all&from=2099-01-01T00:00:00.000Z')).toEqual([]);
+    expect(await history('scope=all&to=2000-01-01T00:00:00.000Z')).toEqual([]);
+
+    const requesters = await testApp.app.inject({ method: 'GET', url: '/api/history/requesters' });
+    expect(historyRequestersResponseSchema.parse(requesters.json()).requesters).toEqual([
+      { value: '10.0.0.6', label: '10.0.0.6', total: 1 },
+      { value: 'PC-SALA', label: 'PC-SALA', total: 1 },
+    ]);
+  });
+
+  it('400 con un tipo o una fecha que no sirven', async () => {
+    const testApp = await app();
+    for (const query of ['type=selftest', 'type=exe', 'from=ayer']) {
+      const response = await testApp.app.inject({ method: 'GET', url: `/api/history?${query}` });
+      expect(response.statusCode).toBe(400);
+    }
   });
 });

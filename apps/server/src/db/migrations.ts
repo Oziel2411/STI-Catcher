@@ -104,4 +104,13 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE jobs ADD COLUMN follow_up_job_id TEXT REFERENCES jobs (id) ON DELETE SET NULL;
     `,
   },
+  {
+    version: 5,
+    name: 'add-client-host',
+    sql: /* sql */ `
+      -- Nombre de la PC que hizo el pedido (D-098), resuelto al crear el job.
+      -- Se guarda (no se calcula al mirar) porque una IP puede pasar a otra PC.
+      ALTER TABLE jobs ADD COLUMN client_host TEXT;
+    `,
+  },
 ];

@@ -27,12 +27,14 @@ describe('applyEventToList', () => {
     id: '00000000-0000-4000-8000-00000000000a',
     isMine: true,
     parentTitle: null,
+    requester: 'PC-SALA',
   };
   const b = {
     ...base,
     id: '00000000-0000-4000-8000-00000000000b',
     isMine: false,
     parentTitle: 'Origen',
+    requester: null,
   };
 
   it('actualiza el job y conserva isMine (los eventos no lo traen)', () => {

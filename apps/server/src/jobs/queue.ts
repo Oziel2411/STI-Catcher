@@ -45,6 +45,11 @@ export type JobQueueDeps = {
    * se loguean y no cambian el resultado del job.
    */
   onDone?: (record: JobRecord) => Promise<void>;
+  /**
+   * IP → nombre de la PC (D-098). Se consulta en segundo plano al crear cada
+   * job y se guarda; no demora la respuesta.
+   */
+  resolveHost?: (ip: string) => Promise<string | null>;
   /** Mínimo entre dos eventos de progreso del mismo job. */
   progressIntervalMs?: number;
   /** Cuánto esperar a que los jobs corten al detener el server. */
@@ -154,6 +159,19 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
     followUpJobId: record.followUpJobId,
     progress: record.status === 'running' ? (progress.get(record.id) ?? null) : null,
   });
+
+  /** Anota el nombre de la PC del pedido, sin esperar (puede tardar segundos si no responde). */
+  const annotateHost = (id: string, ip: string | null | undefined) => {
+    if (!deps.resolveHost || !ip) return;
+    deps
+      .resolveHost(ip)
+      .then((host) => {
+        if (host !== null) repo.setClientHost(id, host);
+      })
+      .catch((error: unknown) => {
+        logger.warn({ jobId: id, err: error }, 'No se pudo resolver el nombre de la PC');
+      });
+  };
 
   const publishUpdated = (id: string) => {
     const record = repo.get(id);
@@ -356,6 +374,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         clientId: input.clientId ?? null,
         parentJobId: input.parentJobId ?? null,
       });
+      annotateHost(record.id, input.clientIp);
       bus.publish({ type: 'job.updated', job: toApi(record) });
       void pump();
       return toApi(record);
@@ -423,6 +442,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         clientId: input.clientId ?? null,
         parentJobId: input.parentJobId ?? null,
       });
+      annotateHost(input.id, input.clientIp);
       repo.markRunning(input.id, timestamp);
       repo.finish(input.id, { ...result, status: 'done', finishedAt: timestamp });
       const record = repo.get(input.id);
@@ -443,6 +463,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         clientId: input.clientId ?? null,
         parentJobId: input.parentJobId ?? null,
       });
+      annotateHost(record.id, input.clientIp);
       repo.finish(record.id, { status: 'failed', finishedAt: now().toISOString(), error });
       const failed = repo.get(record.id) ?? record;
       bus.publish({ type: 'job.updated', job: toApi(failed) });
