@@ -166,6 +166,25 @@ Probá desde una PC cliente: descargar un video, convertir un archivo y grabar l
 | Copia de seguridad                  | Detené el servicio y copiá `C:\STI-Catcher\data` (base y certificados) y el `.env`. Los videos de `storage` son regenerables y se borran solos por retención.                                                                                  |
 | Desinstalar                         | `.\scripts\uninstall-service.ps1`: quita el servicio y la regla de firewall. No borra datos.                                                                                                                                                   |
 
+## Migrar a otro servidor
+
+Para pasar STI-Catcher de un equipo (el «viejo») a otro (el «nuevo») conservando el historial. La base guarda las rutas de los archivos relativas a `STORAGE_DIR`, así que alcanza con copiar carpetas.
+
+**Antes del día:** si los compañeros entran por un alias DNS (por ejemplo `sti.empresa.local`), la migración no se nota: al final solo se cambia a qué equipo apunta. Si entran por el nombre del equipo viejo, avisales la dirección nueva.
+
+1. **En el nuevo:** pasos 1 a 4 de esta guía (Node, código, `setup.ps1`, `.env`, compilar). Para el `.env`, partí del `.env` del viejo y ajustá las carpetas. El mail (`SMTP_*`, `MAIL_TO`) queda igual.
+2. **El certificado de la red.** Elegí una:
+   - **CA nueva (más simple):** en el nuevo, `.\scripts\new-certificate.ps1` (paso 5). Después, cada PC cliente instala la CA nueva (paso 8).
+   - **Llevar la CA del viejo (las PCs cliente no tocan nada):** en el viejo, `bin\mkcert.exe -CAROOT` muestra la carpeta de la CA. Copiá `rootCA.pem` y `rootCA-key.pem` a la carpeta que muestra el mismo comando en el nuevo, **antes** de correr `new-certificate.ps1` ahí. `rootCA-key.pem` es secreto: pasalo por un pendrive (no por mail ni carpeta compartida) y borralo del pendrive al terminar.
+   - Si hay alias DNS, sumalo: `.\scripts\new-certificate.ps1 -Names sti.empresa.local`.
+3. **En el viejo:** `Stop-Service sti-catcher`. Desde acá no se puede usar la app hasta terminar.
+4. **Copiá del viejo al nuevo:**
+   - `DATA_DIR\sti-catcher.db` (y `sti-catcher.db-wal` / `sti-catcher.db-shm` si están) al `DATA_DIR` del nuevo. **No** copies `certs\` ni `sti-catcher.pid`.
+   - `STORAGE_DIR\files` y `STORAGE_DIR\recordings`, si querés conservar los archivos. Si no, el historial queda y los archivos figuran como «expirado».
+5. **En el nuevo:** `.\scripts\install-service.ps1 -DisableSleep` (paso 6). Abrí **Estado**, revisá el historial y mandá el mail de prueba.
+6. **En el viejo:** `.\scripts\uninstall-service.ps1`. Si llevaste la CA y el viejo deja de ser de confianza, borrá su carpeta `-CAROOT`.
+7. **Alias DNS:** que apunte a la IP del nuevo. Probá desde una PC cliente: descargar, convertir y grabar.
+
 ## Problemas comunes
 
 - **«La conexión no es privada»:** a esa PC le falta la CA (paso 8), o se está entrando por un nombre que no está en el certificado. Los nombres válidos son los que listó `new-certificate.ps1`.
