@@ -7,9 +7,8 @@ const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Error desconocido.';
 
 /**
- * Aviso por mail al terminar una grabación (D-099): si está configurado y un
- * botón para mandar un mail de prueba. La configuración está en el .env del
- * servidor (las direcciones no se muestran).
+ * Avisos por mail (D-099, D-104): si hay servidor de correo y un botón para
+ * mandarse un mail de prueba. La configuración está en el .env del servidor.
  */
 export function MailCard() {
   const [status, setStatus] = useState<MailStatusResponse | null>(null);
@@ -35,10 +34,7 @@ export function MailCard() {
       .then(({ sentTo }) => {
         setResult({
           ok: true,
-          message:
-            sentTo === 1
-              ? 'Mail de prueba enviado al destinatario. Revisá la bandeja (y la de spam).'
-              : `Mail de prueba enviado a los ${String(sentTo)} destinatarios. Revisá las bandejas (y spam).`,
+          message: `Mail de prueba enviado a ${sentTo}. Revisá la bandeja (y la de spam).`,
         });
       })
       .catch((error: unknown) => {
@@ -49,14 +45,14 @@ export function MailCard() {
       });
   };
 
-  const ready = status !== null && status.configured && status.recipients > 0;
+  const ready = status !== null && status.configured;
 
   return (
     <div className="card">
       <h2>Aviso por mail</h2>
       <p className="muted small">
-        Cuando termina una grabación se manda un mail a las direcciones configuradas en el servidor
-        (MAIL_TO).
+        Al grabar, descargar o convertir, cada uno elige a quién avisar cuando termine o falle. El
+        mail de prueba te llega a vos.
       </p>
       {status === null ? (
         <p className="muted small">Consultando…</p>
@@ -66,15 +62,8 @@ export function MailCard() {
         </p>
       ) : (
         <>
-          <p className="stat">
-            {status.recipients === 0
-              ? 'Sin destinatarios'
-              : `Activo · ${String(status.recipients)} ${status.recipients === 1 ? 'destinatario' : 'destinatarios'}`}
-          </p>
-          <p className="muted small">
-            Desde {status.from}
-            {status.recipients === 0 && '. Completá MAIL_TO en el .env y reiniciá el servidor.'}
-          </p>
+          <p className="stat">Activo</p>
+          <p className="muted small">Desde {status.from}</p>
         </>
       )}
       <div className="row">

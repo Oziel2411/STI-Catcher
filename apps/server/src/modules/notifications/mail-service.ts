@@ -1,6 +1,6 @@
 import type { MailStatusResponse } from '@sti-catcher/shared';
 import type { SendMail } from '../../adapters/mailer.ts';
-import { mailDateTime } from './recording-notice.ts';
+import { mailDateTime } from './job-notice.ts';
 
 export class MailServiceError extends Error {
   override name = 'MailServiceError';
@@ -17,28 +17,25 @@ export type MailServiceDeps = {
   /** null sin SMTP configurado. */
   send: SendMail | null;
   from: string | null;
-  to: readonly string[];
   now?: () => Date;
 };
 
-/** Estado del aviso por mail y envío de prueba (página Estado, D-099). */
+/** Estado del mail y envío de prueba a quien lo pide (página Estado, D-099 y D-104). */
 export function createMailService(deps: MailServiceDeps) {
   const now = deps.now ?? (() => new Date());
   let sending = false;
 
   return {
     status(): MailStatusResponse {
-      return { configured: deps.send !== null, from: deps.from, recipients: deps.to.length };
+      return { configured: deps.send !== null, from: deps.from };
     },
 
-    /** Manda un mail de prueba a los destinatarios. Lanza MailError si el servidor falla. */
-    async sendTest(): Promise<{ sentTo: number }> {
-      if (deps.send === null || deps.to.length === 0) {
+    /** Manda un mail de prueba a la cuenta que lo pide. Lanza MailError si el servidor falla. */
+    async sendTest(to: { email: string; name: string }): Promise<{ sentTo: string }> {
+      if (deps.send === null) {
         throw new MailServiceError(
           'MAIL_NOT_CONFIGURED',
-          deps.send === null
-            ? 'El mail no está configurado: faltan SMTP_HOST y los datos de la casilla en el .env del servidor.'
-            : 'No hay destinatarios: completá MAIL_TO en el .env del servidor y reinicialo.',
+          'El mail no está configurado: faltan SMTP_HOST y los datos de la casilla en el .env del servidor.',
           409,
         );
       }
@@ -48,16 +45,18 @@ export function createMailService(deps: MailServiceDeps) {
       sending = true;
       try {
         await deps.send({
-          to: [...deps.to],
+          to: [to.email],
           subject: 'STI-Catcher: mail de prueba',
           text: [
-            'Este es un mail de prueba de STI-Catcher.',
+            `Hola, ${to.name}:`,
             '',
-            'Si te llegó, los avisos de grabación terminada van a llegar a esta dirección.',
+            'Este es un mail de prueba de STI-Catcher. Si te llegó, los avisos que pidas',
+            '(o que te pidan tus compañeros) al grabar, descargar o convertir te van a llegar acá.',
+            '',
             `Enviado: ${mailDateTime(now().toISOString()) ?? ''}`,
           ].join('\n'),
         });
-        return { sentTo: deps.to.length };
+        return { sentTo: to.email };
       } finally {
         sending = false;
       }

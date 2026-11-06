@@ -611,7 +611,7 @@ Verificado con una fuente simulada: programada para el minuto siguiente con cort
 
 Verificado: con la base de prueba (28 trabajos), un trabajo nuevo quedó como «SISTEMAS2-PC» y los viejos como 127.0.0.1; filtrar por grabaciones dio 4, por SISTEMAS2-PC 1 y desde el 4/11 15; un rango invertido avisa; «Limpiar filtros» vuelve a los 28.
 
-### D-099 — Aviso por mail al terminar una grabación · Vigente
+### D-099 — Aviso por mail al terminar una grabación · Reemplazada en parte por D-104 (destinatarios por trabajo, sin MAIL_TO)
 
 Pensado para las grabaciones programadas (D-097), que se dejan solas: al terminar bien una grabación se manda un mail a direcciones fijas.
 
@@ -677,7 +677,7 @@ Verificado en claro y oscuro a 1366 px y a 390 px (sin scroll horizontal en ning
 
 ## Usuarios y login
 
-### D-104 — Login con cuentas locales y avisos por usuario · Vigente (por etapas: hechas la 1, la 2 y la 3)
+### D-104 — Login con cuentas locales y avisos por usuario · Vigente (por etapas: hechas de la 1 a la 4)
 
 Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie anónima (D-041) y el «usuario» del historial era la PC (D-098). El aviso de grabación iba a una lista fija (`MAIL_TO`, D-099). Ahora la app tiene que saber **quién** es cada uno para mandarle el aviso a esa persona y a los compañeros que elija. Esto cambia el alcance de la SPEC («Usuarios, login, roles» estaba fuera de alcance).
 
@@ -744,6 +744,17 @@ Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie a
 - **Al usarlo:** contraseña nueva (sin marca de provisoria), se cortan **todas** las sesiones de la cuenta y se destraba el bloqueo por intentos fallidos. No deja la sesión abierta: se vuelve a ingresar. Se marca usado con un `UPDATE … WHERE used_at IS NULL`: si llegan dos pedidos juntos, gana uno.
 - **Web:** «¿Olvidaste tu contraseña?» en el ingreso solo si `passwordReset`; si no, el texto de siempre (pedírsela a un admin). `/restablecer` se muestra con o sin sesión.
 - **Verificado** con un SMTP falso local con TLS (certificado de prueba con openssl y `NODE_EXTRA_CA_CERTS`): el mail llegó con el link, se eligió la contraseña desde la web, la vieja dejó de servir, el link no sirvió dos veces y ni el token ni la contraseña aparecieron en el log. Con el certificado sin confiar, el envío falló con `ESOCKET` en el log y la pantalla respondió igual.
+
+**Implementación (etapa 4):**
+
+- **`notify`** (ids de cuentas, sin repetidos, hasta 30) en `POST /api/jobs/download`, `POST /api/jobs/convert` y `POST /api/recordings`. Se guarda en `notify_user_ids` (migración 8) del job o de la sesión de grabación, que lo pasa a su job al cerrarse. Reintentar copia la lista del original. Una descarga con `then` pasa la lista a su conversión.
+- **Cuándo avisa:** al llegar a **terminado o fallido** una grabación, descarga o conversión con alguien elegido (cancelar no avisa: lo hace uno mismo). La cola tiene un gancho nuevo, `onFinished`, para cualquier estado final (también las fallas por falta de disco y las conversiones encadenadas que no se pudieron crear). Una descarga con `then` no avisa al bajar: avisa su conversión (un solo mail). Si la descarga falla, avisa ella.
+- **A quién:** las cuentas **activas** de la lista, con el mail vigente al mandar (`activeByIds`, ordenadas por nombre). Un solo mail con todos en «Para». Si no queda nadie, no se manda.
+- **El mail:** asunto «Grabación terminada: …» o «Falló la descarga: …»; datos (duración, resolución, tamaño) o el motivo de la falla; «Pedida por: nombre (desde PC)»; inicio y fin; link al Historial si hay `PUBLIC_URL`.
+- **`MAIL_TO` ya no se usa:** si quedó en el `.env` se ignora y el log lo avisa al arrancar. `GET /api/mail` dice solo si hay servidor y el remitente; el mail de prueba va a quien lo pide.
+- **`GET /api/users/directory`:** cuentas activas con id y nombre (sin mails), para cualquier cuenta.
+- **Web:** «Avisar por mail» (`NotifyPicker`): casilla «A mí», compañeros como etiquetas que se quitan con ×, y «+ Avisar también a…» para sumar. En Grabar viene con «A mí» tildado; en Descargar (con links en la lista) y Convertir (con archivos), sin tildar. La elección se recuerda por cuenta y página en `localStorage`. Sin servidor de correo no aparece. En Grabar se lee al empezar (también la programada, desde el reloj).
+- **Verificado** con el SMTP falso: elegidos «A mí» y otra cuenta en Grabar, la grabación (procesada sin ffmpeg, así que falló) mandó «Falló la grabación» a las dos con el motivo y el link; el mail de prueba llegó solo a quien lo pidió; con `MAIL_TO` en el `.env`, el log lo avisó.
 
 ## Deuda técnica
 

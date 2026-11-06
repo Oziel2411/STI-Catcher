@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { notifyUserIdsSchema } from './users.ts';
 
 /**
  * Formatos de captura, en orden de preferencia (SPEC §6). La web elige el
@@ -34,6 +35,8 @@ export const createRecordingRequestSchema = z.object({
     }),
   fps: z.union([z.literal(30), z.literal(60)]),
   title: z.string().trim().min(1).max(200),
+  /** A quién avisar por mail cuando termine de procesarse o falle (D-104). */
+  notify: notifyUserIdsSchema,
 });
 export type CreateRecordingRequest = z.input<typeof createRecordingRequestSchema>;
 

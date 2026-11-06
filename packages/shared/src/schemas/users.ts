@@ -88,3 +88,19 @@ export const resetPasswordRequestSchema = z.object({
   password: newPasswordSchema,
 });
 export type ResetPasswordRequest = z.input<typeof resetPasswordRequestSchema>;
+
+/**
+ * A quién avisar por mail cuando termina o falla un trabajo (D-104): ids de
+ * cuentas (la propia incluida si quiere el aviso). Sin repetidos.
+ */
+export const notifyUserIdsSchema = z
+  .array(z.uuid())
+  .max(30, 'Se puede avisar a hasta 30 personas.')
+  .transform((ids) => [...new Set(ids)])
+  .default([]);
+
+/** Cuentas a las que se puede avisar (sin mails: solo id y nombre). */
+export const userDirectoryResponseSchema = z.object({
+  users: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+export type UserDirectoryResponse = z.infer<typeof userDirectoryResponseSchema>;

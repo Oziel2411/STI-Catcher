@@ -66,9 +66,9 @@ LOG_DIR=C:\STI-Catcher\logs
 
 Volvé a correr `.\scripts\setup.ps1` para que cree las carpetas nuevas.
 
-### Aviso por mail de grabaciones (opcional)
+### Avisos por mail (opcional)
 
-Para que llegue un mail cuando termina una grabación, completá en el `.env` la casilla que manda y los destinatarios (D-099):
+Para que lleguen avisos cuando termina o falla una grabación, descarga o conversión, completá en el `.env` la casilla que manda (D-099). A quién le llega lo elige cada uno al pedir el trabajo, entre las cuentas de STI-Catcher (D-104):
 
 ```ini
 SMTP_HOST=c1831749.ferozo.com
@@ -76,10 +76,9 @@ SMTP_PORT=465
 SMTP_SECURITY=ssl
 SMTP_USER=soporte-notificaciones@capitanes.ar
 SMTP_PASSWORD=          # la contraseña de la casilla: escribila solo acá
-MAIL_TO=nombre@capitanes.ar, otro@capitanes.ar
 ```
 
-Reiniciá el servicio y probalo en **Estado → Aviso por mail → Mandar mail de prueba**. Si falla, el mensaje dice qué revisar (usuario y contraseña, host o puerto, destinatarios).
+Reiniciá el servicio y probalo en **Estado → Aviso por mail → Mandar mail de prueba** (te llega a vos). Si falla, el mensaje dice qué revisar (usuario y contraseña, host o puerto).
 
 ### Recuperar la contraseña por mail (opcional)
 
@@ -174,19 +173,19 @@ Probá desde una PC cliente: descargar un video, convertir un archivo y grabar l
 
 ## Mantenimiento
 
-| Tarea                               | Cómo                                                                                                                                                                                                                                                                                     |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| YouTube dejó de funcionar           | `.\scripts\update-ytdlp.ps1`. Es rutina: yt-dlp se actualiza seguido. No hace falta detener el servicio.                                                                                                                                                                                 |
-| Actualizar la app                   | `git pull` (o copiar la versión nueva sin pisar `.env`), `npm ci`, `npm run build`, `Restart-Service sti-catcher`. Si cambiaron las carpetas del `.env`, volvé a correr `install-service.ps1`. La base de datos se actualiza sola al arrancar.                                           |
-| Actualizar a la versión con login   | Una sola vez: después de compilar, `npm run user:create-admin` (paso 4) antes de reiniciar el servicio. Sin cuenta nadie puede ingresar. El historial anterior queda «sin cuenta»: se ve en «Todos» con la PC de siempre.                                                                |
-| Alguien no puede ingresar           | Si se olvidó la contraseña, un admin le pone una provisoria en **Usuarios**. Tras 5 intentos fallidos la cuenta queda bloqueada 15 minutos (20 desde una misma PC bloquean esa PC). Reiniciar el servicio también lo destraba. El log registra cada ingreso fallido con el mail y la IP. |
-| Cambió la IP o el nombre del equipo | `.\scripts\new-certificate.ps1 -Force`, después `.\scripts\install-service.ps1` (reaplica los permisos de la clave nueva). Las PCs cliente no necesitan nada: la CA es la misma.                                                                                                         |
-| Renovar el certificado              | Vence a los 2 años y 3 meses: igual que el caso anterior. La fecha está en la salida de `new-certificate.ps1`.                                                                                                                                                                           |
-| Ver si está andando                 | `Get-Service sti-catcher` o la página **Estado**.                                                                                                                                                                                                                                        |
-| Reiniciar / detener                 | `Restart-Service sti-catcher` / `Stop-Service sti-catcher`. Al detenerlo, los trabajos en curso quedan como «interrumpido» y se pueden reintentar.                                                                                                                                       |
-| Logs                                | `C:\STI-Catcher\logs\app.*.log` (la app, un archivo por día, se guardan 14) y `C:\STI-Catcher\logs\service\` (arranque y errores fatales).                                                                                                                                               |
-| Copia de seguridad                  | Detené el servicio y copiá `C:\STI-Catcher\data` (base y certificados) y el `.env`. Los videos de `storage` son regenerables y se borran solos por retención.                                                                                                                            |
-| Desinstalar                         | `.\scripts\uninstall-service.ps1`: quita el servicio y la regla de firewall. No borra datos.                                                                                                                                                                                             |
+| Tarea                               | Cómo                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| YouTube dejó de funcionar           | `.\scripts\update-ytdlp.ps1`. Es rutina: yt-dlp se actualiza seguido. No hace falta detener el servicio.                                                                                                                                                                                                                                                                          |
+| Actualizar la app                   | `git pull` (o copiar la versión nueva sin pisar `.env`), `npm ci`, `npm run build`, `Restart-Service sti-catcher`. Si cambiaron las carpetas del `.env`, volvé a correr `install-service.ps1`. La base de datos se actualiza sola al arrancar.                                                                                                                                    |
+| Actualizar a la versión con login   | Una sola vez: después de compilar, `npm run user:create-admin` (paso 4) antes de reiniciar el servicio. Sin cuenta nadie puede ingresar. El historial anterior queda «sin cuenta»: se ve en «Todos» con la PC de siempre. `MAIL_TO` ya no se usa: los avisos van a quien cada uno elige (el log avisa si quedó; se puede borrar). Agregá `PUBLIC_URL` para recuperar contraseñas. |
+| Alguien no puede ingresar           | Si se olvidó la contraseña, un admin le pone una provisoria en **Usuarios**. Tras 5 intentos fallidos la cuenta queda bloqueada 15 minutos (20 desde una misma PC bloquean esa PC). Reiniciar el servicio también lo destraba. El log registra cada ingreso fallido con el mail y la IP.                                                                                          |
+| Cambió la IP o el nombre del equipo | `.\scripts\new-certificate.ps1 -Force`, después `.\scripts\install-service.ps1` (reaplica los permisos de la clave nueva). Las PCs cliente no necesitan nada: la CA es la misma.                                                                                                                                                                                                  |
+| Renovar el certificado              | Vence a los 2 años y 3 meses: igual que el caso anterior. La fecha está en la salida de `new-certificate.ps1`.                                                                                                                                                                                                                                                                    |
+| Ver si está andando                 | `Get-Service sti-catcher` o la página **Estado**.                                                                                                                                                                                                                                                                                                                                 |
+| Reiniciar / detener                 | `Restart-Service sti-catcher` / `Stop-Service sti-catcher`. Al detenerlo, los trabajos en curso quedan como «interrumpido» y se pueden reintentar.                                                                                                                                                                                                                                |
+| Logs                                | `C:\STI-Catcher\logs\app.*.log` (la app, un archivo por día, se guardan 14) y `C:\STI-Catcher\logs\service\` (arranque y errores fatales).                                                                                                                                                                                                                                        |
+| Copia de seguridad                  | Detené el servicio y copiá `C:\STI-Catcher\data` (base y certificados) y el `.env`. Los videos de `storage` son regenerables y se borran solos por retención.                                                                                                                                                                                                                     |
+| Desinstalar                         | `.\scripts\uninstall-service.ps1`: quita el servicio y la regla de firewall. No borra datos.                                                                                                                                                                                                                                                                                      |
 
 ## Migrar a otro servidor
 
@@ -194,7 +193,7 @@ Para pasar STI-Catcher de un equipo (el «viejo») a otro (el «nuevo») conserv
 
 **Antes del día:** si los compañeros entran por un alias DNS (por ejemplo `sti.empresa.local`), la migración no se nota: al final solo se cambia a qué equipo apunta. Si entran por el nombre del equipo viejo, avisales la dirección nueva.
 
-1. **En el nuevo:** pasos 1 a 4 de esta guía (Node, código, `setup.ps1`, `.env`, compilar). Para el `.env`, partí del `.env` del viejo y ajustá las carpetas. El mail (`SMTP_*`, `MAIL_TO`) queda igual.
+1. **En el nuevo:** pasos 1 a 4 de esta guía (Node, código, `setup.ps1`, `.env`, compilar). Para el `.env`, partí del `.env` del viejo y ajustá las carpetas. El mail (`SMTP_*`, `MAIL_FROM`, `PUBLIC_URL`) queda igual; `MAIL_TO` ya no se usa.
 2. **El certificado de la red.** Elegí una:
    - **CA nueva (más simple):** en el nuevo, `.\scripts\new-certificate.ps1` (paso 5). Después, cada PC cliente instala la CA nueva (paso 8).
    - **Llevar la CA del viejo (las PCs cliente no tocan nada):** en el viejo, `bin\mkcert.exe -CAROOT` muestra la carpeta de la CA. Copiá `rootCA.pem` y `rootCA-key.pem` a la carpeta que muestra el mismo comando en el nuevo, **antes** de correr `new-certificate.ps1` ahí. `rootCA-key.pem` es secreto: pasalo por un pendrive (no por mail ni carpeta compartida) y borralo del pendrive al terminar.

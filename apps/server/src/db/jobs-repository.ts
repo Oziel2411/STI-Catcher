@@ -32,6 +32,7 @@ type JobRow = {
   client_ip: string | null;
   client_id: string | null;
   user_id: string | null;
+  notify_user_ids: string;
   client_host: string | null;
   parent_job_id: string | null;
   follow_up_job_id: string | null;
@@ -44,6 +45,16 @@ type JobRow = {
  */
 const REQUESTER_SQL =
   "CASE WHEN user_id IS NOT NULL THEN 'user:' || user_id ELSE COALESCE(client_host, client_ip) END";
+
+/** JSON de ids de cuentas; algo raro = nadie. */
+export function parseIds(json: string): string[] {
+  try {
+    const value: unknown = JSON.parse(json);
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 function parseParams(json: string): unknown {
   try {
@@ -76,6 +87,7 @@ function toRecord(row: JobRow): JobRecord {
     clientIp: row.client_ip,
     clientId: row.client_id,
     userId: row.user_id,
+    notifyUserIds: parseIds(row.notify_user_ids),
     clientHost: row.client_host,
     parentJobId: row.parent_job_id,
     followUpJobId: row.follow_up_job_id,
@@ -100,14 +112,15 @@ export function createJobsRepository(db: Db): JobsRepository {
         titleSearch: string | null;
         clientIp: string | null;
         userId: string | null;
+        notifyUserIds: string;
         parentJobId: string | null;
       },
     ]
   >(`
     INSERT INTO jobs (id, type, status, params, created_at, source_url, title, title_search,
-                      client_ip, user_id, parent_job_id)
+                      client_ip, user_id, notify_user_ids, parent_job_id)
     VALUES (@id, @type, 'queued', @params, @createdAt, @sourceUrl, @title, @titleSearch,
-            @clientIp, @userId, @parentJobId)
+            @clientIp, @userId, @notifyUserIds, @parentJobId)
   `);
   const getStmt = db.prepare<[string], JobRow>('SELECT * FROM jobs WHERE id = ?');
   const nextQueuedStmt = db.prepare<[], JobRow>(
@@ -232,6 +245,7 @@ export function createJobsRepository(db: Db): JobsRepository {
         titleSearch: title === null ? null : normalizeSearchText(title),
         clientIp: job.clientIp ?? null,
         userId: job.userId ?? null,
+        notifyUserIds: JSON.stringify(job.notifyUserIds ?? []),
         parentJobId: job.parentJobId ?? null,
       });
       const created = getStmt.get(job.id);

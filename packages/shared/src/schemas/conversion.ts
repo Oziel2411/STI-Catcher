@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { conversionPresetIdSchema } from '../presets/conversion.ts';
 import { jobSchema } from './jobs.ts';
+import { notifyUserIdsSchema } from './users.ts';
 
 /** Lo que tiene el archivo de origen (de ffprobe). */
 export const sourceMediaSchema = z.object({
@@ -58,6 +59,8 @@ export const conversionRequestSchema = z.object({
   maxHeight: z.number().int().min(100).max(4320).nullable().default(null),
   /** Obligatorio para el preset GIF. */
   gif: gifOptionsSchema.optional(),
+  /** A quién avisar por mail al terminar o fallar (D-104). */
+  notify: notifyUserIdsSchema,
 });
 export type ConversionRequest = z.input<typeof conversionRequestSchema>;
 

@@ -35,7 +35,10 @@ export function createFollowUps(deps: FollowUpDeps) {
     const requester = { userId: record.userId, ip: record.clientIp };
     let job: Job;
     try {
-      job = await deps.conversion.enqueue({ sourceJobId: record.id, ...then }, requester);
+      job = await deps.conversion.enqueue(
+        { sourceJobId: record.id, ...then, notify: record.notifyUserIds },
+        requester,
+      );
     } catch (error) {
       const known = error instanceof ConversionError || error instanceof JobRejectedError;
       if (!known) throw error;
@@ -56,6 +59,7 @@ export function createFollowUps(deps: FollowUpDeps) {
           title: `${record.title ?? 'Archivo'} → ${CONVERSION_PRESETS[then.preset].extension.toUpperCase()}`,
           parentJobId: record.id,
           userId: record.userId,
+          notifyUserIds: record.notifyUserIds,
           clientIp: record.clientIp,
         },
         error.message || UNEXPECTED_MESSAGE,

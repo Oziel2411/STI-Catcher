@@ -38,7 +38,7 @@ import { createFollowUps } from './modules/download/follow-up.ts';
 import { createHostResolver } from './adapters/host-resolver.ts';
 import { createSmtpMailer } from './adapters/mailer.ts';
 import { createMailService } from './modules/notifications/mail-service.ts';
-import { createRecordingNotice } from './modules/notifications/recording-notice.ts';
+import { createJobNotice } from './modules/notifications/job-notice.ts';
 import { createJobFiles } from './modules/files/job-files.ts';
 import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
@@ -187,8 +187,11 @@ async function main(): Promise<void> {
     readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,
     // La conversión encadenada necesita el servicio de conversión, que necesita la cola.
     onDone: async (record) => {
-      notifyRecording(record);
       await followUps(record);
+    },
+    // Aviso por mail al terminar o fallar (D-104), a las cuentas elegidas.
+    onFinished: (record) => {
+      notifyJob(record);
     },
     resolveHost: createHostResolver(),
     logger,
@@ -261,20 +264,26 @@ async function main(): Promise<void> {
       'Falta PUBLIC_URL en el .env: no se puede recuperar la contraseña por mail (solo con una provisoria del administrador).',
     );
   }
-  const mail = createMailService({
-    send: sendMail,
-    from: config.mail?.from ?? null,
-    to: config.mail?.to ?? [],
-  });
-  const notifyRecording = sendMail
-    ? createRecordingNotice({ send: sendMail, to: config.mail?.to ?? [], logger })
+  const mail = createMailService({ send: sendMail, from: config.mail?.from ?? null });
+  const notifyJob = sendMail
+    ? createJobNotice({
+        send: sendMail,
+        recipients: (ids) =>
+          users.activeByIds(ids).map((user) => ({ email: user.email, name: user.name })),
+        userName: (id) => users.get(id)?.name ?? null,
+        publicUrl: config.publicUrl,
+        logger,
+      })
     : () => undefined;
   if (config.mail) {
     logger.info(
-      { host: config.mail.host, port: config.mail.port, recipients: config.mail.to.length },
-      config.mail.to.length > 0
-        ? 'Aviso por mail de grabaciones activo'
-        : 'Mail configurado sin destinatarios (MAIL_TO): no se mandan avisos',
+      { host: config.mail.host, port: config.mail.port },
+      'Avisos por mail activos (a las cuentas que elige quien pide cada trabajo)',
+    );
+  }
+  if (config.mailToIgnored) {
+    logger.warn(
+      'MAIL_TO ya no se usa: los avisos van a las cuentas que cada uno elige. Podés borrarlo del .env.',
     );
   }
   const upload = createUploadService({

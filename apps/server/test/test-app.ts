@@ -32,7 +32,7 @@ import { createDownloadService } from '../src/modules/download/download-service.
 import { createFollowUps } from '../src/modules/download/follow-up.ts';
 import type { MailMessage, SendMail } from '../src/adapters/mailer.ts';
 import { createMailService } from '../src/modules/notifications/mail-service.ts';
-import { createRecordingNotice } from '../src/modules/notifications/recording-notice.ts';
+import { createJobNotice } from '../src/modules/notifications/job-notice.ts';
 import { createJobFiles } from '../src/modules/files/job-files.ts';
 import { createHistoryService } from '../src/modules/history/history-service.ts';
 import type { HealthService } from '../src/modules/health/health-service.ts';
@@ -49,6 +49,8 @@ export const sampleHealth: HealthResponse = {
 export type PendingRun = {
   context: JobContext;
   resolve: (result: JobResult) => void;
+  /** Hace fallar el job (con un JobError, el mensaje queda como motivo). */
+  reject: (error: Error) => void;
 };
 
 export type TestAppOptions = {
@@ -62,8 +64,8 @@ export type TestAppOptions = {
   maxUploadBytes?: number;
   /** IP → nombre de la PC (por defecto no se resuelve). */
   resolveHost?: (ip: string) => Promise<string | null>;
-  /** Destinatarios del aviso por mail. Los mails no salen: quedan en `sentMails`. */
-  mailTo?: string[];
+  /** Hay servidor de correo (para la página Estado). Los mails nunca salen: quedan en `sentMails`. */
+  mailConfigured?: boolean;
   /** Simula un servidor de correo que falla. */
   sendMail?: SendMail;
   /** Reloj de las sesiones (para probar el corte por inactividad). */
@@ -138,7 +140,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
         context.signal.addEventListener('abort', () => {
           reject(context.signal.reason as Error);
         });
-        runs.push({ context, resolve });
+        runs.push({ context, resolve, reject });
       }),
   };
   const storageDir = mkdtempSync(path.join(tmpdir(), 'sti-storage-'));
@@ -160,8 +162,10 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     progressIntervalMs: 0,
     onDone: async (record) => {
-      notifyRecording(record);
       await followUps(record);
+    },
+    onFinished: (record) => {
+      notifyJob(record);
     },
     ...(options.resolveHost ? { resolveHost: options.resolveHost } : {}),
   });
@@ -208,7 +212,6 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       sentMails.push(message);
       return Promise.resolve();
     });
-  const mailTo = options.mailTo ?? [];
   const passwordReset = createPasswordReset({
     users,
     sessions,
@@ -220,15 +223,18 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     hash: fakeHash,
     ...(options.authNow ? { now: options.authNow } : {}),
   });
-  const notifyRecording = createRecordingNotice({
+  const noticeLogger = { info: vi.fn(), warn: vi.fn() };
+  const notifyJob = createJobNotice({
     send: sendMail,
-    to: mailTo,
-    logger: { info: vi.fn(), warn: vi.fn() },
+    recipients: (ids) =>
+      users.activeByIds(ids).map((user) => ({ email: user.email, name: user.name })),
+    userName: (id) => users.get(id)?.name ?? null,
+    publicUrl: options.publicUrl === undefined ? 'https://sti.test' : options.publicUrl,
+    logger: noticeLogger,
   });
   const mail = createMailService({
-    send: options.mailTo ? sendMail : null,
-    from: options.mailTo ? 'avisos@capitanes.ar' : null,
-    to: mailTo,
+    send: options.mailConfigured === true ? sendMail : null,
+    from: options.mailConfigured === true ? 'avisos@capitanes.ar' : null,
   });
   mkdirSync(path.join(storageDir, 'tmp'), { recursive: true });
   mkdirSync(filesDir, { recursive: true });
@@ -338,6 +344,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     recordingsDir,
     clock,
     sentMails,
+    noticeLogger,
   };
 }
 

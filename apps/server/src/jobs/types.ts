@@ -26,6 +26,8 @@ export type JobRecord = {
   clientId: string | null;
   /** Cuenta que lo pidió (D-104). null en los trabajos de antes del login. */
   userId: string | null;
+  /** A quién avisar por mail al terminar o fallar (D-104). */
+  notifyUserIds: string[];
   /** Nombre de la PC (D-098); null mientras se resuelve o si no se encontró. */
   clientHost: string | null;
   parentJobId: string | null;
@@ -34,7 +36,9 @@ export type JobRecord = {
 };
 
 export type NewJob = Pick<JobRecord, 'id' | 'type' | 'params' | 'createdAt'> &
-  Partial<Pick<JobRecord, 'sourceUrl' | 'title' | 'clientIp' | 'userId' | 'parentJobId'>>;
+  Partial<
+    Pick<JobRecord, 'sourceUrl' | 'title' | 'clientIp' | 'userId' | 'notifyUserIds' | 'parentJobId'>
+  >;
 
 export type FinalStatus = Extract<JobStatus, 'done' | 'failed' | 'cancelled'>;
 

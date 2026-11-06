@@ -142,14 +142,17 @@ export function useDownloadBatch(limits: GifLimits | null) {
   };
 
   /** Crea una descarga por cada fila lista (la cola del server limita cuántas corren). */
-  const startReady = async () => {
+  const startReady = async (notify: string[] = []) => {
     if (!limits) return;
     setSubmitting(true);
     for (const item of startTargets(items, limits)) {
       const request = downloadRequest(item);
       if (!request) continue;
       try {
-        const { jobId } = await apiPost('/api/jobs/download', createJobResponseSchema, request);
+        const { jobId } = await apiPost('/api/jobs/download', createJobResponseSchema, {
+          ...request,
+          notify,
+        });
         update(item.id, { status: 'job', jobId, job: null, followUp: null, checked: false });
       } catch (error) {
         update(item.id, { error: errorMessage(error) });

@@ -133,6 +133,7 @@ export function createRecordingService(deps: RecordingServiceDeps) {
       params,
       title: session.title,
       userId: session.userId,
+      notifyUserIds: session.notifyUserIds,
       clientIp: session.clientIp,
     });
     deps.repo.finalize(session.id, job.id);
@@ -151,6 +152,7 @@ export function createRecordingService(deps: RecordingServiceDeps) {
         fps: request.fps,
         title: request.title,
         userId: requester.userId,
+        notifyUserIds: request.notify ?? [],
         clientIp: requester.ip,
         createdAt: now().toISOString(),
       });

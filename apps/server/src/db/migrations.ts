@@ -166,4 +166,16 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX password_resets_user ON password_resets (user_id);
     `,
   },
+  {
+    version: 8,
+    name: 'add-notify-user-ids',
+    sql: /* sql */ `
+      -- A quién avisar por mail cuando termina o falla (D-104): JSON con ids
+      -- de cuentas. Se guardan ids, no mails: al mandar se usa el mail vigente
+      -- y se saltean las cuentas desactivadas. La grabación lo elige al empezar
+      -- y lo pasa a su job al cerrarse.
+      ALTER TABLE jobs ADD COLUMN notify_user_ids TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE recordings ADD COLUMN notify_user_ids TEXT NOT NULL DEFAULT '[]';
+    `,
+  },
 ];

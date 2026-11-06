@@ -100,6 +100,7 @@ export function createDownloadService(deps: DownloadServiceDeps): DownloadServic
         sourceUrl: parsed.url,
         clientIp: requester.ip,
         userId: requester.userId,
+        notifyUserIds: parsed.notify,
       });
     },
   };

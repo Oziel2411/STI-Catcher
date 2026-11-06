@@ -28,6 +28,8 @@ import {
 import type { ConvertItem } from '../../lib/convert-batch.ts';
 import { formatBytes, formatDuration } from '../../lib/format.ts';
 import { progressDetails, STATUS_LABELS, TYPE_LABELS } from '../../lib/jobs.ts';
+import { NotifyPicker } from '../auth/NotifyPicker.tsx';
+import { useNotifyChoice } from '../auth/use-notify-choice.ts';
 import { useConvertBatch } from './useConvertBatch.ts';
 import type { ConvertBatch } from './useConvertBatch.ts';
 
@@ -64,6 +66,7 @@ export function ConvertPage() {
   const [options, setOptions] = useState<ConversionOptionsResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const batch = useConvertBatch(options);
+  const [notify, setNotify] = useNotifyChoice('convert', false);
   const [params, setParams] = useSearchParams();
   const origin = params.get('origen');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +135,7 @@ export function ConvertPage() {
               type="button"
               className="button"
               disabled={batch.convertibleCount === 0 || batch.submitting}
-              onClick={() => void batch.convertReady()}
+              onClick={() => void batch.convertReady(notify)}
             >
               <ArrowsLeftRightIcon size={16} aria-hidden="true" />
               {batch.submitting ? 'Creando…' : `Convertir ${String(batch.convertibleCount)}`}
@@ -140,6 +143,8 @@ export function ConvertPage() {
           </div>
         )}
       </header>
+
+      {!empty && <NotifyPicker value={notify} onChange={setNotify} what="cada conversión" />}
 
       <input
         ref={inputRef}

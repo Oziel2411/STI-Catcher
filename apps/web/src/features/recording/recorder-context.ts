@@ -43,6 +43,9 @@ export type Recorder = {
   setSystemAudio: (value: boolean) => void;
   setMicrophone: (value: boolean) => void;
   setTitle: (value: string) => void;
+  /** A quién avisar por mail cuando la grabación termine o falle (D-104). */
+  notify: string[];
+  setNotify: (ids: string[]) => void;
   changeFps: (value: Fps) => void;
   setSchedule: (patch: Partial<RecordingSchedule>) => void;
   /** Con la vista previa abierta: queda esperando la hora de inicio. */

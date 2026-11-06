@@ -46,6 +46,12 @@ export type JobQueueDeps = {
    */
   onDone?: (record: JobRecord) => Promise<void>;
   /**
+   * Se llama con cada job que llega a un estado final (terminado, fallido o
+   * cancelado), después de `onDone`. Es sincrónica y no debe demorar: los
+   * avisos por mail (D-104) mandan en segundo plano. Sus errores se loguean.
+   */
+  onFinished?: (record: JobRecord) => void;
+  /**
    * IP → nombre de la PC (D-098). Se consulta en segundo plano al crear cada
    * job y se guarda; no demora la respuesta.
    */
@@ -63,6 +69,8 @@ export type EnqueueInput = {
   sourceUrl?: string | null;
   clientIp?: string | null;
   userId?: string | null;
+  /** A quién avisar por mail al terminar o fallar (D-104). */
+  notifyUserIds?: string[];
   parentJobId?: string | null;
 };
 
@@ -178,6 +186,16 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
     if (record) bus.publish({ type: 'job.updated', job: toApi(record) });
   };
 
+  const notifyFinished = (id: string) => {
+    if (!deps.onFinished) return;
+    const record = repo.get(id);
+    try {
+      if (record) deps.onFinished(record);
+    } catch (error) {
+      logger.error({ jobId: id, err: error }, 'Error al avisar el fin de un job');
+    }
+  };
+
   // --- Progreso ---------------------------------------------------------------
 
   const sendProgress = (id: string) => {
@@ -291,6 +309,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
       }
     }
     publishUpdated(id);
+    notifyFinished(id);
     logger.info({ jobId: id, status: finish.status }, 'Job terminado');
   };
 
@@ -342,6 +361,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
               })
             ) {
               publishUpdated(next.id);
+              notifyFinished(next.id);
             }
             continue;
           }
@@ -372,6 +392,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         sourceUrl: input.sourceUrl ?? null,
         clientIp: input.clientIp ?? null,
         userId: input.userId ?? null,
+        notifyUserIds: input.notifyUserIds ?? [],
         parentJobId: input.parentJobId ?? null,
       });
       annotateHost(record.id, input.clientIp);
@@ -440,6 +461,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         sourceUrl: input.sourceUrl ?? null,
         clientIp: input.clientIp ?? null,
         userId: input.userId ?? null,
+        notifyUserIds: input.notifyUserIds ?? [],
         parentJobId: input.parentJobId ?? null,
       });
       annotateHost(input.id, input.clientIp);
@@ -461,12 +483,14 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         sourceUrl: input.sourceUrl ?? null,
         clientIp: input.clientIp ?? null,
         userId: input.userId ?? null,
+        notifyUserIds: input.notifyUserIds ?? [],
         parentJobId: input.parentJobId ?? null,
       });
       annotateHost(record.id, input.clientIp);
       repo.finish(record.id, { status: 'failed', finishedAt: now().toISOString(), error });
       const failed = repo.get(record.id) ?? record;
       bus.publish({ type: 'job.updated', job: toApi(failed) });
+      notifyFinished(record.id);
       return toApi(failed);
     },
 

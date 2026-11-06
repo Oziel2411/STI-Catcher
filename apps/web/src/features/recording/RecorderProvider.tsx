@@ -20,6 +20,7 @@ import {
   sourceKindFromSurface,
 } from '../../lib/recording.ts';
 import type { SourceKind } from '../../lib/recording.ts';
+import { useNotifyChoice } from '../auth/use-notify-choice.ts';
 import { keepScreenAwake, startBackgroundClock } from './background-clock.ts';
 import { previewOf, RecorderContext, stopPreview } from './recorder-context.ts';
 import type {
@@ -62,6 +63,14 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     title: '',
     schedule: DEFAULT_SCHEDULE,
   });
+  // A quién avisar por mail (D-104). Ref: una grabación programada arranca
+  // desde un temporizador y tiene que leer la elección del momento.
+  const [notify, setNotifyState] = useNotifyChoice('recording', true);
+  const notifyRef = useRef(notify);
+  const setNotify = (ids: string[]) => {
+    notifyRef.current = ids;
+    setNotifyState(ids);
+  };
   const [phase, setPhaseState] = useState<RecorderPhase>({ kind: 'idle' });
   const [upload, setUpload] = useState<UploaderState>(EMPTY_UPLOAD);
   const [error, setError] = useState<string | null>(null);
@@ -263,6 +272,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
         mimeType,
         fps,
         title: title.trim() || defaultRecordingTitle(new Date()),
+        notify: notifyRef.current,
       });
 
       const stream = new MediaStream(audio ? [preview.video, audio] : [preview.video]);
@@ -402,6 +412,8 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     setSchedule: (patch: Partial<RecordingSchedule>) => {
       setSettings((current) => ({ ...current, schedule: { ...current.schedule, ...patch } }));
     },
+    notify,
+    setNotify,
     scheduleStart,
     cancelSchedule,
     chooseSource,

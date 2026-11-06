@@ -32,6 +32,7 @@ import {
   scheduleProblems,
 } from '../../lib/recording-schedule.ts';
 import type { RecordingSchedule, StartMode, StopMode } from '../../lib/recording-schedule.ts';
+import { NotifyPicker } from '../auth/NotifyPicker.tsx';
 import { previewOf, useClock, useElapsedSeconds, useRecorder } from './recorder-context.ts';
 import type { Fps, Preview } from './recorder-context.ts';
 
@@ -330,6 +331,13 @@ function Recorder() {
           )}
 
           <ScheduleOptions schedule={schedule} disabled={locked} onChange={recorder.setSchedule} />
+
+          <NotifyPicker
+            value={recorder.notify}
+            onChange={recorder.setNotify}
+            what="la grabación"
+            disabled={locked}
+          />
 
           {recording ? (
             <button

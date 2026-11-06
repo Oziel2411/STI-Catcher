@@ -1,4 +1,5 @@
 import type { Db } from './connection.ts';
+import { parseIds } from './jobs-repository.ts';
 
 export type RecordingStatus = 'recording' | 'finalized' | 'discarded';
 
@@ -13,6 +14,8 @@ export type RecordingSession = {
   clientId: string | null;
   /** Cuenta que la empezó (D-104): solo ella manda fragmentos y la termina. */
   userId: string | null;
+  /** A quién avisar por mail (D-104); pasa al job al cerrarse. */
+  notifyUserIds: string[];
   clientIp: string | null;
   /** Próximo número de fragmento esperado. */
   nextSeq: number;
@@ -31,6 +34,7 @@ type Row = {
   title: string;
   client_id: string | null;
   user_id: string | null;
+  notify_user_ids: string;
   client_ip: string | null;
   next_seq: number;
   size_bytes: number;
@@ -48,6 +52,7 @@ const toSession = (row: Row): RecordingSession => ({
   title: row.title,
   clientId: row.client_id,
   userId: row.user_id,
+  notifyUserIds: parseIds(row.notify_user_ids),
   clientIp: row.client_ip,
   nextSeq: row.next_seq,
   sizeBytes: row.size_bytes,
@@ -58,7 +63,15 @@ const toSession = (row: Row): RecordingSession => ({
 
 export type NewRecording = Pick<
   RecordingSession,
-  'id' | 'mimeType' | 'extension' | 'fps' | 'title' | 'userId' | 'clientIp' | 'createdAt'
+  | 'id'
+  | 'mimeType'
+  | 'extension'
+  | 'fps'
+  | 'title'
+  | 'userId'
+  | 'notifyUserIds'
+  | 'clientIp'
+  | 'createdAt'
 >;
 
 export type RecordingsRepository = {
@@ -75,9 +88,9 @@ export type RecordingsRepository = {
 };
 
 export function createRecordingsRepository(db: Db): RecordingsRepository {
-  const insertStmt = db.prepare<[NewRecording]>(`
-    INSERT INTO recordings (id, status, mime_type, extension, fps, title, user_id, client_ip, created_at)
-    VALUES (@id, 'recording', @mimeType, @extension, @fps, @title, @userId, @clientIp, @createdAt)
+  const insertStmt = db.prepare<[Omit<NewRecording, 'notifyUserIds'> & { notifyUserIds: string }]>(`
+    INSERT INTO recordings (id, status, mime_type, extension, fps, title, user_id, notify_user_ids, client_ip, created_at)
+    VALUES (@id, 'recording', @mimeType, @extension, @fps, @title, @userId, @notifyUserIds, @clientIp, @createdAt)
   `);
   const getStmt = db.prepare<[string], Row>('SELECT * FROM recordings WHERE id = ?');
   const chunkStmt = db.prepare<[number, string, string, number]>(`
@@ -99,7 +112,7 @@ export function createRecordingsRepository(db: Db): RecordingsRepository {
 
   return {
     insert(session) {
-      insertStmt.run(session);
+      insertStmt.run({ ...session, notifyUserIds: JSON.stringify(session.notifyUserIds) });
       const row = getStmt.get(session.id);
       if (!row) throw new Error(`No se pudo leer la grabación recién creada ${session.id}`);
       return toSession(row);

@@ -55,6 +55,8 @@ export type UsersRepository = {
   findByEmail(email: string): UserRecord | null;
   /** Nombre de varias cuentas a la vez (historial). */
   namesByIds(ids: readonly string[]): Map<string, string>;
+  /** Las cuentas **activas** de esa lista (para mandarles un aviso). */
+  activeByIds(ids: readonly string[]): UserRecord[];
   setLastLogin(id: string, at: string): void;
   /** Administradores activos. */
   countAdmins(): number;
@@ -129,6 +131,17 @@ export function createUsersRepository(db: Db): UsersRepository {
     findByEmail(email) {
       const row = byEmailStmt.get(email.trim().toLowerCase());
       return row ? toUser(row) : null;
+    },
+
+    activeByIds(ids) {
+      const unique = [...new Set(ids)];
+      if (unique.length === 0) return [];
+      return db
+        .prepare<string[], UserRow>(
+          `SELECT * FROM users WHERE active = 1 AND id IN (${unique.map(() => '?').join(', ')}) ORDER BY name COLLATE NOCASE, email`,
+        )
+        .all(...unique)
+        .map(toUser);
     },
 
     namesByIds(ids) {

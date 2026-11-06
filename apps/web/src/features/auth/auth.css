@@ -225,3 +225,70 @@
 .users-table td:last-child {
   min-width: 220px;
 }
+
+/* «Avisar por mail» (D-104). */
+.notify-picker {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+}
+
+.notify-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  font-size: 0.8667rem;
+  font-weight: 500;
+}
+
+.notify-help {
+  margin: 0 0 8px;
+}
+
+.notify-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.notify-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  font-size: 0.8667rem;
+  color: var(--accent-strong);
+  background: var(--accent-tint);
+  border-radius: 999px;
+}
+
+.notify-chip-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.notify-chip-remove:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.notify-add {
+  min-height: 30px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 0.8667rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+}

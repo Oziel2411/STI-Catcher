@@ -6,7 +6,7 @@ import {
   updateUserRequestSchema,
   userIdParamsSchema,
 } from '@sti-catcher/shared';
-import type { MeResponse } from '@sti-catcher/shared';
+import type { MeResponse, UserDirectoryResponse } from '@sti-catcher/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { UserRecord } from '../db/users-repository.ts';
 import { requireUser } from '../http/session.ts';
@@ -54,6 +54,12 @@ export function registerUserRoutes(
     if (!user) throw new HttpError(404, 'USER_NOT_FOUND', 'No existe esa cuenta.');
     return { user: toSessionUser(user) };
   };
+
+  // Para elegir a quién avisar por mail (D-104): cualquier cuenta, sin mails.
+  app.get('/api/users/directory', (request): UserDirectoryResponse => {
+    actorOf(request);
+    return { users: users.directory() };
+  });
 
   app.get('/api/users', (request) => {
     requireAdmin(request);

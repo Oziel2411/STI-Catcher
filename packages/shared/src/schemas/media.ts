@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { conversionPresetIdSchema, CONVERSION_PRESETS } from '../presets/conversion.ts';
 import type { ConversionPresetId } from '../presets/conversion.ts';
 import { gifOptionsSchema } from './conversion.ts';
+import { notifyUserIdsSchema } from './users.ts';
 
 /** Familia de codec de video, para avisar compatibilidad en la UI. */
 export const VIDEO_CODEC_FAMILIES = ['h264', 'h265', 'vp9', 'av1', 'other'] as const;
@@ -105,5 +106,7 @@ export const downloadRequestSchema = z.object({
    * ignoran: se descarga lo que conviene para ese preset (`followUpDownloadFormat`).
    */
   then: downloadFollowUpSchema.nullable().default(null),
+  /** A quién avisar por mail al terminar o fallar (D-104). Con `then`, avisa la conversión. */
+  notify: notifyUserIdsSchema,
 });
 export type DownloadRequest = z.input<typeof downloadRequestSchema>;

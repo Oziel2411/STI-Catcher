@@ -35,6 +35,7 @@ describe('downloadRequestSchema', () => {
       videoMode: 'compat',
       title: null,
       then: null,
+      notify: [],
     });
   });
 
@@ -70,5 +71,17 @@ describe('then (conversión encadenada)', () => {
     expect(followUpDownloadFormat('wav')).toBe('m4a');
     expect(followUpDownloadFormat('webm')).toBe('mp4');
     expect(followUpDownloadFormat('gif')).toBe('mp4');
+  });
+});
+
+describe('notify (D-104)', () => {
+  it('ids de cuentas sin repetidos; otra cosa no', () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    expect(
+      downloadRequestSchema.parse({ url: 'https://youtu.be/x', notify: [id, id] }).notify,
+    ).toEqual([id]);
+    expect(
+      downloadRequestSchema.safeParse({ url: 'https://youtu.be/x', notify: ['a@b.ar'] }).success,
+    ).toBe(false);
   });
 });

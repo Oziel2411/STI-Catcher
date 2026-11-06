@@ -40,6 +40,8 @@ import { codecNotices, codecsLabel, resolutionLabel } from '../../lib/download.t
 import type { CodecNotice } from '../../lib/download.ts';
 import { formatBytes, formatDuration } from '../../lib/format.ts';
 import { progressDetails } from '../../lib/jobs.ts';
+import { NotifyPicker } from '../auth/NotifyPicker.tsx';
+import { useNotifyChoice } from '../auth/use-notify-choice.ts';
 import { useDownloadBatch } from './useDownloadBatch.ts';
 import type { DownloadBatch } from './useDownloadBatch.ts';
 
@@ -70,6 +72,7 @@ export function DownloadPage() {
   const [limits, setLimits] = useState<GifLimits | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const batch = useDownloadBatch(limits);
+  const [notify, setNotify] = useNotifyChoice('download', false);
   const [text, setText] = useState('');
   const [rejected, setRejected] = useState<{ line: number; text: string }[]>([]);
   const [submittedLines, setSubmittedLines] = useState(0);
@@ -223,7 +226,7 @@ export function DownloadPage() {
               type="button"
               className="button toolbar-end"
               disabled={targets === 0 || batch.submitting}
-              onClick={() => void batch.startReady()}
+              onClick={() => void batch.startReady(notify)}
               title={
                 targets === 0
                   ? 'Todavía no hay links listos para descargar.'
@@ -234,6 +237,8 @@ export function DownloadPage() {
               {startButtonLabel(targets, batch.submitting)}
             </button>
           </div>
+
+          <NotifyPicker value={notify} onChange={setNotify} what="cada descarga" />
 
           <div className="table-wrap">
             <table className="table links-table">

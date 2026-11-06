@@ -34,18 +34,6 @@ const requiredPath = z
 const optionalPath = z.preprocess(emptyToUndefined, z.string().trim().optional());
 const optionalText = optionalPath;
 
-/** "a@x.com, b@y.com" → lista validada (vacío = nadie). */
-const emailList = z.preprocess(
-  (value) =>
-    typeof value === 'string'
-      ? value
-          .split(/[,;]/)
-          .map((part) => part.trim())
-          .filter((part) => part !== '')
-      : [],
-  z.array(z.email({ error: (issue) => `«${String(issue.input)}» no es una dirección de mail.` })),
-);
-
 const rawEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production']).default('development'),
@@ -92,8 +80,8 @@ const rawEnvSchema = z
     // Grabación: sin fragmentos nuevos durante este tiempo se da por terminada (D-032).
     RECORDING_IDLE_MINUTES: intInRange(1, 60, 2),
 
-    // Aviso por mail al terminar una grabación (D-099). Sin SMTP_HOST o sin
-    // MAIL_TO no se manda nada.
+    // Avisos por mail (D-099, D-104): a las cuentas que elige quien pide cada
+    // trabajo. Sin SMTP_HOST no se manda nada.
     SMTP_HOST: optionalText,
     SMTP_PORT: intInRange(1, 65_535, 465),
     /** ssl: TLS desde el principio (puerto 465). starttls: texto y después TLS (587). */
@@ -101,7 +89,8 @@ const rawEnvSchema = z
     SMTP_USER: optionalText,
     SMTP_PASSWORD: z.preprocess(emptyToUndefined, z.string().optional()),
     MAIL_FROM: optionalText,
-    MAIL_TO: emailList,
+    // Ya no se usa (D-104): los avisos van a las cuentas elegidas. Si quedó, se avisa en el log.
+    MAIL_TO: optionalText,
 
     // Dirección con la que los compañeros entran (D-104): va en el link para
     // recuperar la contraseña. Sin ella (o sin SMTP) esa opción no aparece.
@@ -185,6 +174,8 @@ export type Config = {
   recording: {
     idleMinutes: number;
   };
+  /** El .env todavía tiene MAIL_TO, que ya no se usa (D-104). */
+  mailToIgnored: boolean;
   /** Dirección pública de la app, sin / al final. null si no está (D-104). */
   publicUrl: string | null;
   /** null si falta SMTP_HOST. Ver D-099. */
@@ -194,7 +185,6 @@ export type Config = {
     secure: boolean;
     auth: { user: string; password: string } | null;
     from: string;
-    to: string[];
   } | null;
   gif: {
     maxSeconds: number;
@@ -269,6 +259,7 @@ export function parseConfig(raw: Record<string, string | undefined>, baseDir: st
     recording: {
       idleMinutes: env.RECORDING_IDLE_MINUTES,
     },
+    mailToIgnored: env.MAIL_TO !== undefined,
     publicUrl: env.PUBLIC_URL === undefined ? null : env.PUBLIC_URL.replace(/\/+$/, ''),
     mail:
       env.SMTP_HOST === undefined
@@ -282,7 +273,6 @@ export function parseConfig(raw: Record<string, string | undefined>, baseDir: st
                 ? { user: env.SMTP_USER, password: env.SMTP_PASSWORD }
                 : null,
             from: env.MAIL_FROM ?? env.SMTP_USER ?? `sti-catcher@${env.SMTP_HOST}`,
-            to: env.MAIL_TO,
           },
     gif: {
       maxSeconds: env.GIF_MAX_SECONDS,

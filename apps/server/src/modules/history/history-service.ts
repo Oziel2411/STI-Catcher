@@ -251,6 +251,8 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
         sourceUrl: record.sourceUrl,
         parentJobId: record.parentJobId,
         userId: requester.userId,
+        // Reintentar avisa a los mismos que el original (D-104).
+        notifyUserIds: record.notifyUserIds,
         clientIp: requester.ip,
       };
       return deps.queue.enqueue(input);

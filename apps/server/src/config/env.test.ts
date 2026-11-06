@@ -136,35 +136,35 @@ describe('mail (D-099)', () => {
     expect(parseConfig(minimal, BASE).mail).toBeNull();
   });
 
-  it('SSL en el 465 por defecto; el remitente es la casilla; destinatarios separados por comas', () => {
-    const config = parseConfig({ ...smtp, MAIL_TO: 'a@capitanes.ar; b@capitanes.ar , ' }, BASE);
+  it('SSL en el 465 por defecto; el remitente es la casilla', () => {
+    const config = parseConfig(smtp, BASE);
     expect(config.mail).toEqual({
       host: 'c1831749.ferozo.com',
       port: 465,
       secure: true,
       auth: { user: 'avisos@capitanes.ar', password: 'secreta' },
       from: 'avisos@capitanes.ar',
-      to: ['a@capitanes.ar', 'b@capitanes.ar'],
     });
+    expect(config.mailToIgnored).toBe(false);
   });
 
-  it('STARTTLS en otro puerto; MAIL_TO vacío = nadie', () => {
-    const config = parseConfig(
-      { ...smtp, SMTP_PORT: '587', SMTP_SECURITY: 'starttls', MAIL_TO: '' },
-      BASE,
-    );
-    expect(config.mail).toMatchObject({ port: 587, secure: false, to: [] });
+  it('STARTTLS en otro puerto', () => {
+    const config = parseConfig({ ...smtp, SMTP_PORT: '587', SMTP_SECURITY: 'starttls' }, BASE);
+    expect(config.mail).toMatchObject({ port: 587, secure: false });
   });
 
-  it('rechaza un destinatario inválido o un usuario sin contraseña, sin mostrar la contraseña', () => {
-    expect(
-      errorOf(() => parseConfig({ ...smtp, MAIL_TO: 'a@capitanes.ar, juanpi' }, BASE)).message,
-    ).toContain('«juanpi» no es una dirección de mail');
+  it('MAIL_TO ya no se usa (D-104): se ignora y se marca para avisar en el log', () => {
+    const config = parseConfig({ ...smtp, MAIL_TO: 'a@capitanes.ar, juanpi' }, BASE);
+    expect(config.mailToIgnored).toBe(true);
+    expect(config.mail).not.toHaveProperty('to');
+  });
+
+  it('rechaza un usuario sin contraseña, sin mostrar la contraseña', () => {
     const error = errorOf(() => parseConfig({ ...smtp, SMTP_PASSWORD: '' }, BASE));
     expect(error.message).toContain('SMTP_PASSWORD');
-    expect(errorOf(() => parseConfig({ ...smtp, MAIL_TO: 'x' }, BASE)).message).not.toContain(
-      'secreta',
-    );
+    expect(
+      errorOf(() => parseConfig({ ...smtp, MAIL_FROM: 'no-es-mail' }, BASE)).message,
+    ).not.toContain('secreta');
   });
 });
 

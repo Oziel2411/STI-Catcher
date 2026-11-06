@@ -218,7 +218,7 @@ export function useConvertBatch(options: ConversionOptionsResponse | null) {
   const convertible = options ? items.filter((item) => isConvertible(item, options.gif)) : [];
 
   /** Crea una conversión por cada archivo listo. La cola del server limita cuántas corren a la vez. */
-  const convertReady = async () => {
+  const convertReady = async (notify: string[] = []) => {
     if (!options) return;
     setSubmitting(true);
     for (const item of items.filter((entry) => isConvertible(entry, options.gif))) {
@@ -229,6 +229,7 @@ export function useConvertBatch(options: ConversionOptionsResponse | null) {
           preset: item.preset,
           maxHeight: item.maxHeight,
           ...(item.preset === 'gif' && item.gif ? { gif: item.gif } : {}),
+          notify,
         });
         update(item.id, { status: 'job', jobId, job: null, error: null });
       } catch (error) {

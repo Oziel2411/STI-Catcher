@@ -82,6 +82,14 @@ export function createUsersService(deps: UsersServiceDeps) {
       return deps.users.list().map(toUserSummary);
     },
 
+    /** A quién se puede avisar por mail: cuentas activas, solo id y nombre (sin mails). */
+    directory(): { id: string; name: string }[] {
+      return deps.users
+        .list()
+        .filter((user) => user.active)
+        .map((user) => ({ id: user.id, name: user.name }));
+    },
+
     /** Crea una cuenta con contraseña provisoria: se cambia al primer ingreso. */
     async create(input: CreateUserRequest, actor: Actor): Promise<UserSummary> {
       const user = await deps.auth.createUser({
