@@ -2,7 +2,7 @@
 
 Web app interna para **descargar video por URL**, **grabar la pantalla** desde el navegador y **convertir archivos** entre formatos de video y audio, con historial de todo lo procesado.
 
-Corre en una PC con Windows que hace de servidor en la red interna. Se usa desde el navegador, sin login.
+Corre en una PC con Windows que hace de servidor en la red interna. Se usa desde el navegador, con una cuenta que crea un administrador.
 
 > Usar solo con contenido propio o con autorización.
 
@@ -20,6 +20,8 @@ Corre en una PC con Windows que hace de servidor en la red interna. Se usa desde
 npm install
 npm run dev
 ```
+
+Para ingresar hace falta una cuenta: la primera se crea con `npm run user:create-admin`.
 
 - Web: http://127.0.0.1:5173 (Vite, con proxy de `/api` al server).
 - API: http://127.0.0.1:3000 (por ejemplo `/api/health`).

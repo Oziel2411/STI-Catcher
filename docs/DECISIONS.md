@@ -677,7 +677,7 @@ Verificado en claro y oscuro a 1366 px y a 390 px (sin scroll horizontal en ning
 
 ## Usuarios y login
 
-### D-104 — Login con cuentas locales y avisos por usuario · Vigente (por etapas: hechas de la 1 a la 4)
+### D-104 — Login con cuentas locales y avisos por usuario · Vigente
 
 Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie anónima (D-041) y el «usuario» del historial era la PC (D-098). El aviso de grabación iba a una lista fija (`MAIL_TO`, D-099). Ahora la app tiene que saber **quién** es cada uno para mandarle el aviso a esa persona y a los compañeros que elija. Esto cambia el alcance de la SPEC («Usuarios, login, roles» estaba fuera de alcance).
 
@@ -755,6 +755,18 @@ Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie a
 - **`GET /api/users/directory`:** cuentas activas con id y nombre (sin mails), para cualquier cuenta.
 - **Web:** «Avisar por mail» (`NotifyPicker`): casilla «A mí», compañeros como etiquetas que se quitan con ×, y «+ Avisar también a…» para sumar. En Grabar viene con «A mí» tildado; en Descargar (con links en la lista) y Convertir (con archivos), sin tildar. La elección se recuerda por cuenta y página en `localStorage`. Sin servidor de correo no aparece. En Grabar se lee al empezar (también la programada, desde el reloj).
 - **Verificado** con el SMTP falso: elegidos «A mí» y otra cuenta en Grabar, la grabación (procesada sin ffmpeg, así que falló) mandó «Falló la grabación» a las dos con el motivo y el link; el mail de prueba llegó solo a quien lo pidió; con `MAIL_TO` en el `.env`, el log lo avisó.
+
+**Prueba de punta a punta (etapa 5):** con el build de producción (`npm run build` + `npm start`), una base nueva, ffmpeg real y el SMTP falso, siguiendo el orden de `DEPLOY.md`:
+
+- `user:create-admin` con la base vacía (la crea y la deja en la versión 8); el admin ingresó sin cambio obligatorio y creó una cuenta en **Usuarios**.
+- La cuenta nueva ingresó con la provisoria: la API respondió `PASSWORD_CHANGE_REQUIRED` hasta que la cambió; sin el enlace «Usuarios» y con **403** en `/api/users`.
+- Un trabajo de antes del login (sin `user_id`) se vio en «Todos» con su PC, y su PC en el filtro Usuario.
+- Avisos: una conversión desde la web (MP3, «A mí» + otra cuenta), una grabación (enviada por la API, porque el navegador de prueba no comparte pantalla) y una descarga que falló mandaron un mail cada una, a las cuentas elegidas y con los datos o el motivo.
+- Recuperación desde el ingreso: llegó el link, se eligió otra contraseña, la sesión vieja dio 401, la contraseña vieja dejó de servir y el link no sirvió dos veces.
+- Al sexto intento fallido con el mismo mail, **429**; otra cuenta desde la misma IP siguió entrando. Sin sesión, 401 (salvo `health`); con `Origin` ajeno, 403.
+- Desactivar una cuenta cortó su sesión, le impidió ingresar y la sacó de la lista para avisar. Un admin no pudo desactivarse a sí mismo.
+- En el log no apareció ninguna contraseña, token de recuperación ni cookie.
+- Con el primer admin creado antes de instalar el servicio, la base queda a nombre de quien corrió el comando; `install-service.ps1` da a la cuenta del servicio permiso heredable sobre `DATA_DIR`, que `icacls` aplica también a los archivos que ya están.
 
 ## Deuda técnica
 

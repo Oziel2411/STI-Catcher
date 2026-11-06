@@ -20,7 +20,7 @@ Web app interna inspirada en aTube Catcher, con tres funciones:
 Más un **historial** de todo lo procesado, con acceso directo a los archivos.
 
 - Se desarrolla y prueba en mi PC. Destino final: una PC con **Windows 10** que funciona como servidor en la red interna del trabajo. Mis compañeros la usan desde el navegador de sus PCs.
-- **Sin login.**
+- **Con login** (cambio posterior, D-104): cuentas locales con mail y contraseña, creadas por un administrador. Al principio era sin login.
 - El diseño apunta desde el día uno a ese servidor: nada de decisiones "solo para local" que haya que rehacer.
 - Ubicación del repo: `D:\Documentos\Ozi\Proyectos\STI-Catcher` (la carpeta raíz se llama exactamente `STI-Catcher`).
 - Plataforma única: Windows. No hace falta soportar Linux, macOS ni Docker.
@@ -30,7 +30,7 @@ Más un **historial** de todo lo procesado, con acceso directo a los archivos.
 - Contenido protegido con DRM (Netflix, Disney+, Spotify, etc.): no se intenta descargar ni se implementa ningún tipo de evasión.
 - Detección de streams en páginas web (modo "stream catcher" / extensión de navegador).
 - Playlists completas: siempre `--no-playlist`.
-- Usuarios, login, roles.
+- ~~Usuarios, login, roles.~~ Se sumó después: cuentas locales con dos roles (usuario y administrador, que solo administra cuentas). Ver D-104.
 - Exposición a internet.
 
 ## 3. Stack y decisiones técnicas
@@ -183,14 +183,15 @@ Todo trabajo pesado (descarga, conversión, procesamiento de grabación) es un *
 - ruta relativa al storage
 - fechas de creación y finalización
 - error, si lo hubo
-- IP del solicitante, `clientId`
+- IP del solicitante, `clientId` (antes del login) y la cuenta que lo pidió (`user_id`)
+- a quién avisar por mail al terminar (`notify_user_ids`)
 - `parent_job_id`
 
-**Sin login:**
+**Trabajos propios** (con login desde D-104; antes era una cookie anónima con un `clientId`):
 
-- Cada navegador recibe una cookie con un `clientId` anónimo (UUID).
+- Cada trabajo queda a nombre de la cuenta que lo pidió. Los de antes del login quedan «sin cuenta».
 - La UI ofrece las vistas "Mis trabajos" y "Todos".
-- Solo se pueden borrar los trabajos propios. No es seguridad (la cookie se puede falsificar), es prevención de accidentes.
+- Solo se pueden borrar los trabajos propios.
 - Los borrados quedan registrados en el log con la IP.
 
 **Acciones por entrada:**
@@ -254,7 +255,9 @@ Todo trabajo pesado (descarga, conversión, procesamiento de grabación) es un *
 - `docs/DEPLOY.md`: instalación paso a paso, escrita para que otra persona del área pueda instalar el sistema sin preguntarme.
 - Aclarar que Windows 10 está fuera de soporte desde octubre de 2025, por lo que el servicio es **solo para la red interna** y nunca debe exponerse a internet.
 
-## 10. Seguridad mínima (sin login, red interna)
+## 10. Seguridad mínima (red interna)
+
+- Login obligatorio (D-104): contraseñas con scrypt, cookie de sesión HttpOnly/SameSite (Secure con HTTPS), límite de intentos, y ni contraseñas ni tokens en los logs ni en la API.
 
 - Procesos hijos siempre con `spawn` y un array de argumentos. Nunca `shell: true` ni concatenar strings.
 - `--` antes de las URLs que se pasan a yt-dlp.
