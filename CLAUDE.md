@@ -76,7 +76,7 @@ Detalle en `docs/DECISIONS.md`.
 - Descarga: `-f bv[height<=H]+ba/b[height<=H]/bv+ba/b`; compat `-S vcodec:h264,res:H,channels:2,acodec:aac`. "Recodificar" lo hace nuestro ffmpeg (con progreso), no yt-dlp. Archivo en disco `<jobId>.<ext>`; el título solo va en `Content-Disposition`.
 - `vite.config.ts` lee el `.env` directo (no `loadEnv`): una herramienta que define `PORT` apuntaba el proxy a sí mismo.
 - Historial: filtros fecha/origen/usuario (D-098); usuario = nombre de la PC (`dns.lookupService`, en segundo plano al crear el job, `client_host`) o la IP.
-- Historial: cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
+- Historial: tabla con menú «…» de acciones y lista en vivo, sin «Actualizar» (D-101); cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
 - Descargar es una lista de links (D-095): análisis de a tres, formato por fila (los que no son MP4/MP3/M4A usan `then`), lista en `sessionStorage`.
 - Descarga + conversión encadenada (`then`): al terminar bien, la cola (`onDone`) crea la conversión por el camino normal y la vincula en `follow_up_job_id`; si las opciones no sirven, queda una conversión fallida con el motivo.
 - Conversión: presets cerrados en shared → `buildConversionArgs` (pura); copia sin recodificar cuando el origen ya cumple; solo se ofrecen los presets que tienen sentido para el archivo (ffprobe); subida en streaming como `application/octet-stream`.

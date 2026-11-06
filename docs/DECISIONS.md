@@ -636,6 +636,21 @@ Antes el contenido tenía un tope de 1080 px pegado a la izquierda: en un monito
 
 Verificado midiendo, sin scroll horizontal en las cinco secciones a 2560, 1920, 1366, 1024, 800 y 375 px. A 1920 px la letra base es de 17 px y el contenido ocupa 1695 px (antes 1080).
 
+### D-101 — Historial en tabla, con acciones agrupadas y en vivo · Vigente
+
+El historial era una tarjeta por trabajo con hasta cinco botones (Reproducir, Descargar, Convertir, Abrir original, Borrar) y una línea larga de datos. Ahora es una tabla como la de Descargar.
+
+- **Columnas:** Trabajo (ícono del tipo, título, tipo y de dónde salió: el sitio o «de «archivo»»), Fecha, Usuario (solo en «Todos», y «Vos» en los propios), Archivo (formato · resolución · duración), Tamaño, Estado (etiqueta, o barra con la fase mientras corre). Anchos fijos como en D-100; en pantallas angostas la tabla se desplaza de costado y la columna Trabajo mantiene 18 rem.
+- **Sin miniaturas reales:** el server no guarda la imagen del video (la de yt-dlp solo se usa al analizar). Va un ícono por tipo, y uno de nota musical si el archivo es solo audio. Las miniaturas necesitarían generarlas con ffmpeg y guardarlas: queda para más adelante.
+- **Acciones:** a la vista solo lo de todos los días: reproducir y descargar (íconos), o Cancelar / Reintentar según el estado. El resto (convertir, abrir el link original, borrar) va en un menú «…» (`RowMenu`): `position: fixed` para que no lo corte el scroll de la tabla, teclado con flechas, Escape y Tab, y se cierra al tocar afuera o hacer scroll. «Convertir» navega dentro de la app (un link común recargaría la página y cortaría una grabación en curso, D-094).
+- **Reproducir** abre el reproductor en una fila debajo. Un GIF se muestra como imagen: con `<video>` no se veía (pasaba también antes).
+- **Se actualiza solo; se sacó «Actualizar»:**
+  - Los trabajos visibles siguen con `/api/events?jobIds=` como antes. Se vuelve a suscribir cuando cambia la lista y el server manda primero el estado actual de cada uno, así no se pierde un cambio que pasó mientras se pedía la lista (medido: con un solo stream general, un trabajo quedó en «Procesando» después de terminar).
+  - En la primera página, un stream general detecta trabajos nuevos (`isNewJobEvent`: un `job.updated` de un trabajo que no está y es más reciente que todos, salvo la prueba del sistema) y vuelve a pedir la lista a los 400 ms.
+- **Filtros en la misma tarjeta que la búsqueda**, en una fila, con el total a la derecha («8 trabajos»). Sin resultados se ve un estado vacío con «Limpiar la búsqueda y los filtros». La paginación solo aparece si hay más de una página.
+
+Verificado con el server real: descargas MP4 y MP3, una descarga con GIF encadenado, tres conversiones de audio y una descarga cancelada. Todas aparecieron y terminaron sin recargar, y el menú anduvo con mouse y teclado. El GIF se vio, y en 390 px la tabla se desplaza sin ensanchar la página.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5
