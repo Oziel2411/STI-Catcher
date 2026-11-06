@@ -1,6 +1,8 @@
+import { UserCircleIcon } from '@phosphor-icons/react';
 import { useState } from 'react';
 import type { SubmitEvent } from 'react';
 import { renameMe } from '../../api/users.ts';
+import { PageTitle } from '../../components/PageTitle.tsx';
 import { ChangePasswordForm } from './ChangePasswordForm.tsx';
 import { useSession } from './session-context.ts';
 import './auth.css';
@@ -36,13 +38,10 @@ export function AccountPage() {
   return (
     <section className="page">
       <header className="page-header">
-        <div>
-          <h1>Mi cuenta</h1>
-          <p className="muted">
-            {user.email}
-            {user.role === 'admin' && ' · Administrador'}
-          </p>
-        </div>
+        <PageTitle icon={UserCircleIcon} title="Mi cuenta">
+          {user.email}
+          {user.role === 'admin' && ' · Administrador'}
+        </PageTitle>
       </header>
       {message !== null && (
         <p className={`alert ${message.ok ? 'alert-ok' : 'alert-error'}`} role="status">

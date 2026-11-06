@@ -9,9 +9,12 @@ export default defineConfig({
           name: 'server',
           root: './apps/server',
           environment: 'node',
-          // El primer test de cada archivo de rutas levanta la app entera; en Windows,
-          // en frío (después de cambiar archivos) puede pasar los 5 s por defecto.
-          testTimeout: 15_000,
+          // El primer test de cada archivo de rutas paga el arranque en frío de
+          // Fastify y sus plugins (~300 ms sin carga). Con la PC ocupada (dev server
+          // + decenas de workers de Vitest) se multiplica y rozaba los 5 s por defecto.
+          // Los tests normales duran decenas de ms: el margen no esconde cuelgues reales.
+          testTimeout: 20_000,
+          hookTimeout: 20_000,
         },
       },
       { test: { name: 'web', root: './apps/web', environment: 'node' } },

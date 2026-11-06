@@ -33,7 +33,15 @@ export function AuthCard({
           width={40}
           height={40}
         />
-        <h1 id="login-title">{title}</h1>
+        <h1 id="login-title">
+          {title === 'STI-Catcher' ? (
+            <>
+              <span className="brand-accent">STI</span>-Catcher
+            </>
+          ) : (
+            title
+          )}
+        </h1>
       </div>
       {children}
     </>

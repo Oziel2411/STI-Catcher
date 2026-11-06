@@ -1,3 +1,4 @@
+import { UsersThreeIcon } from '@phosphor-icons/react';
 import { PASSWORD_MIN_LENGTH } from '@sti-catcher/shared';
 import type { UserRole, UserSummary } from '@sti-catcher/shared';
 import { useCallback, useEffect, useState } from 'react';
@@ -9,6 +10,7 @@ import {
   setProvisionalPassword,
   updateUser,
 } from '../../api/users.ts';
+import { PageTitle } from '../../components/PageTitle.tsx';
 import { formatDateTime } from '../../lib/format.ts';
 import { useSession } from '../auth/session-context.ts';
 import '../auth/auth.css';
@@ -65,12 +67,9 @@ export function UsersPage() {
   return (
     <section className="page">
       <header className="page-header">
-        <div>
-          <h1>Usuarios</h1>
-          <p className="muted">
-            Las cuentas para ingresar a STI-Catcher. Ser administrador solo sirve para esta página.
-          </p>
-        </div>
+        <PageTitle icon={UsersThreeIcon} title="Usuarios">
+          Las cuentas para ingresar a STI-Catcher. Ser administrador solo sirve para esta página.
+        </PageTitle>
       </header>
       {notice !== null && (
         <div className={`alert ${notice.ok ? 'alert-ok' : 'alert-error'}`} role="status">
