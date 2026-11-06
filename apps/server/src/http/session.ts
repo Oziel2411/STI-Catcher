@@ -15,7 +15,14 @@ declare module 'fastify' {
 export const SESSION_COOKIE = 'sti_session';
 
 /** Rutas de la API que se pueden usar sin sesión. */
-const PUBLIC_API = new Set(['/api/auth/login', '/api/auth/logout', '/api/health']);
+const PUBLIC_API = new Set([
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/options',
+  '/api/auth/forgot',
+  '/api/auth/reset',
+  '/api/health',
+]);
 /**
  * Con una contraseña provisoria solo se puede cambiarla (D-100): el resto de
  * la API responde 403 `PASSWORD_CHANGE_REQUIRED` hasta que se cambie.
@@ -25,6 +32,9 @@ const ALLOWED_WITH_PROVISIONAL_PASSWORD = new Set([
   '/api/auth/logout',
   '/api/auth/login',
   '/api/me/password',
+  '/api/auth/options',
+  '/api/auth/forgot',
+  '/api/auth/reset',
   '/api/health',
 ]);
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

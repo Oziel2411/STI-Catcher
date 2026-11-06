@@ -1,5 +1,6 @@
-import { meResponseSchema } from '@sti-catcher/shared';
-import type { SessionUser } from '@sti-catcher/shared';
+import { authOptionsResponseSchema, meResponseSchema } from '@sti-catcher/shared';
+import type { AuthOptionsResponse, SessionUser } from '@sti-catcher/shared';
+import { z } from 'zod';
 import { ApiClientError, apiGet, apiPost } from './client.ts';
 
 /** La cuenta de la sesión actual, o null si no hay sesión (401). */
@@ -23,4 +24,23 @@ export async function logout(): Promise<void> {
   } catch {
     // Sin conexión: igual se vuelve a la pantalla de ingreso.
   }
+}
+
+/** Opciones de ingreso (público). Si falla, se asume que no hay recuperación por mail. */
+export async function fetchAuthOptions(signal?: AbortSignal): Promise<AuthOptionsResponse> {
+  try {
+    return await apiGet('/api/auth/options', authOptionsResponseSchema, signal);
+  } catch {
+    return { passwordReset: false };
+  }
+}
+
+/** Pide el link para elegir una contraseña nueva. El server responde igual exista o no la cuenta. */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiPost('/api/auth/forgot', z.object({}), { email });
+}
+
+/** Elige la contraseña nueva con el token del link (el server responde 204 sin cuerpo). */
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await apiPost('/api/auth/reset', z.null(), { token, password });
 }

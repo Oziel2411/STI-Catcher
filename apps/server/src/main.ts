@@ -27,6 +27,8 @@ import { createUsersRepository } from './db/users-repository.ts';
 import { createAuthService } from './modules/auth/auth-service.ts';
 import { createLoginLimiter } from './modules/auth/login-limiter.ts';
 import { createUsersService } from './modules/auth/users-service.ts';
+import { createPasswordReset } from './modules/auth/password-reset.ts';
+import { createPasswordResetsRepository } from './db/password-resets-repository.ts';
 import { createConversionRunner } from './modules/conversion/conversion-runner.ts';
 import { createConversionService } from './modules/conversion/conversion-service.ts';
 import { createUploadService } from './modules/conversion/upload-service.ts';
@@ -244,6 +246,21 @@ async function main(): Promise<void> {
   const followUps = createFollowUps({ conversion, queue, repo, logger });
   // Aviso por mail al terminar una grabación (D-099). Sin SMTP o sin MAIL_TO, nada.
   const sendMail = config.mail ? createSmtpMailer(config.mail) : null;
+  // Recuperar la contraseña por mail (D-100): hace falta SMTP y PUBLIC_URL.
+  const passwordReset = createPasswordReset({
+    users,
+    sessions,
+    resets: createPasswordResetsRepository(db),
+    send: sendMail,
+    publicUrl: config.publicUrl,
+    limiter: loginLimiter,
+    logger,
+  });
+  if (sendMail !== null && config.publicUrl === null) {
+    logger.warn(
+      'Falta PUBLIC_URL en el .env: no se puede recuperar la contraseña por mail (solo con una provisoria del administrador).',
+    );
+  }
   const mail = createMailService({
     send: sendMail,
     from: config.mail?.from ?? null,
@@ -307,6 +324,7 @@ async function main(): Promise<void> {
       mail,
       auth,
       users: usersService,
+      passwordReset,
       getUser: (id) => users.get(id),
     },
     // En desarrollo la web la sirve Vite (otro puerto) y los POST llegan con su Origin.

@@ -149,4 +149,21 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE recordings ADD COLUMN user_id TEXT REFERENCES users (id) ON DELETE SET NULL;
     `,
   },
+  {
+    version: 7,
+    name: 'create-password-resets',
+    sql: /* sql */ `
+      -- Links para recuperar la contraseña por mail (D-100). Como las sesiones,
+      -- se guarda el SHA-256 del token, nunca el token.
+      CREATE TABLE password_resets (
+        token_hash TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used_at    TEXT,
+        ip         TEXT
+      );
+      CREATE INDEX password_resets_user ON password_resets (user_id);
+    `,
+  },
 ];

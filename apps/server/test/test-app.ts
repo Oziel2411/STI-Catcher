@@ -18,6 +18,8 @@ import { createUsersRepository } from '../src/db/users-repository.ts';
 import { createAuthService } from '../src/modules/auth/auth-service.ts';
 import { createLoginLimiter } from '../src/modules/auth/login-limiter.ts';
 import { createUsersService } from '../src/modules/auth/users-service.ts';
+import { createPasswordReset } from '../src/modules/auth/password-reset.ts';
+import { createPasswordResetsRepository } from '../src/db/password-resets-repository.ts';
 import { migrate } from '../src/db/migrate.ts';
 import { migrations } from '../src/db/migrations.ts';
 import { createJobEventBus } from '../src/jobs/event-bus.ts';
@@ -66,6 +68,8 @@ export type TestAppOptions = {
   sendMail?: SendMail;
   /** Reloj de las sesiones (para probar el corte por inactividad). */
   authNow?: () => Date;
+  /** Dirección pública para el link de recuperación (null = desactivada). */
+  publicUrl?: string | null;
 };
 
 /** Contraseña de las cuentas que crea `loginAs`. */
@@ -205,6 +209,17 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       return Promise.resolve();
     });
   const mailTo = options.mailTo ?? [];
+  const passwordReset = createPasswordReset({
+    users,
+    sessions,
+    resets: createPasswordResetsRepository(db),
+    send: sendMail,
+    publicUrl: options.publicUrl === undefined ? 'https://sti.test' : options.publicUrl,
+    limiter: loginLimiter,
+    logger: authLogger,
+    hash: fakeHash,
+    ...(options.authNow ? { now: options.authNow } : {}),
+  });
   const notifyRecording = createRecordingNotice({
     send: sendMail,
     to: mailTo,
@@ -264,6 +279,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       mail,
       auth,
       users: usersService,
+      passwordReset,
       getUser: (id) => users.get(id),
     },
     filesDir,

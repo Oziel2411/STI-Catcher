@@ -1,11 +1,13 @@
 import type { SessionUser } from '@sti-catcher/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useLocation } from 'react-router';
 import { fetchCurrentUser, logout as logoutRequest } from '../../api/auth.ts';
 import { SESSION_EXPIRED_EVENT } from '../../api/client.ts';
 import { startBackgroundClock } from '../recording/background-clock.ts';
 import { ForcedPasswordChange } from './ForcedPasswordChange.tsx';
 import { LoginPage } from './LoginPage.tsx';
+import { ResetPasswordPage } from './ResetPasswordPage.tsx';
 import { SessionContext } from './session-context.ts';
 import './auth.css';
 
@@ -51,6 +53,7 @@ const signedIn = (previous: State, user: SessionUser): SignedIn => ({
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ status: 'loading' });
+  const { pathname } = useLocation();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -106,6 +109,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     [user, logout, updateUser],
   );
 
+  // El link del mail para elegir una contraseña nueva: sirve con o sin sesión.
+  if (pathname === '/restablecer') return <ResetPasswordPage />;
   if (state.status === 'loading') return null;
   if (state.status === 'error') {
     return (

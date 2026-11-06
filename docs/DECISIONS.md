@@ -627,7 +627,7 @@ Verificado con un SMTP falso local con SSL y una CA de prueba: el mail de prueba
 
 ## Usuarios y login
 
-### D-100 — Login con cuentas locales y avisos por usuario · Vigente (por etapas: hechas la 1 y la 2)
+### D-100 — Login con cuentas locales y avisos por usuario · Vigente (por etapas: hechas la 1, la 2 y la 3)
 
 Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie anónima (D-041) y el «usuario» del historial era la PC (D-098). El aviso de grabación iba a una lista fija (`MAIL_TO`, D-099). Ahora la app tiene que saber **quién** es cada uno para mandarle el aviso a esa persona y a los compañeros que elija. Esto cambia el alcance de la SPEC («Usuarios, login, roles» estaba fuera de alcance).
 
@@ -674,7 +674,7 @@ Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie a
 - **Primer admin:** `npm run user:create-admin` (con `tsx`, que `npm ci` instala). Pide mail, nombre y contraseña dos veces sin mostrarla; usa el mismo `.env` (o `STI_ENV_FILE`) y se puede correr con el servicio andando (SQLite en WAL). Al arrancar, si no hay ningún admin, el log lo avisa.
 - **Web:** `AuthGate` pide `/api/auth/me` al cargar; sin sesión muestra solo el ingreso. Si la sesión se corta con la app abierta (otra pestaña cerró sesión), el ingreso aparece **encima** de la app sin desmontarla: una grabación en curso no se pierde y, al volver a ingresar con la misma cuenta, sigue. Con otra cuenta, se recarga. Latido a `/api/auth/me` cada 10 min desde el reloj del Worker. Nombre y «Salir» en la barra lateral. Los estilos del ingreso están en `features/auth/auth.css` (aparte de `styles.css`).
 - **Logs:** pino redacta `password`, `token` y `cookie`. Un ingreso fallido registra mail, IP y motivo (`unknown`, `password`, `inactive`); nunca la contraseña.
-- **Tests:** la app de prueba (`makeTestApp`) entra con la cuenta «ana» en cada `inject` (`cookie: ''` = sin sesión) y `loginAs(mail)` da otra. Usa un hash falso por velocidad; scrypt se prueba aparte.
+- **Tests:** la app de prueba (`makeTestApp`) entra con la cuenta «ana» en cada `inject` (`cookie: ''` = sin sesión) y `loginAs(mail)` da otra. Usa un hash falso por velocidad; scrypt se prueba aparte. El límite de tiempo de los tests del server es 15 s (no 5): en la primera corrida después de cambiar archivos, el primer test de algunos archivos de rutas tardaba 5–7 s en Windows y fallaba solo por eso.
 
 **Implementación (etapa 2):**
 
@@ -683,6 +683,17 @@ Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie a
 - **Contraseña provisoria:** mientras la tenga, la API responde **403** `PASSWORD_CHANGE_REQUIRED` a todo salvo `/api/auth/me`, salir y `/api/me/password`. La web muestra solo «Elegí tu contraseña»; si se la pusieron con la app abierta (se le cortó la sesión y volvió a ingresar), aparece encima, sin desmontar la app.
 - **Provisoria generada en el navegador:** 12 caracteres al azar (`crypto.getRandomValues`) sin letras que se confunden (l, 1, O, 0), ~69 bits. El admin la ve una vez en el aviso para pasársela a la persona; el server solo guarda el hash.
 - **Web:** «Mi cuenta» (`/cuenta`) y «Usuarios» (`/usuarios`, el enlace solo lo ven los admins) se entran desde la cuenta en la barra lateral, debajo del nombre: no se tocó la lista de secciones de `Layout`. La tabla de cuentas se desplaza dentro de su tarjeta en pantallas angostas.
+
+**Implementación (etapa 3):**
+
+- **Rutas públicas:** `GET /api/auth/options` (`{ passwordReset }`: hay SMTP y `PUBLIC_URL`), `POST /api/auth/forgot` (**202** siempre igual, exista o no la cuenta; **409** `RESET_DISABLED` si no está configurado) y `POST /api/auth/reset` (**204**; **400** `INVALID_RESET_LINK` si el link venció, ya se usó o no existe).
+- **Tabla `password_resets`** (migración 7): SHA-256 del token, cuenta, vencimiento (1 h), cuándo se usó e IP. Un link nuevo borra los anteriores sin usar; usarlo los borra todos.
+- **El token va después de `#`** (`/restablecer#token=…`): el navegador no manda esa parte al server, así que no queda en el log de pedidos. La página lo lee y lo borra de la barra de direcciones (`history.replaceState`). En la base solo queda su hash.
+- **Sin pistas:** el mail sale en segundo plano (la respuesta no espera al SMTP) y la respuesta es la misma con o sin cuenta. Una cuenta desactivada no recibe link. Si el envío falla, queda en el log.
+- **Límite:** 3 pedidos por hora para el mismo mail (exista o no) y 10 por IP; después, **429**. En memoria, como el del ingreso.
+- **Al usarlo:** contraseña nueva (sin marca de provisoria), se cortan **todas** las sesiones de la cuenta y se destraba el bloqueo por intentos fallidos. No deja la sesión abierta: se vuelve a ingresar. Se marca usado con un `UPDATE … WHERE used_at IS NULL`: si llegan dos pedidos juntos, gana uno.
+- **Web:** «¿Olvidaste tu contraseña?» en el ingreso solo si `passwordReset`; si no, el texto de siempre (pedírsela a un admin). `/restablecer` se muestra con o sin sesión.
+- **Verificado** con un SMTP falso local con TLS (certificado de prueba con openssl y `NODE_EXTRA_CA_CERTS`): el mail llegó con el link, se eligió la contraseña desde la web, la vieja dejó de servir, el link no sirvió dos veces y ni el token ni la contraseña aparecieron en el log. Con el certificado sin confiar, el envío falló con `ESOCKET` en el log y la pantalla respondió igual.
 
 ## Deuda técnica
 

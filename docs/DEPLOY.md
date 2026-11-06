@@ -81,6 +81,16 @@ MAIL_TO=nombre@capitanes.ar, otro@capitanes.ar
 
 Reiniciá el servicio y probalo en **Estado → Aviso por mail → Mandar mail de prueba**. Si falla, el mensaje dice qué revisar (usuario y contraseña, host o puerto, destinatarios).
 
+### Recuperar la contraseña por mail (opcional)
+
+Con el mail configurado, agregá la dirección con la que los compañeros entran a la app (la misma del certificado, paso 5). Va en el link que reciben para elegir una contraseña nueva (D-100):
+
+```ini
+PUBLIC_URL=https://192.168.3.115:3000
+```
+
+Reiniciá el servicio: en la pantalla de ingreso aparece **¿Olvidaste tu contraseña?**. El link vale 1 hora y una sola vez. Sin `PUBLIC_URL` esa opción no aparece y el log lo avisa al arrancar; queda la contraseña provisoria que pone un administrador en **Usuarios**.
+
 ## 4. Compilar
 
 ```powershell

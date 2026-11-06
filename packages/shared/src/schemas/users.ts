@@ -70,3 +70,21 @@ export const changePasswordRequestSchema = z.object({
   newPassword: newPasswordSchema,
 });
 export type ChangePasswordRequest = z.input<typeof changePasswordRequestSchema>;
+
+/** Qué opciones de ingreso hay (público: lo pide la pantalla de ingreso). */
+export const authOptionsResponseSchema = z.object({
+  /** Se puede recuperar la contraseña por mail (hay SMTP y PUBLIC_URL). */
+  passwordReset: z.boolean(),
+});
+export type AuthOptionsResponse = z.infer<typeof authOptionsResponseSchema>;
+
+/** «¿Olvidaste tu contraseña?»: manda un link al mail, si tiene cuenta. */
+export const forgotPasswordRequestSchema = z.object({ email: emailSchema });
+export type ForgotPasswordRequest = z.input<typeof forgotPasswordRequestSchema>;
+
+/** Elegir una contraseña nueva con el token del link. */
+export const resetPasswordRequestSchema = z.object({
+  token: z.string().min(20).max(200),
+  password: newPasswordSchema,
+});
+export type ResetPasswordRequest = z.input<typeof resetPasswordRequestSchema>;

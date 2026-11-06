@@ -167,3 +167,20 @@ describe('mail (D-099)', () => {
     );
   });
 });
+
+describe('PUBLIC_URL (D-100)', () => {
+  it('opcional; sin la / del final', () => {
+    expect(parseConfig(minimal, BASE).publicUrl).toBeNull();
+    expect(
+      parseConfig({ ...minimal, PUBLIC_URL: 'https://192.168.3.115:3000/' }, BASE).publicUrl,
+    ).toBe('https://192.168.3.115:3000');
+  });
+
+  it('rechaza algo que no es una dirección web', () => {
+    for (const value of ['192.168.3.115', 'ftp://x.local', 'cualquier cosa']) {
+      expect(errorOf(() => parseConfig({ ...minimal, PUBLIC_URL: value }, BASE)).message).toContain(
+        'PUBLIC_URL',
+      );
+    }
+  });
+});

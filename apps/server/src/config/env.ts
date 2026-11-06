@@ -102,6 +102,18 @@ const rawEnvSchema = z
     SMTP_PASSWORD: z.preprocess(emptyToUndefined, z.string().optional()),
     MAIL_FROM: optionalText,
     MAIL_TO: emailList,
+
+    // Dirección con la que los compañeros entran (D-100): va en el link para
+    // recuperar la contraseña. Sin ella (o sin SMTP) esa opción no aparece.
+    PUBLIC_URL: z.preprocess(
+      emptyToUndefined,
+      z
+        .url({
+          protocol: /^https?$/,
+          error: 'Tiene que ser una dirección web, p. ej. https://192.168.3.115:3000',
+        })
+        .optional(),
+    ),
   })
   .superRefine((env, ctx) => {
     if (env.SMTP_USER !== undefined && env.SMTP_PASSWORD === undefined) {
@@ -173,6 +185,8 @@ export type Config = {
   recording: {
     idleMinutes: number;
   };
+  /** Dirección pública de la app, sin / al final. null si no está (D-100). */
+  publicUrl: string | null;
   /** null si falta SMTP_HOST. Ver D-099. */
   mail: {
     host: string;
@@ -255,6 +269,7 @@ export function parseConfig(raw: Record<string, string | undefined>, baseDir: st
     recording: {
       idleMinutes: env.RECORDING_IDLE_MINUTES,
     },
+    publicUrl: env.PUBLIC_URL === undefined ? null : env.PUBLIC_URL.replace(/\/+$/, ''),
     mail:
       env.SMTP_HOST === undefined
         ? null
