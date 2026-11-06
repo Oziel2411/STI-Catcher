@@ -38,14 +38,11 @@ export function Layout() {
       <div className="layout">
         <aside className="sidebar">
           <span className="brand">
-            <img
-              className="brand-logo"
-              src="/logo-128.png"
-              alt="Centro de Capitanes de Ultramar y Oficiales de la Marina Mercante"
-              width={28}
-              height={28}
-            />
-            STI-Catcher
+            {/* El nombre va al lado: el logo es decorativo para los lectores de pantalla. */}
+            <img className="brand-logo" src="/logo-128.png" alt="" width={34} height={34} />
+            <span className="brand-name">
+              <span className="brand-accent">STI</span>-Catcher
+            </span>
           </span>
           <nav aria-label="Secciones">
             <ul className="nav">

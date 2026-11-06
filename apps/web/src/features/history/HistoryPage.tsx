@@ -1,4 +1,5 @@
 import {
+  ClockCounterClockwiseIcon,
   ArrowSquareOutIcon,
   ArrowsClockwiseIcon,
   ArrowsLeftRightIcon,
@@ -31,6 +32,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { apiDelete, apiGet, apiPost } from '../../api/client.ts';
 import { subscribeToAllEvents, subscribeToJobsEvents } from '../../api/events.ts';
 import { RowMenu } from '../../components/RowMenu.tsx';
+import { PageTitle } from '../../components/PageTitle.tsx';
 import type { RowMenuItem } from '../../components/RowMenu.tsx';
 import { formatBytes, formatDateTime } from '../../lib/format.ts';
 import { dayRange, invalidRange, ORIGIN_OPTIONS } from '../../lib/history-filters.ts';
@@ -239,10 +241,9 @@ export function HistoryPage() {
   return (
     <section className="page">
       <header className="page-header">
-        <div>
-          <h1>Historial</h1>
-          <p className="muted">Todo lo descargado, convertido y grabado. Se actualiza solo.</p>
-        </div>
+        <PageTitle icon={ClockCounterClockwiseIcon} title="Historial">
+          Todo lo descargado, convertido y grabado. Se actualiza solo.
+        </PageTitle>
       </header>
 
       <div className="card history-toolbar">

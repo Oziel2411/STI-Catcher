@@ -15,6 +15,7 @@ import type { DragEvent, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { apiGet } from '../../api/client.ts';
 import { JobProgress } from '../../components/JobProgress.tsx';
+import { PageTitle } from '../../components/PageTitle.tsx';
 import { gifFpsOptions, isScalable, scaleOptions } from '../../lib/convert.ts';
 import {
   formatTag,
@@ -116,14 +117,11 @@ export function ConvertPage() {
   return (
     <section className="page" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
       <header className="page-header">
-        <div>
-          <h1>Convertir archivos</h1>
-          <p className="muted">
-            {empty
-              ? 'Video y audio entre MP4, WebM, MKV, MOV, AVI, GIF, MP3, M4A y WAV.'
-              : 'Elegí un archivo de la lista para cambiar su formato de salida.'}
-          </p>
-        </div>
+        <PageTitle icon={ArrowsLeftRightIcon} title="Convertir archivos">
+          {empty
+            ? 'Video y audio entre MP4, WebM, MKV, MOV, AVI, GIF, MP3, M4A y WAV.'
+            : 'Elegí un archivo de la lista para cambiar su formato de salida.'}
+        </PageTitle>
         {!empty && (
           <div className="page-actions">
             <button type="button" className="button button-secondary" onClick={pick}>

@@ -651,6 +651,16 @@ El historial era una tarjeta por trabajo con hasta cinco botones (Reproducir, De
 
 Verificado con el server real: descargas MP4 y MP3, una descarga con GIF encadenado, tres conversiones de audio y una descarga cancelada. Todas aparecieron y terminaron sin recargar, y el menú anduvo con mouse y teclado. El GIF se vio, y en 390 px la tabla se desplaza sin ensanchar la página.
 
+### D-102 — Logo propio, acento azul y más vida visual · Vigente
+
+- **Logo nuevo** (`docs/design/logo/sti-catcher-logo.jpg`: timón con una flecha de descarga). En la barra lateral y la pestaña va solo el emblema, recortado en cuadrado (`emblem-512.png` → `public/logo-128.png` y `logo-64.png`), porque el texto no se lee a 34 px. Al lado va el nombre, con «STI» en el color de acento como en el logo. El `alt` del logo queda vacío porque el nombre ya está escrito. Reemplaza al escudo del Centro.
+- **El acento pasa de violeta a azul**, el de la flecha (`#2563d6` en claro, `#5b91f0` en oscuro, con contraste AA sobre los fondos). El modo oscuro toma el azul marino del fondo del logo (`--bg: #0f1624`). La estructura de Nocturne (D-090) no cambia: botones de contorno, Inter 400/500, mismos radios y espacios.
+- **Títulos de sección con ícono** (`PageTitle`, el mismo ícono de la barra lateral, en un cuadro con el tinte del acento). La sección activa de la barra lleva además una marca a la izquierda.
+- **Profundidad y movimiento:** las tarjetas tienen una sombra suave además del borde (`--shadow-card`). Hay un brillo azul muy tenue arriba a la derecha y transiciones de 0,15 s en botones, opciones y filas. Los estados vacíos llevan el ícono en un círculo. Con `prefers-reduced-motion` no hay giros ni desplazamientos.
+- **Estado como tablero:** arriba el aviso general con ícono, después Disco / Trabajos / Servidor con ícono (el de Disco se pone en rojo si falta espacio), después Herramientas, y «Probar sistema» y «Aviso por mail» lado a lado. Mientras llega la primera respuesta (las versiones tardan unos segundos) se ve un esqueleto con la forma de la página, y «Actualizar» gira mientras consulta.
+
+Verificado en claro y oscuro a 1366 px y a 390 px (sin scroll horizontal en ninguna sección).
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

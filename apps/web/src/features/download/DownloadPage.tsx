@@ -17,6 +17,7 @@ import type {
 import { useEffect, useState } from 'react';
 import type { SubmitEvent } from 'react';
 import { apiGet } from '../../api/client.ts';
+import { PageTitle } from '../../components/PageTitle.tsx';
 import { gifFpsOptions, gifWidthOptions } from '../../lib/convert.ts';
 import {
   editableChecked,
@@ -114,12 +115,9 @@ export function DownloadPage() {
   return (
     <section className="page">
       <header className="page-header">
-        <div>
-          <h1>Descargar videos</h1>
-          <p className="muted">
-            YouTube, Instagram, X y otros sitios. Pegá uno o varios links, uno por línea.
-          </p>
-        </div>
+        <PageTitle icon={DownloadSimpleIcon} title="Descargar videos">
+          YouTube, Instagram, X y otros sitios. Pegá uno o varios links, uno por línea.
+        </PageTitle>
       </header>
 
       {loadError && (
