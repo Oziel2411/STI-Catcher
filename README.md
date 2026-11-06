@@ -37,3 +37,4 @@ Instalación en el servidor, HTTPS y servicio de Windows: `docs/DEPLOY.md` (Fase
 - [SPEC.md](SPEC.md): especificación.
 - [docs/DECISIONS.md](docs/DECISIONS.md): decisiones técnicas y su porqué.
 - [CLAUDE.md](CLAUDE.md): comandos y convenciones del proyecto.
+# STI-Catcher
