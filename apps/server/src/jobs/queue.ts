@@ -62,7 +62,7 @@ export type EnqueueInput = {
   title?: string | null;
   sourceUrl?: string | null;
   clientIp?: string | null;
-  clientId?: string | null;
+  userId?: string | null;
   parentJobId?: string | null;
 };
 
@@ -371,7 +371,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         title: input.title ?? null,
         sourceUrl: input.sourceUrl ?? null,
         clientIp: input.clientIp ?? null,
-        clientId: input.clientId ?? null,
+        userId: input.userId ?? null,
         parentJobId: input.parentJobId ?? null,
       });
       annotateHost(record.id, input.clientIp);
@@ -439,7 +439,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         title: input.title ?? null,
         sourceUrl: input.sourceUrl ?? null,
         clientIp: input.clientIp ?? null,
-        clientId: input.clientId ?? null,
+        userId: input.userId ?? null,
         parentJobId: input.parentJobId ?? null,
       });
       annotateHost(input.id, input.clientIp);
@@ -460,7 +460,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         title: input.title ?? null,
         sourceUrl: input.sourceUrl ?? null,
         clientIp: input.clientIp ?? null,
-        clientId: input.clientId ?? null,
+        userId: input.userId ?? null,
         parentJobId: input.parentJobId ?? null,
       });
       annotateHost(record.id, input.clientIp);

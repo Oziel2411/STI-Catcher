@@ -22,7 +22,10 @@ export type JobRecord = {
   finishedAt: string | null;
   error: string | null;
   clientIp: string | null;
+  /** Cookie anónima de antes del login (D-041). Los trabajos nuevos no la tienen. */
   clientId: string | null;
+  /** Cuenta que lo pidió (D-100). null en los trabajos de antes del login. */
+  userId: string | null;
   /** Nombre de la PC (D-098); null mientras se resuelve o si no se encontró. */
   clientHost: string | null;
   parentJobId: string | null;
@@ -31,7 +34,7 @@ export type JobRecord = {
 };
 
 export type NewJob = Pick<JobRecord, 'id' | 'type' | 'params' | 'createdAt'> &
-  Partial<Pick<JobRecord, 'sourceUrl' | 'title' | 'clientIp' | 'clientId' | 'parentJobId'>>;
+  Partial<Pick<JobRecord, 'sourceUrl' | 'title' | 'clientIp' | 'userId' | 'parentJobId'>>;
 
 export type FinalStatus = Extract<JobStatus, 'done' | 'failed' | 'cancelled'>;
 
@@ -63,14 +66,14 @@ export type ListJobsFilter = {
 export type HistoryFilter = {
   /** Tipos que se muestran en el historial (el selftest no). */
   types: readonly JobType[];
-  /** Solo los de este navegador; null = todos. */
-  clientId: string | null;
+  /** Solo los de esta cuenta; null = todos. */
+  userId: string | null;
   /** Texto a buscar en el título (se normaliza sin tildes). */
   search: string | null;
   /** Creados desde (inclusive) / hasta (exclusive), ISO. */
   from?: string | null;
   to?: string | null;
-  /** PC (o IP) que lo pidió, como lo da listRequesters. */
+  /** Quién lo pidió, como lo da listRequesters (`user:<id>`, o la PC o IP de los viejos). */
   requester?: string | null;
   limit: number;
   offset: number;
@@ -100,15 +103,16 @@ export type JobsRepository = {
    */
   listExpirable(beforeIso: string): { id: string; filePath: string }[];
   /**
-   * Trabajos en cola o en curso de un navegador, por tipo. Las conversiones
+   * Trabajos en cola o en curso de una cuenta, por tipo. Las conversiones
    * encadenadas a una descarga cuentan como 'download'.
    */
-  countActiveByClient(clientId: string): Partial<Record<JobType, number>>;
+  countActiveByUser(userId: string): Partial<Record<JobType, number>>;
   /** Guarda el nombre de la PC que hizo el pedido. */
   setClientHost(id: string, host: string): void;
   /**
-   * Quiénes pidieron trabajos de esos tipos: nombre de la PC (o IP si no se
-   * resolvió), con cuántos trabajos, del más reciente al más viejo.
+   * Quiénes pidieron trabajos de esos tipos, con cuántos trabajos, del más
+   * reciente al más viejo: `user:<id>` para los de una cuenta; para los de
+   * antes del login, el nombre de la PC (o la IP si no se resolvió).
    */
   listRequesters(types: readonly JobType[]): { value: string; total: number }[];
   /** Vincula la conversión encadenada. false si ya tenía una (no se pisa). */

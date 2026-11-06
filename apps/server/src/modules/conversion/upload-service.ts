@@ -140,7 +140,7 @@ export function createUploadService(deps: UploadServiceDeps) {
         type: 'upload',
         params: {},
         title,
-        clientId: requester.clientId,
+        userId: requester.userId,
         clientIp: requester.ip,
       },
       {

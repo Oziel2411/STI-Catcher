@@ -6,6 +6,7 @@ import { YtdlpError } from '../../adapters/ytdlp.ts';
 import type { Ytdlp } from '../../adapters/ytdlp.ts';
 import type { EnqueueInput } from '../../jobs/queue.ts';
 import type { DownloadParams } from './download-runner.ts';
+import type { Requester } from '../history/history-service.ts';
 
 /** Error con mensaje para el usuario y el código HTTP que corresponde. Las rutas lo traducen. */
 export class MediaRequestError extends Error {
@@ -30,10 +31,7 @@ export type DownloadServiceDeps = {
 
 export type DownloadService = {
   probe: (url: string) => Promise<ProbeResponse>;
-  enqueue: (
-    request: DownloadRequest,
-    requester: { clientId: string; ip: string | null },
-  ) => Promise<Job>;
+  enqueue: (request: DownloadRequest, requester: Requester) => Promise<Job>;
 };
 
 export function createDownloadService(deps: DownloadServiceDeps): DownloadService {
@@ -101,7 +99,7 @@ export function createDownloadService(deps: DownloadServiceDeps): DownloadServic
         title: parsed.title ?? parsed.url,
         sourceUrl: parsed.url,
         clientIp: requester.ip,
-        clientId: requester.clientId,
+        userId: requester.userId,
       });
     },
   };

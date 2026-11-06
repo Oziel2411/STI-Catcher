@@ -4,6 +4,7 @@ import { createJobsRepository } from './jobs-repository.ts';
 import { migrate } from './migrate.ts';
 import type { Migration } from './migrate.ts';
 import { migrations } from './migrations.ts';
+import { createUsersRepository } from './users-repository.ts';
 
 const ids = {
   a: '00000000-0000-4000-8000-00000000000a',
@@ -20,9 +21,9 @@ function freshDb() {
 describe('migrate', () => {
   it('aplica las pendientes una sola vez', () => {
     const db = openDatabase(':memory:');
-    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1, 2, 3, 4, 5]);
+    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(migrate(db, migrations)).toEqual([]);
-    expect(db.pragma('user_version', { simple: true })).toBe(5);
+    expect(db.pragma('user_version', { simple: true })).toBe(6);
   });
 
   it('revierte una migración que falla y no avanza la versión', () => {
@@ -144,17 +145,33 @@ describe('jobs repository', () => {
 });
 
 describe('historial (repositorio)', () => {
-  const CLIENT_A = '11111111-1111-4111-8111-111111111111';
-  const CLIENT_B = '22222222-2222-4222-8222-222222222222';
+  const USER_A = '11111111-1111-4111-8111-111111111111';
+  const USER_B = '22222222-2222-4222-8222-222222222222';
   const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
   const types = ['download', 'upload', 'conversion', 'recording'] as const;
 
   function seeded() {
-    const repo = createJobsRepository(freshDb());
+    const db = freshDb();
+    const users = createUsersRepository(db);
+    for (const [userId, name] of [
+      [USER_A, 'Ana'],
+      [USER_B, 'Beto'],
+    ] as const) {
+      users.insert({
+        id: userId,
+        email: `${name}@capitanes.ar`,
+        name,
+        role: 'user',
+        passwordHash: 'x',
+        mustChangePassword: false,
+        createdAt: 't',
+      });
+    }
+    const repo = createJobsRepository(db);
     const add = (
       n: number,
       title: string,
-      clientId: string,
+      userId: string,
       type: 'download' | 'selftest' = 'download',
     ) =>
       repo.insert({
@@ -162,13 +179,13 @@ describe('historial (repositorio)', () => {
         type,
         params: {},
         title,
-        clientId,
+        userId,
         createdAt: `2026-10-29T12:00:${String(n).padStart(2, '0')}.000Z`,
       });
-    add(1, 'Canción del Ñandú', CLIENT_A);
-    add(2, 'Big Buck Bunny', CLIENT_B);
-    add(3, 'cancion_sin_tilde 100%', CLIENT_A);
-    add(4, 'Prueba del sistema (10 s)', CLIENT_A, 'selftest');
+    add(1, 'Canción del Ñandú', USER_A);
+    add(2, 'Big Buck Bunny', USER_B);
+    add(3, 'cancion_sin_tilde 100%', USER_A);
+    add(4, 'Prueba del sistema (10 s)', USER_A, 'selftest');
     return repo;
   }
 
@@ -177,7 +194,7 @@ describe('historial (repositorio)', () => {
   it('lista del más nuevo al más viejo, sin el selftest, con el total', () => {
     const result = seeded().listHistory({
       types,
-      clientId: null,
+      userId: null,
       search: null,
       limit: 10,
       offset: 0,
@@ -186,10 +203,10 @@ describe('historial (repositorio)', () => {
     expect(result.total).toBe(3);
   });
 
-  it('"Mis trabajos" filtra por navegador', () => {
+  it('"Mis trabajos" filtra por cuenta', () => {
     const result = seeded().listHistory({
       types,
-      clientId: CLIENT_A,
+      userId: USER_A,
       search: null,
       limit: 10,
       offset: 0,
@@ -200,7 +217,7 @@ describe('historial (repositorio)', () => {
   it('busca sin distinguir mayúsculas ni tildes', () => {
     const repo = seeded();
     const search = (text: string) =>
-      ids(repo.listHistory({ types, clientId: null, search: text, limit: 10, offset: 0 }));
+      ids(repo.listHistory({ types, userId: null, search: text, limit: 10, offset: 0 }));
     expect(search('CANCION')).toEqual([id(3), id(1)]);
     expect(search('ñandu')).toEqual([id(1)]);
     expect(search('bunny')).toEqual([id(2)]);
@@ -209,17 +226,17 @@ describe('historial (repositorio)', () => {
   it('% y _ en la búsqueda se toman literalmente', () => {
     const repo = seeded();
     expect(
-      ids(repo.listHistory({ types, clientId: null, search: '100%', limit: 10, offset: 0 })),
+      ids(repo.listHistory({ types, userId: null, search: '100%', limit: 10, offset: 0 })),
     ).toEqual([id(3)]);
     expect(
-      ids(repo.listHistory({ types, clientId: null, search: '_', limit: 10, offset: 0 })),
+      ids(repo.listHistory({ types, userId: null, search: '_', limit: 10, offset: 0 })),
     ).toEqual([id(3)]);
   });
 
   it('pagina con limit y offset; el total no depende de la página', () => {
     const result = seeded().listHistory({
       types,
-      clientId: null,
+      userId: null,
       search: null,
       limit: 2,
       offset: 2,
@@ -233,7 +250,7 @@ describe('historial (repositorio)', () => {
     repo.markRunning(id(2), 't');
     repo.finish(id(2), { status: 'done', finishedAt: 't', title: 'Título Nuevo Ácido' });
     expect(
-      ids(repo.listHistory({ types, clientId: null, search: 'acido', limit: 10, offset: 0 })),
+      ids(repo.listHistory({ types, userId: null, search: 'acido', limit: 10, offset: 0 })),
     ).toEqual([id(2)]);
   });
 
@@ -257,9 +274,7 @@ describe('historial (repositorio)', () => {
     repo.setClientHost(id(11), 'PC-SALA');
     repo.setClientHost(id(13), 'PC-SALA');
     const list = (filter: Partial<Parameters<typeof repo.listHistory>[0]>) =>
-      ids(
-        repo.listHistory({ types, clientId: null, search: null, limit: 20, offset: 0, ...filter }),
-      );
+      ids(repo.listHistory({ types, userId: null, search: null, limit: 20, offset: 0, ...filter }));
 
     expect(list({ from: '2026-10-30T02:00:00.000Z' })).toEqual([id(13), id(12)]);
     expect(list({ from: '2026-10-30T00:00:00.000Z', to: '2026-10-30T02:00:00.000Z' })).toEqual([
@@ -269,9 +284,14 @@ describe('historial (repositorio)', () => {
     expect(list({ requester: 'PC-SALA' })).toEqual([id(13), id(11)]);
     expect(list({ requester: '192.168.3.41' })).toEqual([id(12)]);
 
+    // Los de una cuenta (D-100) se identifican por la cuenta, no por la PC.
+    expect(list({ requester: `user:${USER_A}` })).toEqual([id(3), id(1)]);
+
     expect(repo.listRequesters(types)).toEqual([
       { value: 'PC-SALA', total: 2 },
       { value: '192.168.3.41', total: 1 },
+      { value: `user:${USER_A}`, total: 2 },
+      { value: `user:${USER_B}`, total: 1 },
     ]);
   });
 

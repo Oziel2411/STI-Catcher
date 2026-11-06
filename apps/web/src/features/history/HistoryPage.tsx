@@ -102,7 +102,7 @@ export function HistoryPage() {
     };
   }, [scope, q, page, reloadKey, from, to, origin, user]);
 
-  // Valores del filtro "Usuario" (PCs que pidieron trabajos).
+  // Valores del filtro "Usuario": cuentas, y las PCs de los trabajos de antes del login.
   useEffect(() => {
     const controller = new AbortController();
     apiGet('/api/history/requesters', historyRequestersResponseSchema, controller.signal)
@@ -260,7 +260,7 @@ export function HistoryPage() {
             className="select-compact"
             value={user ?? ''}
             onChange={(e) => {
-              // Ver los de otra PC solo tiene sentido en "Todos".
+              // Ver los de otra persona solo tiene sentido en "Todos".
               updateParams({
                 usuario: e.target.value,
                 ...(e.target.value ? { scope: 'all' } : {}),
@@ -316,7 +316,7 @@ export function HistoryPage() {
             : q
               ? `No hay trabajos que coincidan con «${q}».`
               : scope === 'mine'
-                ? 'Todavía no hiciste ningún trabajo desde este navegador.'
+                ? 'Todavía no hiciste ningún trabajo con tu cuenta.'
                 : 'Todavía no hay trabajos.'}
         </p>
       )}

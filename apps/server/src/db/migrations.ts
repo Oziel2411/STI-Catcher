@@ -113,4 +113,40 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE jobs ADD COLUMN client_host TEXT;
     `,
   },
+  {
+    version: 6,
+    name: 'create-users-and-sessions',
+    sql: /* sql */ `
+      -- Cuentas locales (D-100). El mail es el usuario: se guarda en minúsculas.
+      CREATE TABLE users (
+        id                   TEXT PRIMARY KEY,
+        email                TEXT NOT NULL UNIQUE,
+        name                 TEXT NOT NULL,
+        role                 TEXT NOT NULL CHECK (role IN ('admin', 'user')),
+        active               INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        -- scrypt$<log2 N>$<r>$<p>$<sal>$<hash> (base64). Nunca sale por la API.
+        password_hash        TEXT NOT NULL,
+        must_change_password INTEGER NOT NULL DEFAULT 0 CHECK (must_change_password IN (0, 1)),
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL,
+        last_login_at        TEXT
+      );
+
+      -- Sesiones abiertas. Se guarda el SHA-256 del token, no el token: quien
+      -- lea la base no puede usarlas.
+      CREATE TABLE sessions (
+        token_hash   TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        created_at   TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        ip           TEXT
+      );
+      CREATE INDEX sessions_user ON sessions (user_id);
+
+      -- Dueño de cada trabajo y grabación. Los anteriores quedan sin cuenta (NULL).
+      ALTER TABLE jobs ADD COLUMN user_id TEXT REFERENCES users (id) ON DELETE SET NULL;
+      CREATE INDEX jobs_user_status ON jobs (user_id, status);
+      ALTER TABLE recordings ADD COLUMN user_id TEXT REFERENCES users (id) ON DELETE SET NULL;
+    `,
+  },
 ];

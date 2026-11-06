@@ -1,12 +1,13 @@
 import { historyQuerySchema, jobIdParamsSchema } from '@sti-catcher/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { HttpError, parseInput } from '../http/validation.ts';
+import { requireUser } from '../http/session.ts';
 import { HistoryError } from '../modules/history/history-service.ts';
 import type { HistoryService, Requester } from '../modules/history/history-service.ts';
 import { rethrowJobRejection } from './jobs.ts';
 
 export const requesterOf = (request: FastifyRequest): Requester => ({
-  clientId: request.clientId,
+  userId: requireUser(request).id,
   ip: request.ip,
 });
 

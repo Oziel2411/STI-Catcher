@@ -31,6 +31,6 @@ export function RecordingNavBadge({ processing }: { processing: number }) {
   if (phase.kind === 'finishing') {
     return <span className="nav-rec nav-rec-muted">subiendo…</span>;
   }
-  // Grabaciones de este navegador que se están procesando a MP4.
+  // Grabaciones de esta cuenta que se están procesando a MP4.
   return <NavCount value={processing} />;
 }

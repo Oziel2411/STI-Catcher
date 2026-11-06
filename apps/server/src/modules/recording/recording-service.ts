@@ -102,8 +102,8 @@ export function createRecordingService(deps: RecordingServiceDeps) {
   const ownSession = (id: string, requester: Requester): RecordingSession => {
     const session = deps.repo.get(id);
     if (!session) throw new RecordingError('NOT_FOUND', 'No existe esa grabación.', 404);
-    if (session.clientId !== requester.clientId) {
-      throw new RecordingError('NOT_OWNER', 'Esta grabación es de otro navegador.', 403);
+    if (session.userId === null || session.userId !== requester.userId) {
+      throw new RecordingError('NOT_OWNER', 'Esta grabación es de otra persona.', 403);
     }
     return session;
   };
@@ -132,7 +132,7 @@ export function createRecordingService(deps: RecordingServiceDeps) {
       type: 'recording',
       params,
       title: session.title,
-      clientId: session.clientId,
+      userId: session.userId,
       clientIp: session.clientIp,
     });
     deps.repo.finalize(session.id, job.id);
@@ -150,7 +150,7 @@ export function createRecordingService(deps: RecordingServiceDeps) {
         extension: container,
         fps: request.fps,
         title: request.title,
-        clientId: requester.clientId,
+        userId: requester.userId,
         clientIp: requester.ip,
         createdAt: now().toISOString(),
       });

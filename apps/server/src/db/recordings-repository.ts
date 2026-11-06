@@ -11,6 +11,8 @@ export type RecordingSession = {
   fps: number;
   title: string;
   clientId: string | null;
+  /** Cuenta que la empezó (D-100): solo ella manda fragmentos y la termina. */
+  userId: string | null;
   clientIp: string | null;
   /** Próximo número de fragmento esperado. */
   nextSeq: number;
@@ -28,6 +30,7 @@ type Row = {
   fps: number;
   title: string;
   client_id: string | null;
+  user_id: string | null;
   client_ip: string | null;
   next_seq: number;
   size_bytes: number;
@@ -44,6 +47,7 @@ const toSession = (row: Row): RecordingSession => ({
   fps: row.fps,
   title: row.title,
   clientId: row.client_id,
+  userId: row.user_id,
   clientIp: row.client_ip,
   nextSeq: row.next_seq,
   sizeBytes: row.size_bytes,
@@ -54,7 +58,7 @@ const toSession = (row: Row): RecordingSession => ({
 
 export type NewRecording = Pick<
   RecordingSession,
-  'id' | 'mimeType' | 'extension' | 'fps' | 'title' | 'clientId' | 'clientIp' | 'createdAt'
+  'id' | 'mimeType' | 'extension' | 'fps' | 'title' | 'userId' | 'clientIp' | 'createdAt'
 >;
 
 export type RecordingsRepository = {
@@ -72,8 +76,8 @@ export type RecordingsRepository = {
 
 export function createRecordingsRepository(db: Db): RecordingsRepository {
   const insertStmt = db.prepare<[NewRecording]>(`
-    INSERT INTO recordings (id, status, mime_type, extension, fps, title, client_id, client_ip, created_at)
-    VALUES (@id, 'recording', @mimeType, @extension, @fps, @title, @clientId, @clientIp, @createdAt)
+    INSERT INTO recordings (id, status, mime_type, extension, fps, title, user_id, client_ip, created_at)
+    VALUES (@id, 'recording', @mimeType, @extension, @fps, @title, @userId, @clientIp, @createdAt)
   `);
   const getStmt = db.prepare<[string], Row>('SELECT * FROM recordings WHERE id = ?');
   const chunkStmt = db.prepare<[number, string, string, number]>(`

@@ -1,6 +1,6 @@
 # STI-Catcher
 
-Web app interna (inspirada en aTube Catcher) para **descargar video por URL**, **grabar pantalla** desde el navegador y **convertir archivos**, con historial. Corre en una PC con Windows 10 que hace de servidor en la red interna; los compañeros la usan desde el navegador, sin login.
+Web app interna (inspirada en aTube Catcher) para **descargar video por URL**, **grabar pantalla** desde el navegador y **convertir archivos**, con historial. Corre en una PC con Windows 10 que hace de servidor en la red interna; los compañeros la usan desde el navegador, con una cuenta local (D-100).
 
 - Especificación completa: [SPEC.md](SPEC.md). Decisiones vigentes y su porqué: [docs/DECISIONS.md](docs/DECISIONS.md).
 - Plataforma única: Windows. Sin Docker, Linux ni macOS.
@@ -30,6 +30,7 @@ Se trabaja de a una fase: tests + commit + resumen, y **esperar el OK** antes de
 .\scripts\uninstall-service.ps1      # quita servicio y regla de firewall (admin)
 npm install
 npm run dev          # server (tsx watch, :3000) + web (Vite, http://127.0.0.1:5173)
+npm run user:create-admin   # crea una cuenta de administrador (pide mail, nombre y contraseña)
 npm run build        # web (apps/web/dist) + server (apps/server/dist)
 npm start            # producción: un proceso, un puerto (requiere NODE_ENV=production en .env)
 npm test             # Vitest, todos los proyectos
@@ -76,7 +77,8 @@ Detalle en `docs/DECISIONS.md`.
 - Descarga: `-f bv[height<=H]+ba/b[height<=H]/bv+ba/b`; compat `-S vcodec:h264,res:H,channels:2,acodec:aac`. "Recodificar" lo hace nuestro ffmpeg (con progreso), no yt-dlp. Archivo en disco `<jobId>.<ext>`; el título solo va en `Content-Disposition`.
 - `vite.config.ts` lee el `.env` directo (no `loadEnv`): una herramienta que define `PORT` apuntaba el proxy a sí mismo.
 - Historial: filtros fecha/origen/usuario (D-098); usuario = nombre de la PC (`dns.lookupService`, en segundo plano al crear el job, `client_host`) o la IP.
-- Historial: cookie anónima `sti_client` (HttpOnly) → `isMine`; búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; borrar solo lo propio; reintentar = trabajo nuevo.
+- Login obligatorio (D-100): cuentas locales (mail + contraseña, scrypt), las crea un admin; el primero con `npm run user:create-admin`. Cookie de sesión `sti_session` (HttpOnly, SameSite=Lax, sin vencimiento; el server corta a las 12 h sin uso), en la base solo el SHA-256 del token. 5 fallidos por cuenta o 20 por IP → 429 por 15 min. Toda la API da 401 sin sesión salvo login, logout y health. El admin solo administra cuentas.
+- Historial: los trabajos guardan `user_id` → `isMine`, borrar solo lo propio, contadores; los de antes del login no son de nadie (columna `client_id` de la cookie vieja `sti_client`). Usuario del filtro = `user:<id>` (o la PC/IP de los viejos). Búsqueda sin tildes con `title_search`; un `done` sin archivo pasa a `expired` al mirarlo; reintentar = trabajo nuevo.
 - Descargar es una lista de links (D-095): análisis de a tres, formato por fila (los que no son MP4/MP3/M4A usan `then`), lista en `sessionStorage`.
 - Descarga + conversión encadenada (`then`): al terminar bien, la cola (`onDone`) crea la conversión por el camino normal y la vincula en `follow_up_job_id`; si las opciones no sirven, queda una conversión fallida con el motivo.
 - Conversión: presets cerrados en shared → `buildConversionArgs` (pura); copia sin recodificar cuando el origen ya cumple; solo se ofrecen los presets que tienen sentido para el archivo (ffprobe); subida en streaming como `application/octet-stream`.
@@ -91,6 +93,9 @@ Detalle en `docs/DECISIONS.md`.
 | Método | Ruta                                                                       | Respuesta                                                                                                           |
 | ------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | GET    | `/api/health`                                                              | versiones, disco, trabajos (`?refresh=1` fuerza versiones)                                                          |
+| POST   | `/api/auth/login` `{ email, password }`                                    | `{ user }` + cookie `sti_session` · 401 · 429 (público)                                                             |
+| POST   | `/api/auth/logout`                                                         | 204, borra la cookie (público)                                                                                      |
+| GET    | `/api/auth/me`                                                             | `{ user }` (también es el latido de la web) · 401                                                                   |
 | GET    | `/api/jobs?status=a,b&type=x&limit=n`                                      | `{ jobs }`                                                                                                          |
 | GET    | `/api/jobs/:id`                                                            | `{ job }`                                                                                                           |
 | POST   | `/api/jobs/selftest` `{ durationSeconds? }`                                | 202 `{ jobId }` · 507 sin disco                                                                                     |

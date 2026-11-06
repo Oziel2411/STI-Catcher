@@ -31,10 +31,19 @@ type JobRow = {
   error: string | null;
   client_ip: string | null;
   client_id: string | null;
+  user_id: string | null;
   client_host: string | null;
   parent_job_id: string | null;
   follow_up_job_id: string | null;
 };
+
+/**
+ * Quién pidió un trabajo, para el filtro del historial (D-098, D-100): `user:<id>`
+ * si tiene cuenta; si es de antes del login, la PC (o la IP). Un nombre de PC o
+ * una IP nunca empiezan con "user:".
+ */
+const REQUESTER_SQL =
+  "CASE WHEN user_id IS NOT NULL THEN 'user:' || user_id ELSE COALESCE(client_host, client_ip) END";
 
 function parseParams(json: string): unknown {
   try {
@@ -66,6 +75,7 @@ function toRecord(row: JobRow): JobRecord {
     error: row.error,
     clientIp: row.client_ip,
     clientId: row.client_id,
+    userId: row.user_id,
     clientHost: row.client_host,
     parentJobId: row.parent_job_id,
     followUpJobId: row.follow_up_job_id,
@@ -89,15 +99,15 @@ export function createJobsRepository(db: Db): JobsRepository {
         title: string | null;
         titleSearch: string | null;
         clientIp: string | null;
-        clientId: string | null;
+        userId: string | null;
         parentJobId: string | null;
       },
     ]
   >(`
     INSERT INTO jobs (id, type, status, params, created_at, source_url, title, title_search,
-                      client_ip, client_id, parent_job_id)
+                      client_ip, user_id, parent_job_id)
     VALUES (@id, @type, 'queued', @params, @createdAt, @sourceUrl, @title, @titleSearch,
-            @clientIp, @clientId, @parentJobId)
+            @clientIp, @userId, @parentJobId)
   `);
   const getStmt = db.prepare<[string], JobRow>('SELECT * FROM jobs WHERE id = ?');
   const nextQueuedStmt = db.prepare<[], JobRow>(
@@ -159,7 +169,7 @@ export function createJobsRepository(db: Db): JobsRepository {
                         WHERE c.parent_job_id = j.id AND c.status IN ('queued', 'running'))
      ORDER BY j.finished_at
   `);
-  const activeByClientStmt = db.prepare<[string], { kind: string; total: number }>(`
+  const activeByUserStmt = db.prepare<[string], { kind: string; total: number }>(`
     SELECT CASE
              WHEN j.type = 'conversion'
               AND EXISTS (SELECT 1 FROM jobs d WHERE d.follow_up_job_id = j.id) THEN 'download'
@@ -167,7 +177,7 @@ export function createJobsRepository(db: Db): JobsRepository {
            END AS kind,
            COUNT(*) AS total
       FROM jobs j
-     WHERE j.client_id = ? AND j.status IN ('queued', 'running')
+     WHERE j.user_id = ? AND j.status IN ('queued', 'running')
      GROUP BY kind
   `);
   const setClientHostStmt = db.prepare<[string, string]>(
@@ -184,9 +194,9 @@ export function createJobsRepository(db: Db): JobsRepository {
   const historyWhere = (filter: HistoryFilter) => {
     const where = [`type IN (${filter.types.map(() => '?').join(', ')})`];
     const args: string[] = [...filter.types];
-    if (filter.clientId !== null) {
-      where.push('client_id = ?');
-      args.push(filter.clientId);
+    if (filter.userId !== null) {
+      where.push('user_id = ?');
+      args.push(filter.userId);
     }
     const search = filter.search === null ? '' : normalizeSearchText(filter.search);
     if (search !== '') {
@@ -203,7 +213,7 @@ export function createJobsRepository(db: Db): JobsRepository {
       args.push(filter.to);
     }
     if (filter.requester) {
-      where.push('COALESCE(client_host, client_ip) = ?');
+      where.push(`${REQUESTER_SQL} = ?`);
       args.push(filter.requester);
     }
     return { sql: where.join(' AND '), args };
@@ -221,7 +231,7 @@ export function createJobsRepository(db: Db): JobsRepository {
         title,
         titleSearch: title === null ? null : normalizeSearchText(title),
         clientIp: job.clientIp ?? null,
-        clientId: job.clientId ?? null,
+        userId: job.userId ?? null,
         parentJobId: job.parentJobId ?? null,
       });
       const created = getStmt.get(job.id);
@@ -326,9 +336,9 @@ export function createJobsRepository(db: Db): JobsRepository {
       return expirableStmt.all(beforeIso).map((row) => ({ id: row.id, filePath: row.file_path }));
     },
 
-    countActiveByClient(clientId) {
+    countActiveByUser(userId) {
       const counts: Partial<Record<JobType, number>> = {};
-      for (const row of activeByClientStmt.all(clientId)) {
+      for (const row of activeByUserStmt.all(userId)) {
         counts[jobTypeSchema.parse(row.kind)] = row.total;
       }
       return counts;
@@ -342,10 +352,10 @@ export function createJobsRepository(db: Db): JobsRepository {
       if (types.length === 0) return [];
       return db
         .prepare<string[], { value: string; total: number }>(
-          `SELECT COALESCE(client_host, client_ip) AS value, COUNT(*) AS total
+          `SELECT ${REQUESTER_SQL} AS value, COUNT(*) AS total
              FROM jobs
             WHERE type IN (${types.map(() => '?').join(', ')})
-              AND COALESCE(client_host, client_ip) IS NOT NULL
+              AND ${REQUESTER_SQL} IS NOT NULL
             GROUP BY value
             ORDER BY MAX(created_at) DESC
             LIMIT 200`,

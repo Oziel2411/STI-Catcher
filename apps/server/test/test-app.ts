@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { HealthResponse, ProbeResponse } from '@sti-catcher/shared';
+import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { pino } from 'pino';
 import { vi } from 'vitest';
 import type { Ffprobe, MediaInfo } from '../src/adapters/ffprobe.ts';
@@ -12,6 +13,10 @@ import { buildApp } from '../src/app.ts';
 import { openDatabase } from '../src/db/connection.ts';
 import { createJobsRepository } from '../src/db/jobs-repository.ts';
 import { createRecordingsRepository } from '../src/db/recordings-repository.ts';
+import { createSessionsRepository } from '../src/db/sessions-repository.ts';
+import { createUsersRepository } from '../src/db/users-repository.ts';
+import { createAuthService } from '../src/modules/auth/auth-service.ts';
+import { createLoginLimiter } from '../src/modules/auth/login-limiter.ts';
 import { migrate } from '../src/db/migrate.ts';
 import { migrations } from '../src/db/migrations.ts';
 import { createJobEventBus } from '../src/jobs/event-bus.ts';
@@ -58,7 +63,20 @@ export type TestAppOptions = {
   mailTo?: string[];
   /** Simula un servidor de correo que falla. */
   sendMail?: SendMail;
+  /** Reloj de las sesiones (para probar el corte por inactividad). */
+  authNow?: () => Date;
 };
+
+/** Contraseña de las cuentas que crea `loginAs`. */
+export const TEST_PASSWORD = 'contraseña-de-prueba';
+
+/**
+ * Hash falso para los tests de rutas: scrypt tarda ~100 ms por llamada. El
+ * real se prueba en password.test.ts.
+ */
+const fakeHash = (password: string) => Promise.resolve(`fake$${password}`);
+const fakeVerify = (password: string, stored: string) =>
+  Promise.resolve(stored === `fake$${password}`);
 
 export const sampleVideoMedia: MediaInfo = {
   durationSeconds: 12,
@@ -85,6 +103,18 @@ export async function makeTestApp(options: TestAppOptions = {}) {
   const db = openDatabase(':memory:');
   migrate(db, migrations);
   const repo = createJobsRepository(db);
+  const users = createUsersRepository(db);
+  const sessions = createSessionsRepository(db);
+  const authLogger = { info: vi.fn(), warn: vi.fn() };
+  const auth = createAuthService({
+    users,
+    sessions,
+    limiter: createLoginLimiter(),
+    logger: authLogger,
+    hash: fakeHash,
+    verify: fakeVerify,
+    ...(options.authNow ? { now: options.authNow } : {}),
+  });
   const bus = createJobEventBus();
   const runs: PendingRun[] = [];
   const runner: JobRunner = {
@@ -143,6 +173,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     filesDir,
     removeFile: (file) => rm(file, { force: true }),
     logger: historyLogger,
+    userNames: (ids) => users.namesByIds(ids),
   });
 
   const ffprobe = vi.fn<Ffprobe>(options.ffprobe ?? (() => Promise.resolve(sampleVideoMedia)));
@@ -220,14 +251,49 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       conversionOptions,
       recordings,
       mail,
+      auth,
     },
     filesDir,
     webDistDir: options.webDistDir ?? null,
     https: null,
     ...(options.sseHeartbeatMs !== undefined ? { sseHeartbeatMs: options.sseHeartbeatMs } : {}),
   });
+  /**
+   * Ingresa con una cuenta (la crea si no existe) y devuelve los headers con
+   * su cookie de sesión. El nombre es la parte del mail antes de la @.
+   */
+  const loginAs = async (email: string, role: 'admin' | 'user' = 'user') => {
+    if (!users.findByEmail(email)) {
+      const name = email.split('@')[0] ?? email;
+      await auth.createUser({ email, name, role, password: TEST_PASSWORD });
+    }
+    const { token, user } = await auth.login({ email, password: TEST_PASSWORD }, '127.0.0.1');
+    return { headers: { cookie: `sti_session=${token}` }, user };
+  };
+
+  // Por defecto cada pedido va con la sesión de «ana»: los tests que no son
+  // del login no tienen que ocuparse. Un `cookie` explícito la reemplaza
+  // (`cookie: ''` = sin sesión).
+  const ana = await loginAs('ana@capitanes.ar');
+  const rawInject = app.inject.bind(app) as unknown as (
+    opts: InjectOptions,
+  ) => Promise<LightMyRequestResponse>;
+  app.inject = ((opts: InjectOptions | string) =>
+    rawInject(
+      typeof opts === 'string'
+        ? { url: opts, headers: ana.headers }
+        : { ...opts, headers: { ...ana.headers, ...opts.headers } },
+    )) as typeof app.inject;
+
   return {
     app,
+    auth,
+    authLogger,
+    users,
+    sessions,
+    loginAs,
+    /** Cuenta y headers de la sesión por defecto. */
+    ana,
     queue,
     repo,
     bus,

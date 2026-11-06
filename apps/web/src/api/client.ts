@@ -13,6 +13,15 @@ export class ApiClientError extends Error {
   }
 }
 
+/** Evento que se dispara cuando el server dice que la sesión ya no vale (401, D-100). */
+export const SESSION_EXPIRED_EVENT = 'sti:session-expired';
+
+function notifyIfUnauthenticated(status: number, code: string): void {
+  if (status === 401 && code === 'UNAUTHENTICATED') {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+}
+
 type RequestOptions = {
   method?: 'GET' | 'POST';
   /** Se envía como JSON. */
@@ -50,6 +59,7 @@ export async function apiRequest<S extends z.ZodType>(
 
   if (!response.ok) {
     const parsed = apiErrorSchema.safeParse(payload);
+    if (parsed.success) notifyIfUnauthenticated(response.status, parsed.data.error.code);
     throw parsed.success
       ? new ApiClientError(parsed.data.error.message, parsed.data.error.code, response.status)
       : new ApiClientError(
@@ -86,6 +96,7 @@ export async function apiDelete(url: string): Promise<void> {
   }
   if (response.ok) return;
   const parsed = apiErrorSchema.safeParse(await response.json().catch(() => null));
+  if (parsed.success) notifyIfUnauthenticated(response.status, parsed.data.error.code);
   throw parsed.success
     ? new ApiClientError(parsed.data.error.message, parsed.data.error.code, response.status)
     : new ApiClientError(

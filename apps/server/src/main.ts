@@ -22,6 +22,10 @@ import { createJobQueue } from './jobs/queue.ts';
 import { recoverOnStartup } from './jobs/recovery.ts';
 import { createLogger } from './logger.ts';
 import { createRecordingsRepository } from './db/recordings-repository.ts';
+import { createSessionsRepository } from './db/sessions-repository.ts';
+import { createUsersRepository } from './db/users-repository.ts';
+import { createAuthService } from './modules/auth/auth-service.ts';
+import { createLoginLimiter } from './modules/auth/login-limiter.ts';
 import { createConversionRunner } from './modules/conversion/conversion-runner.ts';
 import { createConversionService } from './modules/conversion/conversion-service.ts';
 import { createUploadService } from './modules/conversion/upload-service.ts';
@@ -105,6 +109,19 @@ async function main(): Promise<void> {
     );
   }
   const repo = createJobsRepository(db);
+  const users = createUsersRepository(db);
+  // Login obligatorio (D-100). Sin cuentas nadie puede entrar: se avisa cómo crear la primera.
+  const auth = createAuthService({
+    users,
+    sessions: createSessionsRepository(db),
+    limiter: createLoginLimiter(),
+    logger,
+  });
+  if (users.countAdmins() === 0) {
+    logger.warn(
+      'No hay ninguna cuenta de administrador: creala en el servidor con «npm run user:create-admin».',
+    );
+  }
 
   await recoverOnStartup({
     repo,
@@ -204,6 +221,7 @@ async function main(): Promise<void> {
     filesDir: storage.filesDir,
     removeFile: fileOps.removeFile,
     logger,
+    userNames: (ids) => users.namesByIds(ids),
   });
   const gifLimits = {
     ...config.gif,
@@ -282,7 +300,12 @@ async function main(): Promise<void> {
       conversionOptions,
       recordings,
       mail,
+      auth,
     },
+    // En desarrollo la web la sirve Vite (otro puerto) y los POST llegan con su Origin.
+    ...(config.nodeEnv === 'development'
+      ? { extraOrigins: ['http://127.0.0.1:5173', 'http://localhost:5173'] }
+      : {}),
     filesDir: storage.filesDir,
     webDistDir: config.nodeEnv === 'production' ? path.join(repoRoot, 'apps', 'web', 'dist') : null,
     https: config.server.https

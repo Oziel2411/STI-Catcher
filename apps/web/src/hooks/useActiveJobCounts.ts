@@ -10,7 +10,7 @@ const REFRESH_DELAY_MS = 400;
 const EMPTY: ActiveJobsResponse = { download: 0, conversion: 0, recording: 0 };
 
 /**
- * Trabajos de este navegador en cola o en curso, para los contadores de la
+ * Trabajos de esta cuenta en cola o en curso, para los contadores de la
  * barra lateral. El server los cuenta (sabe de quién es cada uno por la
  * cookie); acá se vuelve a pedir cada vez que algún trabajo cambia de estado.
  */

@@ -23,6 +23,7 @@ const record = (patch: Partial<JobRecord> = {}): JobRecord => ({
   error: null,
   clientIp: '192.168.3.40',
   clientId: null,
+  userId: null,
   clientHost: 'PC-SALA',
   parentJobId: null,
   followUpJobId: null,

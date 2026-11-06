@@ -240,7 +240,7 @@ yt-dlp puede recodificar (`--recode-video`), pero no informa el progreso de esa 
 - El nombre de descarga es el título sin caracteres prohibidos en Windows, sin nombres reservados (CON, NUL…), hasta 150 caracteres sin partir emojis, normalizado a NFC.
 - Se adelantó de la Fase 4 porque el criterio de la Fase 3 pide abrir el MP4. La Fase 4 agrega el historial y el reproductor.
 
-### D-041 — Cookie `clientId` con `httpOnly` · Fase 4 · Vigente
+### D-041 — Cookie `clientId` con `httpOnly` · Fase 4 · Reemplazada por D-100
 
 La UI no necesita leer la cookie: cada job llega con `isMine` calculado en el server. La vista "Todos" no muestra IPs (quedan en la DB y el log).
 
@@ -291,7 +291,7 @@ La migración 2 completa los registros que ya existían. Para eso, las migracion
 
 Al listar el historial (una página: hasta 20 `stat`) y al pedir un archivo, si un job `done` ya no tiene su archivo, pasa a `expired` y se publica por SSE. Así un borrado manual o la retención (Fase 7, que también lo marca directamente) nunca dejan un link roto. Es la única transición desde un estado final.
 
-### D-062 — Borrar: solo lo propio, registro y archivo · Fase 4 · Vigente
+### D-062 — Borrar: solo lo propio, registro y archivo · Fase 4 · Vigente (con D-100: propio = de la misma cuenta)
 
 - Solo el navegador que lo creó (cookie), si no **403**. No es seguridad, es prevención de accidentes (SPEC §8).
 - Un trabajo en curso no se borra (**409**): primero hay que cancelarlo.
@@ -573,7 +573,7 @@ Descargar pasa a ser una lista (mockup 2a): se pegan uno o varios links y cada f
 
 Verificado con links reales: 3 de YouTube analizados en paralelo, 2 renglones inválidos y 1 repetido avisados; «Me at the zoo» bajado como MP4 (240p), GIF (2–6 s, 320 px) y WAV; las tres terminaron y cada botón bajó el archivo correcto (video/mp4, image/gif, audio/wav). La lista sobrevivió a una recarga, y un video inexistente quedó como «Falló · El video no existe o fue eliminado».
 
-### D-096 — Contadores de trabajos en la barra lateral · Vigente
+### D-096 — Contadores de trabajos en la barra lateral · Vigente (con D-100: cuenta trabajos de la cuenta)
 
 Cierra lo que había quedado pendiente del handoff (D-090, D-095). Junto a Descargar y Convertir se ve cuántos trabajos **de este navegador** están en cola o en curso; junto a Grabar pantalla, las grabaciones que se están procesando (mientras se graba sigue el punto rojo con el tiempo, D-094).
 
@@ -597,7 +597,7 @@ Para dejar grabando sin estar en la PC: empezar a una hora y cortar después de 
 
 Verificado con una fuente simulada: programada para el minuto siguiente con corte a 1 minuto, esperando en Descargar; empezó a las 15:48:00, cortó sola y el MP4 duró 1:00.
 
-### D-098 — Filtros del historial: fecha, origen y usuario · Vigente
+### D-098 — Filtros del historial: fecha, origen y usuario · Vigente (con D-100: el usuario es la cuenta)
 
 - **Fecha:** «Desde» y «Hasta» (días completos, en la hora de quien mira). El navegador manda el rango ya pasado a ISO (`from` inclusive, `to` exclusive) y el server compara contra `created_at`.
 - **Origen = tipo de trabajo:** descargas, archivos subidos, conversiones o grabaciones (`type=a,b`).
@@ -627,7 +627,7 @@ Verificado con un SMTP falso local con SSL y una CA de prueba: el mail de prueba
 
 ## Usuarios y login
 
-### D-100 — Login con cuentas locales y avisos por usuario · Propuesta (se implementa por etapas)
+### D-100 — Login con cuentas locales y avisos por usuario · Vigente (por etapas: hecha la 1)
 
 Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie anónima (D-041) y el «usuario» del historial era la PC (D-098). El aviso de grabación iba a una lista fija (`MAIL_TO`, D-099). Ahora la app tiene que saber **quién** es cada uno para mandarle el aviso a esa persona y a los compañeros que elija. Esto cambia el alcance de la SPEC («Usuarios, login, roles» estaba fuera de alcance).
 
@@ -664,6 +664,17 @@ Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie a
 3. **Recuperación por mail.** `PUBLIC_URL`, `POST /api/auth/forgot`, `POST /api/auth/reset`, pantallas.
 4. **Avisos por usuario.** `notify_user_ids` al crear trabajos, aviso al terminar o fallar (grabación, descarga, conversión), selector «Avisar por mail» en Grabar, Descargar y Convertir, mail de prueba a quien lo pide, se quita `MAIL_TO`.
 5. **Prueba de punta a punta y despliegue.** Con un SMTP falso local; `DEPLOY.md` (crear el primer admin, `PUBLIC_URL`, quitar `MAIL_TO`), `CLAUDE.md` y SPEC actualizados.
+
+**Implementación (etapa 1):**
+
+- **Toda la API pide sesión** (hook `onRequest` en `http/session.ts`), salvo `POST /api/auth/login`, `POST /api/auth/logout` y `GET /api/health`. La web (index.html y sus archivos) es pública para que cargue la pantalla de ingreso. Error: **401** `UNAUTHENTICATED`.
+- **Origen:** un POST/DELETE con `Origin` de otro sitio recibe **403** `BAD_ORIGIN`. Sin `Origin` (curl, scripts) se acepta: la cookie `SameSite=Lax` ya no viaja en esos pedidos cruzados. En desarrollo se acepta además el origen de Vite (`127.0.0.1:5173`).
+- **La cookie anónima `sti_client` ya no se crea.** Los trabajos y grabaciones nuevos guardan `user_id` (migración 6); `client_id` queda solo en los viejos.
+- **Filtro Usuario:** el valor de una cuenta es `user:<id>` (un nombre de PC o una IP nunca empiezan así) y la etiqueta es su nombre. Los trabajos viejos siguen con la PC o la IP. El nombre de la PC se sigue guardando (va en el log y en el mail).
+- **Primer admin:** `npm run user:create-admin` (con `tsx`, que `npm ci` instala). Pide mail, nombre y contraseña dos veces sin mostrarla; usa el mismo `.env` (o `STI_ENV_FILE`) y se puede correr con el servicio andando (SQLite en WAL). Al arrancar, si no hay ningún admin, el log lo avisa.
+- **Web:** `AuthGate` pide `/api/auth/me` al cargar; sin sesión muestra solo el ingreso. Si la sesión se corta con la app abierta (otra pestaña cerró sesión), el ingreso aparece **encima** de la app sin desmontarla: una grabación en curso no se pierde y, al volver a ingresar con la misma cuenta, sigue. Con otra cuenta, se recarga. Latido a `/api/auth/me` cada 10 min desde el reloj del Worker. Nombre y «Salir» en la barra lateral. Los estilos del ingreso están en `features/auth/auth.css` (aparte de `styles.css`).
+- **Logs:** pino redacta `password`, `token` y `cookie`. Un ingreso fallido registra mail, IP y motivo (`unknown`, `password`, `inactive`); nunca la contraseña.
+- **Tests:** la app de prueba (`makeTestApp`) entra con la cuenta «ana» en cada `inject` (`cookie: ''` = sin sesión) y `loginAs(mail)` da otra. Usa un hash falso por velocidad; scrypt se prueba aparte.
 
 ## Deuda técnica
 

@@ -1,4 +1,4 @@
-/** Cuántos trabajos de este navegador siguen en cola o en curso (nada si son cero). */
+/** Cuántos trabajos de esta cuenta siguen en cola o en curso (nada si son cero). */
 export function NavCount({ value }: { value: number }) {
   if (value === 0) return null;
   return (

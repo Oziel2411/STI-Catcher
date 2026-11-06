@@ -15,6 +15,7 @@
     "dev": "concurrently --kill-others-on-fail --names server,web --prefix-colors blue,magenta \"npm run dev -w @sti-catcher/server\" \"npm run dev -w @sti-catcher/web\"",
     "build": "npm run build -w @sti-catcher/web && npm run build -w @sti-catcher/server",
     "start": "node apps/server/dist/main.js",
+    "user:create-admin": "tsx apps/server/src/cli/create-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

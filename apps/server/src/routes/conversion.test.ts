@@ -13,15 +13,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { MediaInfo } from '../adapters/ffprobe.ts';
 import { flush, makeTestApp, sampleVideoMedia } from '../../test/test-app.ts';
 import { fileOps } from '../adapters/files.ts';
-import { CLIENT_COOKIE } from '../http/client-id.ts';
 import {
   createUploadService,
   describeUploadName,
   UploadError,
 } from '../modules/conversion/upload-service.ts';
 
-const CLIENT = '11111111-1111-4111-8111-111111111111';
-const headers = { cookie: `${CLIENT_COOKIE}=${CLIENT}` };
+// La sesión por defecto de la app de prueba («ana») va sola en cada pedido.
+const headers = {};
 const audioOnly: MediaInfo = {
   ...sampleVideoMedia,
   video: null,
@@ -85,7 +84,7 @@ describe('POST /api/uploads', () => {
       format: 'mov',
       resolution: '1920x1080',
       videoCodec: 'hevc',
-      clientId: CLIENT,
+      userId: testApp.ana.user.id,
     });
     expect(readFileSync(path.join(testApp.filesDir, `${jobId}.mov`))).toEqual(Buffer.alloc(500, 7));
     expect(readdirSync(path.join(testApp.storageDir, 'tmp'))).toEqual([]);
@@ -146,7 +145,7 @@ describe('createUploadService (streaming sin Content-Length)', () => {
       stream: Readable.from(chunks),
       declaredBytes: null,
       fileName: 'x.mp4',
-      requester: { clientId: CLIENT, ip: null },
+      requester: { userId: null, ip: null },
     }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(UploadError);
     expect((error as UploadError).status).toBe(413);
@@ -224,7 +223,7 @@ describe('POST /api/jobs/convert', () => {
       parentJobId: sourceJobId,
       title: 'Video del acto.MOV → MP4',
       params: { sourceJobId, preset: 'mp4', maxHeight: 720 },
-      clientId: CLIENT,
+      userId: testApp.ana.user.id,
     });
 
     // En el historial se ve de qué archivo salió.

@@ -88,6 +88,16 @@ npm ci
 npm run build
 ```
 
+### Crear el primer administrador
+
+Para usar STI-Catcher hay que ingresar con una cuenta (D-100). La primera se crea acá, en el servidor, desde la carpeta del proyecto:
+
+```powershell
+npm run user:create-admin
+```
+
+Pide el mail (es el usuario para ingresar), el nombre que se va a ver en el historial y la contraseña dos veces (al menos 10 caracteres; no se muestra al escribirla). Usa el mismo `.env` y la misma base que el servicio, y se puede correr con el servicio andando. Si el servicio arranca sin ningún administrador, el log lo avisa.
+
 ## 5. Certificado HTTPS
 
 ```powershell
@@ -121,7 +131,7 @@ Si falla al arrancar, el motivo está en `C:\STI-Catcher\logs\service\sti-catche
 
 ## 7. Probar desde el servidor
 
-Abrí `https://<nombre-del-equipo>` en Chrome o Edge. La página **Estado** tiene que mostrar las versiones de yt-dlp, ffmpeg y Deno, y el espacio en disco.
+Abrí `https://<nombre-del-equipo>` en Chrome o Edge. Ingresá con la cuenta del paso 4. La página **Estado** tiene que mostrar las versiones de yt-dlp, ffmpeg y Deno, y el espacio en disco.
 
 ## 8. PCs cliente: instalar la CA
 
@@ -158,6 +168,8 @@ Probá desde una PC cliente: descargar un video, convertir un archivo y grabar l
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | YouTube dejó de funcionar           | `.\scripts\update-ytdlp.ps1`. Es rutina: yt-dlp se actualiza seguido. No hace falta detener el servicio.                                                                                                                                       |
 | Actualizar la app                   | `git pull` (o copiar la versión nueva sin pisar `.env`), `npm ci`, `npm run build`, `Restart-Service sti-catcher`. Si cambiaron las carpetas del `.env`, volvé a correr `install-service.ps1`. La base de datos se actualiza sola al arrancar. |
+| Actualizar a la versión con login   | Una sola vez: después de compilar, `npm run user:create-admin` (paso 4) antes de reiniciar el servicio. Sin cuenta nadie puede ingresar. El historial anterior queda «sin cuenta»: se ve en «Todos» con la PC de siempre.                      |
+| Alguien no puede ingresar           | Tras 5 intentos fallidos la cuenta queda bloqueada 15 minutos (20 desde una misma PC bloquean esa PC). Reiniciar el servicio también lo destraba. El log registra cada ingreso fallido con el mail y la IP.                                    |
 | Cambió la IP o el nombre del equipo | `.\scripts\new-certificate.ps1 -Force`, después `.\scripts\install-service.ps1` (reaplica los permisos de la clave nueva). Las PCs cliente no necesitan nada: la CA es la misma.                                                               |
 | Renovar el certificado              | Vence a los 2 años y 3 meses: igual que el caso anterior. La fecha está en la salida de `new-certificate.ps1`.                                                                                                                                 |
 | Ver si está andando                 | `Get-Service sti-catcher` o la página **Estado**.                                                                                                                                                                                              |

@@ -34,5 +34,13 @@ export function createLogger(config: Pick<Config, 'nodeEnv' | 'logLevel' | 'path
       options: { colorize: true, translateTime: 'SYS:HH:MM:ss', ignore: 'pid,hostname' },
     });
   }
-  return pino({ level: config.logLevel, transport: { targets } });
+  return pino({
+    level: config.logLevel,
+    // Por las dudas: contraseñas, tokens y cookies nunca van al log (D-100).
+    redact: {
+      paths: ['password', '*.password', 'token', '*.token', 'req.headers.cookie', 'headers.cookie'],
+      censor: '[oculto]',
+    },
+    transport: { targets },
+  });
 }

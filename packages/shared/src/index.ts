@@ -1,4 +1,5 @@
 export * from './presets/conversion.ts';
+export * from './schemas/auth.ts';
 export * from './schemas/conversion.ts';
 export * from './schemas/error.ts';
 export * from './schemas/health.ts';

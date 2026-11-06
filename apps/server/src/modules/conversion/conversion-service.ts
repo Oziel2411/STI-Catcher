@@ -171,7 +171,7 @@ export function createConversionService(deps: ConversionServiceDeps) {
         params,
         title: `${record.title ?? 'Archivo'} → ${preset.extension.toUpperCase()}`,
         parentJobId: record.id,
-        clientId: requester.clientId,
+        userId: requester.userId,
         clientIp: requester.ip,
       };
       return deps.queue.enqueue(input);

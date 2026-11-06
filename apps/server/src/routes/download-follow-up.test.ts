@@ -125,13 +125,12 @@ describe('POST /api/jobs/download con `then` (conversión encadenada)', () => {
     );
   });
 
-  it('la conversión queda del mismo navegador que la descarga', async () => {
+  it('la conversión queda a nombre de la misma cuenta que la descarga', async () => {
     const testApp = await app();
     const response = await testApp.app.inject({
       method: 'POST',
       url: '/api/jobs/download',
       payload: { url: 'https://youtu.be/x', then: { preset: 'mp3' } },
-      cookies: { sti_client: 'navegador-1' },
     });
     const { jobId } = createJobResponseSchema.parse(response.json());
     await flush();
@@ -140,7 +139,8 @@ describe('POST /api/jobs/download con `then` (conversión encadenada)', () => {
       expect(testApp.repo.get(jobId)?.followUpJobId).not.toBeNull();
     });
     const followUp = testApp.repo.get(testApp.repo.get(jobId)?.followUpJobId ?? '');
-    expect(followUp?.clientId).toBe(testApp.repo.get(jobId)?.clientId);
+    expect(testApp.repo.get(jobId)?.userId).toBe(testApp.ana.user.id);
+    expect(followUp?.userId).toBe(testApp.ana.user.id);
   });
 
   it('si las opciones no sirven para lo bajado, deja una conversión fallida con el motivo', async () => {

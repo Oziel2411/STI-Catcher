@@ -4,6 +4,7 @@ import { HttpError, parseInput } from '../http/validation.ts';
 import { MediaRequestError } from '../modules/download/download-service.ts';
 import type { DownloadService } from '../modules/download/download-service.ts';
 import { rethrowJobRejection } from './jobs.ts';
+import { requesterOf } from './history.ts';
 
 const toHttpError = (error: unknown): unknown =>
   error instanceof MediaRequestError
@@ -24,7 +25,7 @@ export function registerMediaRoutes(app: FastifyInstance, download: DownloadServ
   app.post('/api/jobs/download', async (request, reply) => {
     const body = parseInput(downloadRequestSchema, request.body ?? {});
     try {
-      const job = await download.enqueue(body, { clientId: request.clientId, ip: request.ip });
+      const job = await download.enqueue(body, requesterOf(request));
       return await reply.status(202).send({ jobId: job.id });
     } catch (error) {
       rethrowJobRejection(error);

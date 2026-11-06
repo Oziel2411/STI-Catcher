@@ -8,11 +8,7 @@ import {
 } from '@sti-catcher/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { flush, makeTestApp } from '../../test/test-app.ts';
-import { CLIENT_COOKIE } from '../http/client-id.ts';
-
-const CLIENT = '11111111-1111-4111-8111-111111111111';
-const OTHER = '22222222-2222-4222-8222-222222222222';
-const cookie = (clientId: string) => ({ cookie: `${CLIENT_COOKIE}=${clientId}` });
+// Los pedidos van con la sesión por defecto de la app de prueba («ana»).
 
 const storageDirs: string[] = [];
 afterEach(() => {
@@ -30,27 +26,28 @@ async function start(testApp: TestApp, mimeType = 'video/webm;codecs=vp9,opus') 
   const response = await testApp.app.inject({
     method: 'POST',
     url: '/api/recordings',
-    headers: cookie(CLIENT),
     payload: { mimeType, fps: 30, title: 'Grabación de prueba' },
   });
   expect(response.statusCode).toBe(201);
   return createRecordingResponseSchema.parse(response.json()).recordingId;
 }
 
-const sendChunk = (testApp: TestApp, id: string, seq: number, body: Buffer, clientId = CLIENT) =>
+const sendChunk = (
+  testApp: TestApp,
+  id: string,
+  seq: number,
+  body: Buffer,
+  headers: Record<string, string> = {},
+) =>
   testApp.app.inject({
     method: 'POST',
     url: `/api/recordings/${id}/chunks?seq=${String(seq)}`,
-    headers: { ...cookie(clientId), 'content-type': 'application/octet-stream' },
+    headers: { ...headers, 'content-type': 'application/octet-stream' },
     payload: body,
   });
 
-const finish = (testApp: TestApp, id: string, clientId = CLIENT) =>
-  testApp.app.inject({
-    method: 'POST',
-    url: `/api/recordings/${id}/finish`,
-    headers: cookie(clientId),
-  });
+const finish = (testApp: TestApp, id: string, headers: Record<string, string> = {}) =>
+  testApp.app.inject({ method: 'POST', url: `/api/recordings/${id}/finish`, headers });
 
 const rawFile = (testApp: TestApp, id: string, ext = 'webm') =>
   path.join(testApp.recordingsDir, `${id}.${ext}`);
@@ -110,10 +107,16 @@ describe('fragmentos', () => {
     expect(existsSync(rawFile(testApp, id))).toBe(false);
   });
 
-  it('solo el navegador que la creó puede agregar fragmentos', async () => {
+  it('solo la cuenta que la creó puede agregar fragmentos', async () => {
     const testApp = await app();
     const id = await start(testApp);
-    const response = await sendChunk(testApp, id, 0, Buffer.alloc(10), OTHER);
+    const response = await sendChunk(
+      testApp,
+      id,
+      0,
+      Buffer.alloc(10),
+      (await testApp.loginAs('beto@capitanes.ar')).headers,
+    );
     expect(response.statusCode).toBe(403);
   });
 
@@ -151,7 +154,7 @@ describe('POST /api/recordings/:id/finish', () => {
     expect(testApp.repo.get(jobId)).toMatchObject({
       type: 'recording',
       title: 'Grabación de prueba',
-      clientId: CLIENT,
+      userId: testApp.ana.user.id,
       params: { recordingId: id, extension: 'webm', fps: 30, estimatedSeconds: 120 },
     });
 

@@ -5,7 +5,9 @@ import type { ApiError, ConversionOptionsResponse } from '@sti-catcher/shared';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
-import { registerClientId } from './http/client-id.ts';
+import { registerSession } from './http/session.ts';
+import type { AuthService } from './modules/auth/auth-service.ts';
+import { registerAuthRoutes } from './routes/auth.ts';
 import { HttpError } from './http/validation.ts';
 import type { JobEventBus } from './jobs/event-bus.ts';
 import type { JobQueue } from './jobs/queue.ts';
@@ -39,6 +41,7 @@ export type AppServices = {
   conversionOptions: ConversionOptionsResponse;
   recordings: RecordingService;
   mail: MailService;
+  auth: AuthService;
 };
 
 export type BuildAppOptions = {
@@ -52,6 +55,8 @@ export type BuildAppOptions = {
   https: { cert: Buffer; key: Buffer } | null;
   /** Intervalo del heartbeat SSE (los tests lo achican). */
   sseHeartbeatMs?: number;
+  /** Orígenes aceptados además del propio (en desarrollo, el de Vite). */
+  extraOrigins?: readonly string[];
 };
 
 const apiError = (
@@ -109,8 +114,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   // reply.download / reply.sendFile (Range, Content-Disposition RFC 5987).
   await app.register(fastifyStatic, { root: options.filesDir, serve: false });
 
-  // Cookie anónima por navegador para "Mis trabajos" (D-041). Secure solo con HTTPS.
-  registerClientId(app, { secure: options.https !== null });
+  // Login obligatorio (D-100): sin sesión, la API responde 401. Secure solo con HTTPS.
+  registerSession(app, {
+    auth: options.services.auth,
+    ...(options.extraOrigins ? { extraOrigins: options.extraOrigins } : {}),
+  });
+  registerAuthRoutes(app, options.services.auth, { secure: options.https !== null });
 
   registerHealthRoutes(app, options.services.health);
   registerJobRoutes(app, options.services.jobs);

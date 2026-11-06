@@ -6,6 +6,7 @@ import {
 import type { Job } from '@sti-catcher/shared';
 import type { FastifyInstance } from 'fastify';
 import { HttpError, parseInput } from '../http/validation.ts';
+import { requireUser } from '../http/session.ts';
 import { JobRejectedError } from '../jobs/errors.ts';
 import type { EnqueueInput, JobQueue } from '../jobs/queue.ts';
 import { selftestTitle } from '../modules/selftest/selftest-runner.ts';
@@ -58,7 +59,7 @@ export function registerJobRoutes(app: FastifyInstance, queue: JobQueue): void {
       params: { durationSeconds },
       title: selftestTitle(durationSeconds),
       clientIp: request.ip,
-      clientId: request.clientId,
+      userId: requireUser(request).id,
     });
     return reply.status(202).send({ jobId: job.id });
   });

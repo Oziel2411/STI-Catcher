@@ -8,6 +8,7 @@ import {
 import type { Icon } from '@phosphor-icons/react';
 import type { ActiveJobsResponse } from '@sti-catcher/shared';
 import { NavLink, Outlet } from 'react-router';
+import { SessionBox } from '../features/auth/SessionBox.tsx';
 import { RecorderProvider } from '../features/recording/RecorderProvider.tsx';
 import { RecordingNavBadge } from '../features/recording/RecordingNavBadge.tsx';
 import { useActiveJobCounts } from '../hooks/useActiveJobCounts.ts';
@@ -64,6 +65,7 @@ export function Layout() {
               ))}
             </ul>
           </nav>
+          <SessionBox />
           <p className="sidebar-footer">Usar solo con contenido propio o con autorización.</p>
         </aside>
         <main className="content">

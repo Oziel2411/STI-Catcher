@@ -17,6 +17,9 @@ import type { JobRecord, JobsRepository } from '../../jobs/types.ts';
 /** Tipos que aparecen en el historial. El selftest no: es una prueba del sistema (D-030). */
 export const HISTORY_TYPES: readonly JobType[] = HISTORY_JOB_TYPES;
 
+/** Prefijo de los valores del filtro Usuario que son una cuenta (ver REQUESTER_SQL). */
+const USER_PREFIX = 'user:';
+
 /** Tipos que se pueden reintentar con los mismos parámetros. */
 const RETRYABLE_TYPES: readonly JobType[] = ['download', 'conversion', 'recording'];
 
@@ -32,16 +35,21 @@ export class HistoryError extends Error {
   }
 }
 
-/** Quién hace el pedido: navegador (cookie anónima) e IP. */
-export type Requester = { clientId: string; ip: string | null };
+/**
+ * Quién hace el pedido: la cuenta (D-100) y la IP. `userId` es null solo para
+ * una conversión encadenada a una descarga de antes del login.
+ */
+export type Requester = { userId: string | null; ip: string | null };
 
 export type HistoryServiceDeps = {
-  repo: Pick<JobsRepository, 'get' | 'listHistory' | 'countActiveByClient' | 'listRequesters'>;
+  repo: Pick<JobsRepository, 'get' | 'listHistory' | 'countActiveByUser' | 'listRequesters'>;
   queue: Pick<JobQueue, 'toApi' | 'expire' | 'remove' | 'enqueue'>;
   storageDir: string;
   filesDir: string;
   removeFile: (filePath: string) => Promise<void>;
   logger: { info: (obj: object, msg: string) => void };
+  /** Nombre de cada cuenta (columna Usuario del historial). */
+  userNames: (ids: readonly string[]) => Map<string, string>;
   /** true si el archivo existe (inyectable para tests). */
   fileExists?: (filePath: string) => Promise<boolean>;
 };
@@ -80,8 +88,8 @@ export type HistoryService = {
  * Historial (SPEC §8): listado paginado con búsqueda, borrado de trabajos
  * propios y reintento de los que fallaron.
  *
- * "Propio" = creado desde el mismo navegador (cookie anónima). No es
- * seguridad, la cookie se puede falsificar: es prevención de accidentes.
+ * "Propio" = creado con la misma cuenta (D-100). Los trabajos de antes del
+ * login no son de nadie: nadie los borra desde la UI.
  */
 export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
   const fileExists = deps.fileExists ?? defaultFileExists;
@@ -106,14 +114,26 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
     return { ...record, status: 'expired' };
   };
 
-  const toItem = (record: JobRecord, requester: Requester): HistoryItem => ({
+  const isOwn = (record: JobRecord, requester: Requester) =>
+    record.userId !== null && record.userId === requester.userId;
+
+  /** Usuario del historial: el nombre de la cuenta; en los viejos, la PC o la IP (D-098). */
+  const requesterLabel = (record: JobRecord, names: Map<string, string>): string | null => {
+    if (record.userId !== null) return names.get(record.userId) ?? 'Cuenta borrada';
+    return record.clientHost ?? (record.clientIp === null ? null : normalizeIp(record.clientIp));
+  };
+
+  const toItem = (
+    record: JobRecord,
+    requester: Requester,
+    names: Map<string, string>,
+  ): HistoryItem => ({
     ...deps.queue.toApi(record),
-    isMine: record.clientId !== null && record.clientId === requester.clientId,
+    isMine: isOwn(record, requester),
     // Una consulta por item con origen (a lo sumo una página): más simple que un JOIN.
     parentTitle:
       record.parentJobId === null ? null : (deps.repo.get(record.parentJobId)?.title ?? null),
-    requester:
-      record.clientHost ?? (record.clientIp === null ? null : normalizeIp(record.clientIp)),
+    requester: requesterLabel(record, names),
   });
 
   const getOrThrow = (id: string): JobRecord => {
@@ -129,7 +149,7 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
       const { records, total } = deps.repo.listHistory({
         types:
           type && type.length > 0 ? type.filter((t) => HISTORY_TYPES.includes(t)) : HISTORY_TYPES,
-        clientId: scope === 'mine' ? requester.clientId : null,
+        userId: scope === 'mine' ? (requester.userId ?? '') : null,
         search: q ?? null,
         from: from ?? null,
         to: to ?? null,
@@ -138,8 +158,11 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
         offset: (page - 1) * pageSize,
       });
       const reconciled = await Promise.all(records.map(reconcile));
+      const names = deps.userNames(
+        reconciled.flatMap((record) => (record.userId === null ? [] : [record.userId])),
+      );
       return {
-        items: reconciled.map((record) => toItem(record, requester)),
+        items: reconciled.map((record) => toItem(record, requester, names)),
         total,
         page,
         pageSize,
@@ -148,12 +171,8 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
 
     async remove(id, requester) {
       const record = getOrThrow(id);
-      if (record.clientId !== requester.clientId) {
-        throw new HistoryError(
-          'NOT_OWNER',
-          'Solo podés borrar los trabajos que creaste desde este navegador.',
-          403,
-        );
+      if (!isOwn(record, requester)) {
+        throw new HistoryError('NOT_OWNER', 'Solo podés borrar los trabajos que creaste vos.', 403);
       }
       if (isActiveStatus(record.status)) {
         throw new HistoryError(
@@ -171,8 +190,9 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
           jobId: id,
           type: record.type,
           title: record.title,
+          deletedByUser: requester.userId,
           deletedByIp: requester.ip,
-          deletedByClient: requester.clientId,
+          createdByUser: record.userId,
           createdByIp: record.clientIp,
         },
         'Trabajo borrado del historial',
@@ -180,17 +200,26 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
     },
 
     requesters() {
+      const rows = deps.repo.listRequesters(HISTORY_TYPES);
+      const names = deps.userNames(
+        rows.flatMap(({ value }) =>
+          value.startsWith(USER_PREFIX) ? [value.slice(USER_PREFIX.length)] : [],
+        ),
+      );
       return {
-        requesters: deps.repo.listRequesters(HISTORY_TYPES).map(({ value, total }) => ({
+        requesters: rows.map(({ value, total }) => ({
           value,
-          label: normalizeIp(value),
+          label: value.startsWith(USER_PREFIX)
+            ? (names.get(value.slice(USER_PREFIX.length)) ?? 'Cuenta borrada')
+            : normalizeIp(value),
           total,
         })),
       };
     },
 
     activeCounts(requester) {
-      const counts = deps.repo.countActiveByClient(requester.clientId);
+      if (requester.userId === null) return { download: 0, conversion: 0, recording: 0 };
+      const counts = deps.repo.countActiveByUser(requester.userId);
       return {
         download: counts.download ?? 0,
         conversion: counts.conversion ?? 0,
@@ -221,7 +250,7 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
         title: record.title,
         sourceUrl: record.sourceUrl,
         parentJobId: record.parentJobId,
-        clientId: requester.clientId,
+        userId: requester.userId,
         clientIp: requester.ip,
       };
       return deps.queue.enqueue(input);
