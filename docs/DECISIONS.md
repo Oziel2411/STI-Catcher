@@ -625,6 +625,17 @@ Pensado para las grabaciones programadas (D-097), que se dejan solas: al termina
 
 Verificado con un SMTP falso local con SSL y una CA de prueba: el mail de prueba y el aviso de una grabación de 5 s llegaron con el remitente, el asunto y los dos destinatarios. Con una contraseña mala, nodemailer devolvió `EAUTH` sin la contraseña en el error, y la contraseña no apareció en los logs. Falta probarlo con la casilla real (lo hace quien cargue la contraseña).
 
+### D-100 — La interfaz se ajusta al ancho del navegador · Vigente
+
+Antes el contenido tenía un tope de 1080 px pegado a la izquierda: en un monitor de 1920 px quedaba más de un tercio vacío y la letra de 13 px se veía chica.
+
+- **Todo el ancho:** `.content` ya no tiene ese tope. Solo en monitores muy anchos (más de 124 rem de contenido, ~2100 px) se centra, para no estirar las tablas de más. Los párrafos de encabezados y tarjetas siguen limitados a 75 caracteres por renglón.
+- **Letra fluida:** los `font-size` pasaron de px a rem, y la base es `clamp(15px, 0.5vw + 8.1px, 17px)`: 15 px hasta ~1366 px de ventana (igual que antes) y 17 px desde ~1780 px. También van en rem los anchos que tienen que crecer con la letra: la barra lateral, la columna de opciones de Grabar, las columnas de Descargar y la grilla de Estado. Los espaciados quedan en px. La lista de Convertir va del 30 % del ancho, entre 330 px y 30 rem.
+- **Columnas fijas en Descargar** (`table-layout: fixed`): antes cambiaban de ancho cuando una fila pasaba de «Listo» a «Descargando». La columna Video se queda con el resto, y los títulos se cortan con «…» al ancho de la columna. Las etiquetas de estado no se parten en dos renglones.
+- **Arreglos de paso:** el texto oculto para lectores de pantalla de la columna Acciones (`position: absolute`) se salía del contenedor con scroll e ensanchaba la página entre 760 y 1100 px. Ahora `.table-wrap` es `position: relative`. En la vista angosta el contenido ocupa el 100 %: con `margin-inline: auto` en una columna flex, se achicaba a lo que medía la tabla.
+
+Verificado midiendo, sin scroll horizontal en las cinco secciones a 2560, 1920, 1366, 1024, 800 y 375 px. A 1920 px la letra base es de 17 px y el contenido ocupa 1695 px (antes 1080).
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

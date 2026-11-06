@@ -31,11 +31,15 @@
   --shadow-sm: 0 0 0 1px var(--border);
   --font: 'Inter', system-ui, sans-serif;
   --mono: 'Cascadia Mono', Consolas, ui-monospace, monospace;
-  --sidebar-w: 196px;
+  --sidebar-w: 13rem;
 
   color-scheme: light dark;
   font-family: var(--font);
-  font-size: 15px;
+  /*
+   * La letra (y lo medido en rem) crece con la ventana: 15px hasta ~1366px de
+   * ancho, 17px desde ~1780px. Así en un monitor grande no queda todo chico.
+   */
+  font-size: clamp(15px, calc(0.5vw + 8.1px), 17px);
   color: var(--text);
   background: var(--bg);
 }
@@ -72,7 +76,7 @@
 body {
   margin: 0;
   background: var(--bg);
-  font-size: 15px;
+  font-size: 1rem;
   line-height: 1.55;
 }
 
@@ -121,7 +125,7 @@ input[type='radio'] {
   align-items: center;
   gap: 9px;
   padding: 0 6px 16px;
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 500;
 }
 
@@ -145,7 +149,7 @@ input[type='radio'] {
   align-items: center;
   gap: 9px;
   padding: 7px 9px;
-  font-size: 13.5px;
+  font-size: 0.9rem;
   color: var(--muted);
   text-decoration: none;
   border-radius: var(--radius);
@@ -171,16 +175,21 @@ input[type='radio'] {
 .sidebar-footer {
   margin: auto 0 0;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: 0.7333rem;
   line-height: 1.4;
   color: var(--faint);
 }
 
+/*
+ * El contenido usa todo el ancho de la ventana. Solo en monitores muy anchos
+ * (más de ~2100px de contenido) se centra, para no estirar las tablas de más.
+ */
 .content {
   flex: 1;
   min-width: 0;
-  max-width: 1080px;
-  padding: 24px 26px 28px;
+  max-width: 124rem;
+  margin-inline: auto;
+  padding: 1.6rem clamp(26px, 2.2vw, 48px) 1.9rem;
 }
 
 /* En pantallas angostas la barra lateral pasa a ser una barra arriba. */
@@ -213,7 +222,10 @@ input[type='radio'] {
     display: none;
   }
 
+  /* En columna, el margen automático achicaría el contenido a lo que mide la tabla. */
   .content {
+    width: 100%;
+    margin-inline: 0;
     padding: 16px;
   }
 }
@@ -221,7 +233,7 @@ input[type='radio'] {
 /* Páginas */
 .page h1 {
   margin: 0 0 4px;
-  font-size: 24px;
+  font-size: 1.6rem;
   line-height: 1.12;
   letter-spacing: -0.015em;
 }
@@ -237,7 +249,7 @@ input[type='radio'] {
 
 .page-header p {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 0.9rem;
 }
 
 .muted {
@@ -245,7 +257,7 @@ input[type='radio'] {
 }
 
 .small {
-  font-size: 12.5px;
+  font-size: 0.8333rem;
 }
 
 .text-error {
@@ -266,15 +278,21 @@ input[type='radio'] {
 
 .card h2 {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 1rem;
 }
 
 .card p {
   margin: 4px 0;
 }
 
+/* Los párrafos no se estiran de lado a lado en pantallas anchas. */
+.page-header p,
+.card > p {
+  max-width: 75ch;
+}
+
 .kicker {
-  font-size: 10.5px;
+  font-size: 0.7rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -282,7 +300,7 @@ input[type='radio'] {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: 16px;
 }
 
@@ -307,7 +325,7 @@ input[type='radio'] {
   gap: 6px;
   padding: 5.6px 10px;
   font: inherit;
-  font-size: 14px;
+  font-size: 0.9333rem;
   font-weight: 500;
   line-height: 1.2;
   color: var(--accent);
@@ -390,7 +408,7 @@ input[type='radio'] {
 .alert {
   margin-bottom: 16px;
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: 0.8667rem;
   border-radius: var(--radius);
 }
 
@@ -420,7 +438,7 @@ input[type='radio'] {
 /* Tabla: la línea de cada fila se desvanece en los extremos. */
 .table {
   width: 100%;
-  font-size: 13px;
+  font-size: 0.8667rem;
   border-collapse: collapse;
 }
 
@@ -431,7 +449,7 @@ input[type='radio'] {
 }
 
 .table thead th {
-  font-size: 11px;
+  font-size: 0.7333rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -471,7 +489,8 @@ input[type='radio'] {
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  font-size: 11px;
+  font-size: 0.7333rem;
+  white-space: nowrap;
   letter-spacing: 0.02em;
   color: var(--text);
   background: var(--surface-2);
@@ -564,7 +583,7 @@ input[type='radio'] {
   justify-content: center;
   gap: 6px;
   padding: 7px 12px;
-  font-size: 13px;
+  font-size: 0.8667rem;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -625,11 +644,11 @@ input[type='radio'] {
 }
 
 .choice-card-title {
-  font-size: 13.5px;
+  font-size: 0.9rem;
 }
 
 .choice-card-hint {
-  font-size: 11.5px;
+  font-size: 0.7667rem;
   color: var(--muted);
 }
 
@@ -646,7 +665,7 @@ input[type='radio'] {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12.5px;
+  font-size: 0.8333rem;
   color: var(--muted);
 }
 
@@ -657,7 +676,7 @@ input[type='radio'] {
   min-height: 34px;
   padding: 6px 10px;
   font: inherit;
-  font-size: 14px;
+  font-size: 0.9333rem;
   color: var(--text);
   caret-color: var(--accent);
   background: var(--surface);
@@ -704,7 +723,7 @@ input[type='radio'] {
 
 .options legend {
   margin-bottom: 6px;
-  font-size: 10.5px;
+  font-size: 0.7rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -715,7 +734,7 @@ input[type='radio'] {
   gap: 8px;
   align-items: baseline;
   margin: 6px 0;
-  font-size: 13.5px;
+  font-size: 0.9rem;
   cursor: pointer;
 }
 
@@ -754,7 +773,7 @@ input[type='radio'] {
 .tab {
   padding: 7px 12px;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8667rem;
   color: var(--text);
   background: none;
   border: none;
@@ -815,7 +834,7 @@ input[type='radio'] {
 }
 
 .history-title {
-  font-size: 13.5px;
+  font-size: 0.9rem;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -828,7 +847,7 @@ input[type='radio'] {
 }
 
 .history-actions .button {
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 
 .player {
@@ -853,7 +872,7 @@ input[type='radio'] {
   justify-content: center;
   gap: 16px;
   margin: 16px 0;
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 
 /* Convertir */
@@ -892,7 +911,7 @@ input[type='radio'] {
 
 .preset-group-title {
   margin: 8px 0 2px;
-  font-size: 10.5px;
+  font-size: 0.7rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -908,7 +927,7 @@ input[type='radio'] {
   align-items: center;
   gap: 10px;
   margin: 12px 0;
-  font-size: 13.5px;
+  font-size: 0.9rem;
 }
 
 .recording-dot {
@@ -934,7 +953,7 @@ input[type='radio'] {
 /* Grabar (2g): fuente + vista previa a la izquierda, opciones a la derecha. */
 .recorder {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 21.5rem;
   gap: 16px;
   align-items: start;
 }
@@ -1016,7 +1035,7 @@ input[type='radio'] {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 0.8333rem;
   color: var(--faint);
 }
 
@@ -1043,20 +1062,20 @@ input[type='radio'] {
 .preview-bar-title {
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 0.8667rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .preview-bar-meta {
-  font-size: 11.5px;
+  font-size: 0.7667rem;
   color: var(--muted);
 }
 
 .preview-change {
   margin-left: auto;
   padding: 4px 10px;
-  font-size: 12.5px;
+  font-size: 0.8333rem;
 }
 
 .help-line {
@@ -1079,7 +1098,7 @@ input[type='radio'] {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  font-size: 13.5px;
+  font-size: 0.9rem;
   cursor: pointer;
 }
 
@@ -1090,7 +1109,7 @@ input[type='radio'] {
 
 .check-hint {
   display: block;
-  font-size: 11.5px;
+  font-size: 0.7667rem;
   color: var(--muted);
 }
 
@@ -1120,7 +1139,7 @@ input[type='radio'] {
 }
 
 .recorder-options .button-block {
-  font-size: 14.5px;
+  font-size: 0.9667rem;
 }
 
 .rec-dot {
@@ -1176,12 +1195,12 @@ input[type='radio'] {
 }
 
 .dropzone-title {
-  font-size: 14px;
+  font-size: 0.9333rem;
 }
 
 .batch {
   display: grid;
-  grid-template-columns: 330px minmax(0, 1fr);
+  grid-template-columns: clamp(330px, 30%, 30rem) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -1248,7 +1267,7 @@ input[type='radio'] {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-size: 13.5px;
+  font-size: 0.9rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1258,7 +1277,7 @@ input[type='radio'] {
 }
 
 .batch-item-meta {
-  font-size: 11.5px;
+  font-size: 0.7667rem;
   color: var(--muted);
 }
 
@@ -1269,7 +1288,7 @@ input[type='radio'] {
 .batch-item-download {
   display: inline-block;
   margin: -4px 12px 8px;
-  font-size: 12px;
+  font-size: 0.8rem;
   color: var(--accent);
 }
 
@@ -1292,7 +1311,7 @@ input[type='radio'] {
 
 .detail-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 1.1333rem;
   overflow-wrap: anywhere;
 }
 
@@ -1323,7 +1342,7 @@ input[type='radio'] {
 
 .preset-more {
   align-self: flex-start;
-  font-size: 12.5px;
+  font-size: 0.8333rem;
 }
 
 .detail-row {
@@ -1334,7 +1353,7 @@ input[type='radio'] {
 }
 
 .field-label {
-  font-size: 12.5px;
+  font-size: 0.8333rem;
   color: var(--muted);
 }
 
@@ -1372,7 +1391,7 @@ input[type='radio'] {
   align-items: center;
   gap: 5px;
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 0.7667rem;
   font-variant-numeric: tabular-nums;
   color: var(--rec);
 }
@@ -1398,7 +1417,7 @@ input[type='radio'] {
 .links-form .field textarea.links-input {
   min-height: 62px;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 0.8333rem;
   line-height: 1.6;
   resize: vertical;
 }
@@ -1428,7 +1447,7 @@ input[type='radio'] {
 
 .batch-toolbar {
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 
 .toolbar-divider {
@@ -1453,7 +1472,7 @@ input[type='radio'] {
   max-width: 100%;
   padding: 0 8px;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8667rem;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--divider);
@@ -1465,11 +1484,15 @@ input[type='radio'] {
 }
 
 .table-wrap {
+  /* relative: los textos ocultos (position: absolute) no se salen del scroll. */
+  position: relative;
   overflow-x: auto;
 }
 
 .links-table {
-  min-width: 860px;
+  min-width: 58rem;
+  /* Anchos fijos: las columnas no saltan cuando una fila cambia de estado. */
+  table-layout: fixed;
 }
 
 .links-table td {
@@ -1477,23 +1500,23 @@ input[type='radio'] {
 }
 
 .links-table .col-check {
-  width: 28px;
+  width: 2.4rem;
 }
 
 .links-table .col-format {
-  width: 150px;
+  width: 10rem;
 }
 
 .links-table .col-quality {
-  width: 210px;
+  width: 15rem;
 }
 
 .links-table .col-state {
-  width: 240px;
+  width: 17rem;
 }
 
 .links-table .col-actions {
-  width: 96px;
+  width: 7.8rem;
   text-align: right;
 }
 
@@ -1554,29 +1577,29 @@ input[type='radio'] {
 }
 
 .video-title {
-  max-width: 300px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .video-meta {
-  font-size: 11.5px;
+  font-size: 0.7667rem;
   color: var(--muted);
 }
 
 .video-url {
-  max-width: 300px;
+  max-width: 100%;
   overflow: hidden;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 0.7667rem;
   color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .video-error {
-  font-size: 11.5px;
+  font-size: 0.7667rem;
   color: var(--error);
 }
 
@@ -1626,7 +1649,7 @@ input[type='radio'] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 0.8333rem;
   color: var(--muted);
 }
 
@@ -1635,7 +1658,7 @@ input[type='radio'] {
   height: 30px;
   padding: 0 8px;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8667rem;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--divider);
@@ -1676,7 +1699,7 @@ input[type='radio'] {
 }
 
 .col-actions .button-ghost {
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 
 .col-actions .row-cancel {
@@ -1686,7 +1709,7 @@ input[type='radio'] {
 /* Trabajos propios en curso, junto a cada sección (D-096). */
 .nav-count {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 0.7333rem;
   font-variant-numeric: tabular-nums;
   color: var(--accent);
 }
@@ -1711,7 +1734,7 @@ input[type='radio'] {
   float: left;
   width: 100%;
   padding: 0;
-  font-size: 10.5px;
+  font-size: 0.7rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1724,7 +1747,7 @@ input[type='radio'] {
   margin-top: 4px;
   padding: 4px 8px;
   font: inherit;
-  font-size: 14px;
+  font-size: 0.9333rem;
   color: var(--text);
   color-scheme: light dark;
   background: var(--surface);
@@ -1755,7 +1778,7 @@ input[type='radio'] {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12.5px;
+  font-size: 0.8333rem;
   color: var(--muted);
 }
 
@@ -1799,7 +1822,7 @@ input[type='radio'] {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 
@@ -1807,7 +1830,7 @@ input[type='radio'] {
   height: 30px;
   padding: 0 8px;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8667rem;
   color: var(--text);
   color-scheme: light dark;
   background: var(--surface);
