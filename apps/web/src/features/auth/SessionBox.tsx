@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router';
 import { useSession } from './session-context.ts';
 
-/** Cuenta actual, «Mi cuenta», «Usuarios» (admins) y «Salir», en la barra lateral (D-100). */
+/** Cuenta actual, «Mi cuenta», «Usuarios» (admins) y «Salir», en la barra lateral (D-104). */
 export function SessionBox() {
   const { user, logout } = useSession();
   return (

@@ -36,7 +36,7 @@ export class HistoryError extends Error {
 }
 
 /**
- * Quién hace el pedido: la cuenta (D-100) y la IP. `userId` es null solo para
+ * Quién hace el pedido: la cuenta (D-104) y la IP. `userId` es null solo para
  * una conversión encadenada a una descarga de antes del login.
  */
 export type Requester = { userId: string | null; ip: string | null };
@@ -88,7 +88,7 @@ export type HistoryService = {
  * Historial (SPEC §8): listado paginado con búsqueda, borrado de trabajos
  * propios y reintento de los que fallaron.
  *
- * "Propio" = creado con la misma cuenta (D-100). Los trabajos de antes del
+ * "Propio" = creado con la misma cuenta (D-104). Los trabajos de antes del
  * login no son de nadie: nadie los borra desde la UI.
  */
 export function createHistoryService(deps: HistoryServiceDeps): HistoryService {

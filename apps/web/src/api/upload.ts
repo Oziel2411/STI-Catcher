@@ -1,5 +1,5 @@
 import { apiErrorSchema, uploadResponseSchema } from '@sti-catcher/shared';
-import { ApiClientError } from './client.ts';
+import { ApiClientError, httpErrorMessage } from './client.ts';
 
 export type UploadProgress = { loadedBytes: number; totalBytes: number };
 
@@ -44,7 +44,7 @@ export function uploadFile(
         else
           reject(
             new ApiClientError(
-              'Respuesta inesperada del servidor.',
+              'El servidor respondió algo inesperado. Recargá la página: puede haberse actualizado.',
               'INVALID_RESPONSE',
               xhr.status,
             ),
@@ -55,11 +55,7 @@ export function uploadFile(
       reject(
         error.success
           ? new ApiClientError(error.data.error.message, error.data.error.code, xhr.status)
-          : new ApiClientError(
-              `El servidor respondió con un error (${String(xhr.status)}).`,
-              'HTTP_ERROR',
-              xhr.status,
-            ),
+          : new ApiClientError(httpErrorMessage(xhr.status), 'HTTP_ERROR', xhr.status),
       );
     });
     xhr.addEventListener('error', () => {

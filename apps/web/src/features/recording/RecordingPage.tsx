@@ -1,4 +1,5 @@
 import {
+  RecordIcon,
   AppWindowIcon,
   BrowserIcon,
   MicrophoneIcon,
@@ -13,6 +14,7 @@ import type { Job } from '@sti-catcher/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { JobProgress } from '../../components/JobProgress.tsx';
+import { PageTitle } from '../../components/PageTitle.tsx';
 import { useTrackedJob } from '../../hooks/useTrackedJob.ts';
 import { formatBytes, formatDuration } from '../../lib/format.ts';
 import {
@@ -67,12 +69,9 @@ export function RecordingPage() {
   return (
     <section className="page">
       <header className="page-header">
-        <div>
-          <h1>Grabar pantalla</h1>
-          <p className="muted">
-            Una pantalla, una ventana o una pestaña, con el sonido del sistema y el micrófono.
-          </p>
-        </div>
+        <PageTitle icon={RecordIcon} title="Grabar pantalla">
+          Una pantalla, una ventana o una pestaña, con el sonido del sistema y el micrófono.
+        </PageTitle>
       </header>
       {support.ok ? <Recorder /> : <Unsupported support={support} />}
     </section>

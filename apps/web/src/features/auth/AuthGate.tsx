@@ -12,7 +12,7 @@ import { SessionContext } from './session-context.ts';
 import './auth.css';
 
 /**
- * Latido: el server corta la sesión tras 12 h sin uso (D-100). Con la pestaña
+ * Latido: el server corta la sesión tras 12 h sin uso (D-104). Con la pestaña
  * abierta se mantiene viva aunque nadie la toque (p. ej. esperando una
  * grabación programada). Sale del reloj del Worker: en segundo plano Chrome
  * frena los timers de la página (D-097).
@@ -43,7 +43,7 @@ const signedIn = (previous: State, user: SessionUser): SignedIn => ({
 });
 
 /**
- * Login obligatorio (D-100). Sin sesión solo se ve la pantalla de ingreso; con
+ * Login obligatorio (D-104). Sin sesión solo se ve la pantalla de ingreso; con
  * una contraseña provisoria, solo la pantalla para cambiarla.
  *
  * Si la sesión se corta con la app abierta (se cerró en otra pestaña, o la

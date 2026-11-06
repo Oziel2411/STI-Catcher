@@ -36,7 +36,7 @@ export function createLogger(config: Pick<Config, 'nodeEnv' | 'logLevel' | 'path
   }
   return pino({
     level: config.logLevel,
-    // Por las dudas: contraseñas, tokens y cookies nunca van al log (D-100).
+    // Por las dudas: contraseñas, tokens y cookies nunca van al log (D-104).
     redact: {
       paths: ['password', '*.password', 'token', '*.token', 'req.headers.cookie', 'headers.cookie'],
       censor: '[oculto]',

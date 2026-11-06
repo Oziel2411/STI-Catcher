@@ -26,7 +26,7 @@ export type AuthServiceDeps = {
     info: (obj: object, msg: string) => void;
     warn: (obj: object, msg: string) => void;
   };
-  /** Sin actividad por más de esto, la sesión se corta (D-100: 12 h). */
+  /** Sin actividad por más de esto, la sesión se corta (D-104: 12 h). */
   idleMs?: number;
   now?: () => Date;
   /** Inyectables para que los tests no paguen el costo de scrypt. */
@@ -73,7 +73,7 @@ export function assertPasswordStrength(password: string): void {
 }
 
 /**
- * Cuentas y sesiones (D-100). No conoce Fastify: las rutas leen la cookie y
+ * Cuentas y sesiones (D-104). No conoce Fastify: las rutas leen la cookie y
  * le pasan el token.
  */
 export function createAuthService(deps: AuthServiceDeps) {

@@ -113,7 +113,7 @@ async function main(): Promise<void> {
   }
   const repo = createJobsRepository(db);
   const users = createUsersRepository(db);
-  // Login obligatorio (D-100). Sin cuentas nadie puede entrar: se avisa cómo crear la primera.
+  // Login obligatorio (D-104). Sin cuentas nadie puede entrar: se avisa cómo crear la primera.
   const sessions = createSessionsRepository(db);
   const loginLimiter = createLoginLimiter();
   const auth = createAuthService({ users, sessions, limiter: loginLimiter, logger });
@@ -246,7 +246,7 @@ async function main(): Promise<void> {
   const followUps = createFollowUps({ conversion, queue, repo, logger });
   // Aviso por mail al terminar una grabación (D-099). Sin SMTP o sin MAIL_TO, nada.
   const sendMail = config.mail ? createSmtpMailer(config.mail) : null;
-  // Recuperar la contraseña por mail (D-100): hace falta SMTP y PUBLIC_URL.
+  // Recuperar la contraseña por mail (D-104): hace falta SMTP y PUBLIC_URL.
   const passwordReset = createPasswordReset({
     users,
     sessions,

@@ -11,7 +11,7 @@ export type RecordingSession = {
   fps: number;
   title: string;
   clientId: string | null;
-  /** Cuenta que la empezó (D-100): solo ella manda fragmentos y la termina. */
+  /** Cuenta que la empezó (D-104): solo ella manda fragmentos y la termina. */
   userId: string | null;
   clientIp: string | null;
   /** Próximo número de fragmento esperado. */

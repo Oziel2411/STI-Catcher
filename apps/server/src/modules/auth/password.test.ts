@@ -7,7 +7,7 @@ import { DEFAULT_SCRYPT_PARAMS, hashPassword, verifyPassword } from './password.
 const fast = { log2N: 10, r: 8, p: 1 };
 
 describe('hashPassword / verifyPassword', () => {
-  it('parámetros por defecto: N = 2^15, r = 8, p = 1 (D-100)', () => {
+  it('parámetros por defecto: N = 2^15, r = 8, p = 1 (D-104)', () => {
     expect(DEFAULT_SCRYPT_PARAMS).toEqual({ log2N: 15, r: 8, p: 1 });
   });
 

@@ -19,7 +19,7 @@ const errorMessage = (error: unknown) =>
 type Notice = { ok: boolean; text: string };
 
 /**
- * Administración de cuentas (D-100), solo para administradores: crear,
+ * Administración de cuentas (D-104), solo para administradores: crear,
  * desactivar, cambiar rol o nombre y poner una contraseña provisoria.
  */
 export function UsersPage() {

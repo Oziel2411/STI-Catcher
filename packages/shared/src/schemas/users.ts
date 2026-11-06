@@ -20,7 +20,7 @@ export const newPasswordSchema = z
     `La contraseña puede tener hasta ${String(PASSWORD_MAX_LENGTH)} caracteres.`,
   );
 
-/** Una cuenta vista por un administrador (D-100). Nunca incluye el hash. */
+/** Una cuenta vista por un administrador (D-104). Nunca incluye el hash. */
 export const userSummarySchema = z.object({
   id: z.string(),
   email: z.string(),

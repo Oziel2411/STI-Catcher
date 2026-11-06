@@ -14,7 +14,7 @@ afterEach(async () => {
   for (const app of apps.splice(0)) await app.close();
 });
 
-/** Cookie de la sesión de la app que está escuchando (login obligatorio, D-100). */
+/** Cookie de la sesión de la app que está escuchando (login obligatorio, D-104). */
 let session: Record<string, string> = {};
 const authFetch = (url: string, init: RequestInit = {}) =>
   fetch(url, { ...init, headers: { ...session, ...(init.headers as Record<string, string>) } });
@@ -158,7 +158,7 @@ describe('GET /api/events', () => {
 });
 
 describe('SSE sin sesión', () => {
-  it('401 sin cookie de sesión (login obligatorio, D-100)', async () => {
+  it('401 sin cookie de sesión (login obligatorio, D-104)', async () => {
     const { base } = await listen();
     const response = await fetch(`${base}/api/events`);
     expect(response.status).toBe(401);

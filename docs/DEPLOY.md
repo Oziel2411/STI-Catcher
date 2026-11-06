@@ -83,7 +83,7 @@ Reiniciá el servicio y probalo en **Estado → Aviso por mail → Mandar mail d
 
 ### Recuperar la contraseña por mail (opcional)
 
-Con el mail configurado, agregá la dirección con la que los compañeros entran a la app (la misma del certificado, paso 5). Va en el link que reciben para elegir una contraseña nueva (D-100):
+Con el mail configurado, agregá la dirección con la que los compañeros entran a la app (la misma del certificado, paso 5). Va en el link que reciben para elegir una contraseña nueva (D-104):
 
 ```ini
 PUBLIC_URL=https://192.168.3.115:3000
@@ -100,7 +100,7 @@ npm run build
 
 ### Crear el primer administrador
 
-Para usar STI-Catcher hay que ingresar con una cuenta (D-100). La primera se crea acá, en el servidor, desde la carpeta del proyecto:
+Para usar STI-Catcher hay que ingresar con una cuenta (D-104). La primera se crea acá, en el servidor, desde la carpeta del proyecto:
 
 ```powershell
 npm run user:create-admin

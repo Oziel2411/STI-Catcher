@@ -24,7 +24,7 @@ export type JobRecord = {
   clientIp: string | null;
   /** Cookie anónima de antes del login (D-041). Los trabajos nuevos no la tienen. */
   clientId: string | null;
-  /** Cuenta que lo pidió (D-100). null en los trabajos de antes del login. */
+  /** Cuenta que lo pidió (D-104). null en los trabajos de antes del login. */
   userId: string | null;
   /** Nombre de la PC (D-098); null mientras se resuelve o si no se encontró. */
   clientHost: string | null;

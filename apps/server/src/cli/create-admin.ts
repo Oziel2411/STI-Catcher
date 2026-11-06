@@ -1,5 +1,5 @@
 /**
- * Crea una cuenta de administrador (D-100). Se corre en el servidor, no desde
+ * Crea una cuenta de administrador (D-104). Se corre en el servidor, no desde
  * la web: `npm run user:create-admin`. Pide mail, nombre y contraseña (la
  * contraseña no se muestra al escribirla y nunca se guarda en texto).
  *

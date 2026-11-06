@@ -5,7 +5,7 @@ import { HttpError } from './validation.ts';
 
 declare module 'fastify' {
   interface FastifyRequest {
-    /** La cuenta de la sesión (D-100). null solo en las rutas públicas. */
+    /** La cuenta de la sesión (D-104). null solo en las rutas públicas. */
     user: UserRecord | null;
     /** SHA-256 del token de la sesión actual. */
     sessionTokenHash: string | null;
@@ -24,7 +24,7 @@ const PUBLIC_API = new Set([
   '/api/health',
 ]);
 /**
- * Con una contraseña provisoria solo se puede cambiarla (D-100): el resto de
+ * Con una contraseña provisoria solo se puede cambiarla (D-104): el resto de
  * la API responde 403 `PASSWORD_CHANGE_REQUIRED` hasta que se cambie.
  */
 const ALLOWED_WITH_PROVISIONAL_PASSWORD = new Set([
@@ -52,7 +52,7 @@ export function readCookie(cookieHeader: string | undefined, name: string): stri
 }
 
 /**
- * Cookie de sesión (D-100):
+ * Cookie de sesión (D-104):
  * - sin Max-Age: dura hasta cerrar el navegador (el server además corta a las 12 h sin uso);
  * - HttpOnly: JavaScript no la lee;
  * - SameSite=Lax: no viaja en pedidos POST que otro sitio dispare contra la app;
@@ -88,7 +88,7 @@ export type SessionOptions = {
 };
 
 /**
- * Login obligatorio (D-100): toda la API, salvo `PUBLIC_API`, responde 401
+ * Login obligatorio (D-104): toda la API, salvo `PUBLIC_API`, responde 401
  * sin una sesión válida. La web (index.html y sus archivos) es pública: la
  * pantalla de ingreso tiene que poder cargarse.
  *

@@ -284,7 +284,7 @@ describe('historial (repositorio)', () => {
     expect(list({ requester: 'PC-SALA' })).toEqual([id(13), id(11)]);
     expect(list({ requester: '192.168.3.41' })).toEqual([id(12)]);
 
-    // Los de una cuenta (D-100) se identifican por la cuenta, no por la PC.
+    // Los de una cuenta (D-104) se identifican por la cuenta, no por la PC.
     expect(list({ requester: `user:${USER_A}` })).toEqual([id(3), id(1)]);
 
     expect(repo.listRequesters(types)).toEqual([

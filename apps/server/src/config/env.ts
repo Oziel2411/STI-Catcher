@@ -103,7 +103,7 @@ const rawEnvSchema = z
     MAIL_FROM: optionalText,
     MAIL_TO: emailList,
 
-    // Dirección con la que los compañeros entran (D-100): va en el link para
+    // Dirección con la que los compañeros entran (D-104): va en el link para
     // recuperar la contraseña. Sin ella (o sin SMTP) esa opción no aparece.
     PUBLIC_URL: z.preprocess(
       emptyToUndefined,
@@ -185,7 +185,7 @@ export type Config = {
   recording: {
     idleMinutes: number;
   };
-  /** Dirección pública de la app, sin / al final. null si no está (D-100). */
+  /** Dirección pública de la app, sin / al final. null si no está (D-104). */
   publicUrl: string | null;
   /** null si falta SMTP_HOST. Ver D-099. */
   mail: {

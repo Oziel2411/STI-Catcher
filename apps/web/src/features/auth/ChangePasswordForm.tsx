@@ -15,7 +15,7 @@ type Props = {
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'No se pudo cambiar la contraseña.';
 
-/** Cambiar la propia contraseña: la actual y la nueva dos veces (D-100). */
+/** Cambiar la propia contraseña: la actual y la nueva dos veces (D-104). */
 export function ChangePasswordForm({
   onChanged,
   submitLabel = 'Cambiar contraseña',

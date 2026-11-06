@@ -36,7 +36,7 @@ export type PasswordResetDeps = {
   hash?: (password: string) => Promise<string>;
   /** Si estaba bloqueada por intentos fallidos, se destraba al elegir la contraseña nueva. */
   limiter?: Pick<LoginLimiter, 'recordSuccess'>;
-  /** Cuánto vale un link (D-100: 1 hora). */
+  /** Cuánto vale un link (D-104: 1 hora). */
   ttlMs?: number;
 };
 
@@ -69,7 +69,7 @@ export function resetMessage(to: string, name: string, link: string): MailMessag
 }
 
 /**
- * Recuperar la contraseña por mail (D-100, etapa 3).
+ * Recuperar la contraseña por mail (D-104, etapa 3).
  *
  * - Pedir un link responde siempre lo mismo, exista o no la cuenta, y el mail
  *   se manda en segundo plano: ni el texto ni el tiempo de respuesta dicen

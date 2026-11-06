@@ -117,7 +117,7 @@ export const migrations: readonly Migration[] = [
     version: 6,
     name: 'create-users-and-sessions',
     sql: /* sql */ `
-      -- Cuentas locales (D-100). El mail es el usuario: se guarda en minúsculas.
+      -- Cuentas locales (D-104). El mail es el usuario: se guarda en minúsculas.
       CREATE TABLE users (
         id                   TEXT PRIMARY KEY,
         email                TEXT NOT NULL UNIQUE,
@@ -153,7 +153,7 @@ export const migrations: readonly Migration[] = [
     version: 7,
     name: 'create-password-resets',
     sql: /* sql */ `
-      -- Links para recuperar la contraseña por mail (D-100). Como las sesiones,
+      -- Links para recuperar la contraseña por mail (D-104). Como las sesiones,
       -- se guarda el SHA-256 del token, nunca el token.
       CREATE TABLE password_resets (
         token_hash TEXT PRIMARY KEY,

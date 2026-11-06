@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-/** Rol de una cuenta (D-100): el admin solo administra cuentas. */
+/** Rol de una cuenta (D-104): el admin solo administra cuentas. */
 export const userRoleSchema = z.enum(['admin', 'user']);
 export type UserRole = z.infer<typeof userRoleSchema>;
 
-/** Largo mínimo de una contraseña (D-100). */
+/** Largo mínimo de una contraseña (D-104). */
 export const PASSWORD_MIN_LENGTH = 10;
 /** Tope: scrypt procesa todo el texto; nadie necesita más. */
 export const PASSWORD_MAX_LENGTH = 200;

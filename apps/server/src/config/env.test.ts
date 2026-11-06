@@ -168,7 +168,7 @@ describe('mail (D-099)', () => {
   });
 });
 
-describe('PUBLIC_URL (D-100)', () => {
+describe('PUBLIC_URL (D-104)', () => {
   it('opcional; sin la / del final', () => {
     expect(parseConfig(minimal, BASE).publicUrl).toBeNull();
     expect(

@@ -1,5 +1,5 @@
 /**
- * Límite de intentos de ingreso (D-100), en memoria (un solo proceso, D-031):
+ * Límite de intentos de ingreso (D-104), en memoria (un solo proceso, D-031):
  * - por cuenta: 5 fallidos seguidos la bloquean 15 minutos. Se cuenta por el
  *   mail escrito, exista o no, para no revelar qué mails tienen cuenta;
  * - por IP: 20 fallidos en 15 minutos bloquean la IP 15 minutos.

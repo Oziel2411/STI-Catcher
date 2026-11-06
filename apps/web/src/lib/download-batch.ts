@@ -410,3 +410,19 @@ export function restoreLinks(raw: string | null): DownloadItem[] {
   if (!parsed.success) return [];
   return parsed.data.map((stored) => ({ ...stored, job: null, followUp: null }));
 }
+
+/** Botón principal de la barra: sin el «0» cuando no hay nada para descargar. */
+export function startButtonLabel(targets: number, submitting: boolean): string {
+  if (submitting) return 'Creando…';
+  if (targets === 0) return 'Descargar';
+  return `Descargar ${String(targets)} ${targets === 1 ? 'listo' : 'listos'}`;
+}
+
+/** «Aplicar a N» solo cuando hay tildados donde aplicarlo. */
+export function applyButtonLabel(checked: number): string {
+  return checked === 0 ? 'Aplicar' : `Aplicar a ${String(checked)}`;
+}
+
+/** Nombre de la fila para los lectores de pantalla: el título, o el link mientras se analiza. */
+export const rowName = (item: Pick<DownloadItem, 'url' | 'probe'>): string =>
+  item.probe?.title ?? item.url;

@@ -7,7 +7,7 @@ import type {
 } from '@sti-catcher/shared';
 import { apiGet, apiPatch, apiPost } from './client.ts';
 
-/** Administración de cuentas (solo admins, D-100). */
+/** Administración de cuentas (solo admins, D-104). */
 export const listUsers = async (signal?: AbortSignal): Promise<UserSummary[]> =>
   (await apiGet('/api/users', usersResponseSchema, signal)).users;
 

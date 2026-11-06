@@ -7,7 +7,7 @@ type Props = {
   onLogout: () => void;
 };
 
-/** Con una contraseña provisoria hay que cambiarla antes de usar la app (D-100). */
+/** Con una contraseña provisoria hay que cambiarla antes de usar la app (D-104). */
 export function ForcedPasswordChange({ onChanged, onLogout }: Props) {
   return (
     <main className="login">

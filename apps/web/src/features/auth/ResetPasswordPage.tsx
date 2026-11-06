@@ -25,7 +25,7 @@ function takeTokenFromUrl(): string | null {
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'No se pudo cambiar la contraseña.';
 
-/** Elegir una contraseña nueva con el link del mail (D-100). */
+/** Elegir una contraseña nueva con el link del mail (D-104). */
 export function ResetPasswordPage() {
   const [token] = useState(takeTokenFromUrl);
   const [password, setPassword] = useState('');

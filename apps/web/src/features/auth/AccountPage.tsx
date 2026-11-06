@@ -8,7 +8,7 @@ import './auth.css';
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'No se pudo guardar.';
 
-/** Mi cuenta (D-100): nombre que se ve en el historial y cambio de contraseña. */
+/** Mi cuenta (D-104): nombre que se ve en el historial y cambio de contraseña. */
 export function AccountPage() {
   const { user, updateUser } = useSession();
   const [name, setName] = useState(user.name);

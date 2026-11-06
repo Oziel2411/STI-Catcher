@@ -13,13 +13,35 @@ export class ApiClientError extends Error {
   }
 }
 
-/** Evento que se dispara cuando el server dice que la sesión ya no vale (401, D-100). */
+/** Evento que se dispara cuando el server dice que la sesión ya no vale (401, D-104). */
 export const SESSION_EXPIRED_EVENT = 'sti:session-expired';
 
 function notifyIfUnauthenticated(status: number, code: string): void {
   if (status === 401 && code === 'UNAUTHENTICATED') {
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }
+}
+
+/** Sin respuesta del server (red caída, server apagado o reiniciándose). */
+export const NETWORK_ERROR_MESSAGE =
+  'No se pudo conectar con el servidor. Revisá la red o probá de nuevo en unos segundos.';
+
+/**
+ * Mensaje para un error HTTP que no trae el formato `ApiError` (lo responde
+ * otro antes que la app: el proxy de desarrollo, un reinicio, un límite).
+ * Sin códigos ni términos técnicos: lo lee cualquier compañero.
+ */
+export function httpErrorMessage(status: number): string {
+  if (status === 502 || status === 503 || status === 504) {
+    return 'El servidor no responde: puede estar reiniciándose. Probá de nuevo en unos segundos.';
+  }
+  if (status === 413) return 'El archivo es demasiado grande para el servidor.';
+  if (status === 429)
+    return 'Hay demasiados pedidos a la vez. Esperá unos segundos y probá de nuevo.';
+  if (status >= 500) {
+    return 'El servidor tuvo un error inesperado. Si se repite, avisale a quien administra STI-Catcher.';
+  }
+  return `No se pudo completar el pedido (error ${String(status)}).`;
 }
 
 type RequestOptions = {
@@ -52,7 +74,7 @@ export async function apiRequest<S extends z.ZodType>(
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
-    throw new ApiClientError('No se pudo conectar con el servidor.', 'NETWORK_ERROR', null);
+    throw new ApiClientError(NETWORK_ERROR_MESSAGE, 'NETWORK_ERROR', null);
   }
 
   const payload: unknown = await response.json().catch(() => null);
@@ -62,17 +84,13 @@ export async function apiRequest<S extends z.ZodType>(
     if (parsed.success) notifyIfUnauthenticated(response.status, parsed.data.error.code);
     throw parsed.success
       ? new ApiClientError(parsed.data.error.message, parsed.data.error.code, response.status)
-      : new ApiClientError(
-          `El servidor respondió con un error (${String(response.status)}).`,
-          'HTTP_ERROR',
-          response.status,
-        );
+      : new ApiClientError(httpErrorMessage(response.status), 'HTTP_ERROR', response.status);
   }
 
   const parsed = schema.safeParse(payload);
   if (!parsed.success) {
     throw new ApiClientError(
-      'La respuesta del servidor no tiene el formato esperado. ¿Están actualizados server y web?',
+      'El servidor respondió algo inesperado. Recargá la página: puede haberse actualizado.',
       'INVALID_RESPONSE',
       response.status,
     );
@@ -92,18 +110,14 @@ export async function apiDelete(url: string): Promise<void> {
   try {
     response = await fetch(url, { method: 'DELETE', headers: { Accept: 'application/json' } });
   } catch {
-    throw new ApiClientError('No se pudo conectar con el servidor.', 'NETWORK_ERROR', null);
+    throw new ApiClientError(NETWORK_ERROR_MESSAGE, 'NETWORK_ERROR', null);
   }
   if (response.ok) return;
   const parsed = apiErrorSchema.safeParse(await response.json().catch(() => null));
   if (parsed.success) notifyIfUnauthenticated(response.status, parsed.data.error.code);
   throw parsed.success
     ? new ApiClientError(parsed.data.error.message, parsed.data.error.code, response.status)
-    : new ApiClientError(
-        `El servidor respondió con un error (${String(response.status)}).`,
-        'HTTP_ERROR',
-        response.status,
-      );
+    : new ApiClientError(httpErrorMessage(response.status), 'HTTP_ERROR', response.status);
 }
 
 export const apiPatch = <S extends z.ZodType>(url: string, schema: S, body: unknown) =>

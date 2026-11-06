@@ -56,7 +56,7 @@ export const toUserSummary = (user: UserRecord): UserSummary => ({
 });
 
 /**
- * Administración de cuentas (solo admins, D-100) y «Mi cuenta» (cada uno).
+ * Administración de cuentas (solo admins, D-104) y «Mi cuenta» (cada uno).
  * El admin no tiene otros poderes: esto es todo lo que lo distingue.
  */
 export function createUsersService(deps: UsersServiceDeps) {

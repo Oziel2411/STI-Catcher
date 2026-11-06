@@ -1,6 +1,6 @@
 import type { Db } from './connection.ts';
 
-/** Una sesión abierta (D-100). Se identifica por el SHA-256 del token, nunca por el token. */
+/** Una sesión abierta (D-104). Se identifica por el SHA-256 del token, nunca por el token. */
 export type SessionRecord = {
   tokenHash: string;
   userId: string;

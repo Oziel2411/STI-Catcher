@@ -2,7 +2,7 @@ import { userRoleSchema } from '@sti-catcher/shared';
 import type { UserRole } from '@sti-catcher/shared';
 import type { Db } from './connection.ts';
 
-/** Una cuenta tal como se guarda (D-100). `passwordHash` nunca sale por la API. */
+/** Una cuenta tal como se guarda (D-104). `passwordHash` nunca sale por la API. */
 export type UserRecord = {
   id: string;
   /** En minúsculas. */

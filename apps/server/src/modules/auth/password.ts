@@ -1,7 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 
 /**
- * Hash de contraseñas con scrypt (D-100), de `node:crypto`: sin módulos
+ * Hash de contraseñas con scrypt (D-104), de `node:crypto`: sin módulos
  * nativos (argon2 necesitaría compilar y los scripts de npm están bloqueados, D-004).
  *
  * Formato guardado: `scrypt$<log2 N>$<r>$<p>$<sal base64>$<hash base64>`.

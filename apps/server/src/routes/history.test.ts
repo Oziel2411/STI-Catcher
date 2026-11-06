@@ -387,7 +387,7 @@ describe('filtros del historial', () => {
       return historyResponseSchema.parse(response.json()).items;
     };
 
-    // El usuario es la cuenta (D-100), no la PC.
+    // El usuario es la cuenta (D-104), no la PC.
     const all = await history('scope=all');
     expect(Object.fromEntries(all.map((item) => [item.id, item.requester]))).toEqual({
       [fromAna]: 'ana',

@@ -1,4 +1,4 @@
-/* Pantalla de ingreso y cuenta en la barra lateral (D-100). Aparte de
+/* Pantalla de ingreso y cuenta en la barra lateral (D-104). Aparte de
    styles.css para no mezclarse con los estilos base. */
 
 .login {
@@ -114,7 +114,7 @@
   }
 }
 
-/* Mi cuenta y Usuarios (D-100, etapa 2). */
+/* Mi cuenta y Usuarios (D-104, etapa 2). */
 .session-links {
   display: flex;
   flex-wrap: wrap;

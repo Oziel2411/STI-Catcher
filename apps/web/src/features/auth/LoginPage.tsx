@@ -52,7 +52,7 @@ export function AuthCard({
 }
 
 /**
- * Pantalla de ingreso (D-100): mail y contraseña. Si el server puede mandar
+ * Pantalla de ingreso (D-104): mail y contraseña. Si el server puede mandar
  * mails (SMTP y PUBLIC_URL), ofrece «¿Olvidaste tu contraseña?».
  */
 export function LoginPage({ onLogin, notice }: Props) {

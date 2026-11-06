@@ -1,6 +1,6 @@
 import type { Db } from './connection.ts';
 
-/** Un link de recuperación (D-100). Se identifica por el SHA-256 del token. */
+/** Un link de recuperación (D-104). Se identifica por el SHA-256 del token. */
 export type PasswordResetRecord = {
   tokenHash: string;
   userId: string;

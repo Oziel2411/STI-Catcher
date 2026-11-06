@@ -38,7 +38,7 @@ type JobRow = {
 };
 
 /**
- * Quién pidió un trabajo, para el filtro del historial (D-098, D-100): `user:<id>`
+ * Quién pidió un trabajo, para el filtro del historial (D-098, D-104): `user:<id>`
  * si tiene cuenta; si es de antes del login, la PC (o la IP). Un nombre de PC o
  * una IP nunca empiezan con "user:".
  */

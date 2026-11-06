@@ -625,9 +625,59 @@ Pensado para las grabaciones programadas (D-097), que se dejan solas: al termina
 
 Verificado con un SMTP falso local con SSL y una CA de prueba: el mail de prueba y el aviso de una grabación de 5 s llegaron con el remitente, el asunto y los dos destinatarios. Con una contraseña mala, nodemailer devolvió `EAUTH` sin la contraseña en el error, y la contraseña no apareció en los logs. Falta probarlo con la casilla real (lo hace quien cargue la contraseña).
 
+### D-100 — La interfaz se ajusta al ancho del navegador · Vigente
+
+Antes el contenido tenía un tope de 1080 px pegado a la izquierda: en un monitor de 1920 px quedaba más de un tercio vacío y la letra de 13 px se veía chica.
+
+- **Todo el ancho:** `.content` ya no tiene ese tope. Solo en monitores muy anchos (más de 124 rem de contenido, ~2100 px) se centra, para no estirar las tablas de más. Los párrafos de encabezados y tarjetas siguen limitados a 75 caracteres por renglón.
+- **Letra fluida:** los `font-size` pasaron de px a rem, y la base es `clamp(15px, 0.5vw + 8.1px, 17px)`: 15 px hasta ~1366 px de ventana (igual que antes) y 17 px desde ~1780 px. También van en rem los anchos que tienen que crecer con la letra: la barra lateral, la columna de opciones de Grabar, las columnas de Descargar y la grilla de Estado. Los espaciados quedan en px. La lista de Convertir va del 30 % del ancho, entre 330 px y 30 rem.
+- **Columnas fijas en Descargar** (`table-layout: fixed`): antes cambiaban de ancho cuando una fila pasaba de «Listo» a «Descargando». La columna Video se queda con el resto, y los títulos se cortan con «…» al ancho de la columna. Las etiquetas de estado no se parten en dos renglones.
+- **Arreglos de paso:** el texto oculto para lectores de pantalla de la columna Acciones (`position: absolute`) se salía del contenedor con scroll e ensanchaba la página entre 760 y 1100 px. Ahora `.table-wrap` es `position: relative`. En la vista angosta el contenido ocupa el 100 %: con `margin-inline: auto` en una columna flex, se achicaba a lo que medía la tabla.
+
+Verificado midiendo, sin scroll horizontal en las cinco secciones a 2560, 1920, 1366, 1024, 800 y 375 px. A 1920 px la letra base es de 17 px y el contenido ocupa 1695 px (antes 1080).
+
+### D-101 — Historial en tabla, con acciones agrupadas y en vivo · Vigente
+
+El historial era una tarjeta por trabajo con hasta cinco botones (Reproducir, Descargar, Convertir, Abrir original, Borrar) y una línea larga de datos. Ahora es una tabla como la de Descargar.
+
+- **Columnas:** Trabajo (ícono del tipo, título, tipo y de dónde salió: el sitio o «de «archivo»»), Fecha, Usuario (solo en «Todos», y «Vos» en los propios), Archivo (formato · resolución · duración), Tamaño, Estado (etiqueta, o barra con la fase mientras corre). Anchos fijos como en D-100; en pantallas angostas la tabla se desplaza de costado y la columna Trabajo mantiene 18 rem.
+- **Sin miniaturas reales:** el server no guarda la imagen del video (la de yt-dlp solo se usa al analizar). Va un ícono por tipo, y uno de nota musical si el archivo es solo audio. Las miniaturas necesitarían generarlas con ffmpeg y guardarlas: queda para más adelante.
+- **Acciones:** a la vista solo lo de todos los días: reproducir y descargar (íconos), o Cancelar / Reintentar según el estado. El resto (convertir, abrir el link original, borrar) va en un menú «…» (`RowMenu`): `position: fixed` para que no lo corte el scroll de la tabla, teclado con flechas, Escape y Tab, y se cierra al tocar afuera o hacer scroll. «Convertir» navega dentro de la app (un link común recargaría la página y cortaría una grabación en curso, D-094).
+- **Reproducir** abre el reproductor en una fila debajo. Un GIF se muestra como imagen: con `<video>` no se veía (pasaba también antes).
+- **Se actualiza solo; se sacó «Actualizar»:**
+  - Los trabajos visibles siguen con `/api/events?jobIds=` como antes. Se vuelve a suscribir cuando cambia la lista y el server manda primero el estado actual de cada uno, así no se pierde un cambio que pasó mientras se pedía la lista (medido: con un solo stream general, un trabajo quedó en «Procesando» después de terminar).
+  - En la primera página, un stream general detecta trabajos nuevos (`isNewJobEvent`: un `job.updated` de un trabajo que no está y es más reciente que todos, salvo la prueba del sistema) y vuelve a pedir la lista a los 400 ms.
+- **Filtros en la misma tarjeta que la búsqueda**, en una fila, con el total a la derecha («8 trabajos»). Sin resultados se ve un estado vacío con «Limpiar la búsqueda y los filtros». La paginación solo aparece si hay más de una página.
+
+Verificado con el server real: descargas MP4 y MP3, una descarga con GIF encadenado, tres conversiones de audio y una descarga cancelada. Todas aparecieron y terminaron sin recargar, y el menú anduvo con mouse y teclado. El GIF se vio, y en 390 px la tabla se desplaza sin ensanchar la página.
+
+### D-102 — Logo propio, acento azul y más vida visual · Vigente
+
+- **Logo nuevo** (`docs/design/logo/sti-catcher-logo.jpg`: timón con una flecha de descarga). En la barra lateral y la pestaña va solo el emblema, recortado en cuadrado (`emblem-512.png` → `public/logo-128.png` y `logo-64.png`), porque el texto no se lee a 34 px. Al lado va el nombre, con «STI» en el color de acento como en el logo. El `alt` del logo queda vacío porque el nombre ya está escrito. Reemplaza al escudo del Centro.
+- **El acento pasa de violeta a azul**, el de la flecha (`#2563d6` en claro, `#5b91f0` en oscuro, con contraste AA sobre los fondos). El modo oscuro toma el azul marino del fondo del logo (`--bg: #0f1624`). La estructura de Nocturne (D-090) no cambia: botones de contorno, Inter 400/500, mismos radios y espacios.
+- **Títulos de sección con ícono** (`PageTitle`, el mismo ícono de la barra lateral, en un cuadro con el tinte del acento). La sección activa de la barra lleva además una marca a la izquierda.
+- **Profundidad y movimiento:** las tarjetas tienen una sombra suave además del borde (`--shadow-card`). Hay un brillo azul muy tenue arriba a la derecha y transiciones de 0,15 s en botones, opciones y filas. Los estados vacíos llevan el ícono en un círculo. Con `prefers-reduced-motion` no hay giros ni desplazamientos.
+- **Estado como tablero:** arriba el aviso general con ícono, después Disco / Trabajos / Servidor con ícono (el de Disco se pone en rojo si falta espacio), después Herramientas, y «Probar sistema» y «Aviso por mail» lado a lado. Mientras llega la primera respuesta (las versiones tardan unos segundos) se ve un esqueleto con la forma de la página, y «Actualizar» gira mientras consulta.
+
+Verificado en claro y oscuro a 1366 px y a 390 px (sin scroll horizontal en ninguna sección).
+
+### D-103 — Pulido: mensajes, textos con cero y nombres por fila · Vigente
+
+- **Errores que entiende cualquiera.** Cuando la respuesta no trae el formato `ApiError` de la app (la manda el proxy, un reinicio o un límite), el mensaje sale de `httpErrorMessage` (`api/client.ts`). Se usa en el cliente JSON, las subidas y los fragmentos de grabación:
+  - 502, 503 y 504: «El servidor no responde: puede estar reiniciándose…».
+  - 413: archivo demasiado grande. 429: demasiados pedidos.
+  - Otros 5xx: «error inesperado; si se repite, avisale a quien administra STI-Catcher».
+  - El resto: «No se pudo completar el pedido (error N)».
+
+  Sin conexión: «No se pudo conectar con el servidor. Revisá la red o probá de nuevo en unos segundos.» Una respuesta con forma inesperada pide recargar la página. Antes ese caso preguntaba si server y web estaban actualizados, que no le sirve al usuario. Los mensajes propios del server siguen teniendo prioridad.
+
+- **Sin «0»:** «Descargar 0 listos» pasa a «Descargar» y «Aplicar a 0» pasa a «Aplicar», los dos deshabilitados. El texto de ayuda del botón explica por qué.
+- **Cada control de una fila de Descargar nombra su video** para los lectores de pantalla: «Formato de «…»», «Quitar «…» de la lista», «Progreso de «…»», etc. Usa el título, o el link mientras se analiza (`rowName`). El Historial ya lo hacía (D-101). En Convertir el panel de detalle es de un solo archivo, con su nombre como título, así que no hace falta.
+- **Grabar en el celular:** no hubo que cambiar nada. Los navegadores de celular no tienen `getDisplayMedia`, y la página ya dice que no funciona en celulares. Las otras pantallas angostas (D-100, D-101) se desplazan sin romperse.
+
 ## Usuarios y login
 
-### D-100 — Login con cuentas locales y avisos por usuario · Vigente (por etapas: hechas la 1, la 2 y la 3)
+### D-104 — Login con cuentas locales y avisos por usuario · Vigente (por etapas: hechas la 1, la 2 y la 3)
 
 Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie anónima (D-041) y el «usuario» del historial era la PC (D-098). El aviso de grabación iba a una lista fija (`MAIL_TO`, D-099). Ahora la app tiene que saber **quién** es cada uno para mandarle el aviso a esa persona y a los compañeros que elija. Esto cambia el alcance de la SPEC («Usuarios, login, roles» estaba fuera de alcance).
 

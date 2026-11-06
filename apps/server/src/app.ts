@@ -122,7 +122,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   // reply.download / reply.sendFile (Range, Content-Disposition RFC 5987).
   await app.register(fastifyStatic, { root: options.filesDir, serve: false });
 
-  // Login obligatorio (D-100): sin sesión, la API responde 401. Secure solo con HTTPS.
+  // Login obligatorio (D-104): sin sesión, la API responde 401. Secure solo con HTTPS.
   registerSession(app, {
     auth: options.services.auth,
     ...(options.extraOrigins ? { extraOrigins: options.extraOrigins } : {}),

@@ -21,7 +21,7 @@ const actorOf = (request: FastifyRequest): Actor => ({
   tokenHash: request.sessionTokenHash,
 });
 
-/** Solo los administradores administran cuentas (D-100). */
+/** Solo los administradores administran cuentas (D-104). */
 function requireAdmin(request: FastifyRequest): Actor {
   const actor = actorOf(request);
   if (actor.user.role !== 'admin') {
