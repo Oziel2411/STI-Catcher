@@ -625,6 +625,46 @@ Pensado para las grabaciones programadas (D-097), que se dejan solas: al termina
 
 Verificado con un SMTP falso local con SSL y una CA de prueba: el mail de prueba y el aviso de una grabación de 5 s llegaron con el remitente, el asunto y los dos destinatarios. Con una contraseña mala, nodemailer devolvió `EAUTH` sin la contraseña en el error, y la contraseña no apareció en los logs. Falta probarlo con la casilla real (lo hace quien cargue la contraseña).
 
+## Usuarios y login
+
+### D-100 — Login con cuentas locales y avisos por usuario · Propuesta (se implementa por etapas)
+
+Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie anónima (D-041) y el «usuario» del historial era la PC (D-098). El aviso de grabación iba a una lista fija (`MAIL_TO`, D-099). Ahora la app tiene que saber **quién** es cada uno para mandarle el aviso a esa persona y a los compañeros que elija. Esto cambia el alcance de la SPEC («Usuarios, login, roles» estaba fuera de alcance).
+
+**Decidido con el usuario:**
+
+- **Cuentas locales** en la base de STI-Catcher: se ingresa con **mail + contraseña**. El mail es a la vez el usuario y la dirección de los avisos. Se descartaron el enlace por mail (depende del SMTP para entrar) y Active Directory (más difícil de configurar y probar; se puede agregar después sin cambiar el resto).
+- **Login obligatorio.** Sin sesión solo se ve la pantalla de ingreso; toda la API (salvo ingreso, recuperación de contraseña y `/api/health`) responde **401**.
+- **Las cuentas las crea un administrador.** El rol admin **solo** sirve para administrar cuentas (crear, desactivar, poner una contraseña provisoria, dar o quitar admin). Para todo lo demás un admin es un usuario más: no borra ni cancela trabajos ajenos. El primer admin se crea en el servidor con un comando (`npm run user:create-admin`), no desde la web.
+- **La sesión dura hasta cerrar el navegador** (cookie de sesión, sin `Max-Age`).
+- **Olvido de contraseña:** link de un solo uso por mail, vence en 1 hora. El admin también puede poner una provisoria; con una provisoria hay que cambiarla al entrar.
+- **Avisos por mail por trabajo:** al grabar, descargar o convertir hay «Avisar por mail»: a mí y a los compañeros que elija de la lista de usuarios.
+  - Grabación: avisa al **terminar** y al **fallar**; «a mí» viene tildado.
+  - Descarga y conversión: solo si se tilda (vienen sin tildar: suelen hacerse mirando la pantalla). Avisa al terminar o al fallar.
+- **`MAIL_TO` se elimina.** El SMTP y el remitente siguen en el `.env`. El mail de prueba de Estado va a quien lo pide.
+- **El historial anterior queda «sin cuenta»:** se ve en «Todos» con la PC o IP de siempre y nadie lo puede borrar desde la UI (como DT-002). Los trabajos nuevos quedan a nombre del usuario. No se «reclaman» por cookie: si dos personas compartían PC se asignarían mal.
+
+**Detalles técnicos (propuestos):**
+
+- **Tablas nuevas** (migraciones al final de `migrations.ts`): `users` (id, email único sin distinguir mayúsculas, nombre, rol `admin`/`user`, activo, hash, `must_change_password`, fechas), `sessions` (hash del token, usuario, creada, última actividad, IP) y `password_resets` (hash del token, usuario, vence, usado). `jobs` y `recordings` ganan `user_id`; `jobs` gana la lista de a quién avisar (`notify_user_ids`). Se guardan **ids**, no mails: si alguien cambia de mail o se desactiva, el aviso usa lo vigente al mandarlo.
+- **Contraseñas con scrypt** (`node:crypto`, sin dependencias): N = 2^15, r = 8, p = 1, sal de 16 bytes, clave de 32 bytes, guardado como `scrypt$N$r$p$sal$hash` para poder subir los parámetros más adelante. Comparación con `timingSafeEqual`. Mínimo 10 caracteres. Se descartó argon2: necesita un módulo nativo y los scripts de instalación de npm están bloqueados (D-004).
+- **Sesión:** token de 32 bytes al azar en la cookie `sti_session` (`HttpOnly`, `SameSite=Lax`, `Secure` con HTTPS, `Path=/`). En la base va solo su **SHA-256**: quien lea la base no puede usar las sesiones. Se cambia el token al ingresar (evita fijación de sesión). Como un navegador que «restaura pestañas» también restaura cookies de sesión, el server además la corta tras **12 h sin actividad**. La pestaña abierta la mantiene viva con un latido cada 10 min desde el reloj del Web Worker (D-097), así una grabación programada para dentro de 20 h igual puede empezar. Cerrar sesión, desactivar la cuenta o cambiar la contraseña cortan las sesiones al instante.
+- **Límite de intentos:** 5 fallidos seguidos por cuenta bloquean esa cuenta 15 minutos; 20 por IP en 15 minutos bloquean la IP (**429**). El mensaje es siempre «Mail o contraseña incorrectos» (no dice si el mail existe), y con un mail inexistente igual se calcula un scrypt para que el tiempo de respuesta no lo delate. La recuperación responde siempre «Si el mail está registrado, te llegó un link» y tiene su propio límite.
+- **CSRF:** `SameSite=Lax` ya impide que otro sitio mande la cookie en un POST; además los pedidos que cambian algo deben traer `Origin` igual al del server.
+- **Nada sensible en logs ni en la API:** ni contraseñas, ni hashes, ni tokens, ni el link de recuperación. Pino redacta `password`, `token` y el header `cookie`. El log registra ingresos, fallas (con el mail y la IP) y cambios de cuentas.
+- **El link de recuperación necesita la dirección pública de la app:** variable nueva `PUBLIC_URL` (p. ej. `https://192.168.3.115:3000`). Sin ella, o sin SMTP, la opción «¿Olvidaste tu contraseña?» no aparece y queda solo la provisoria del admin.
+- **«Mis trabajos», borrar y los contadores** pasan a usar `user_id` en vez de la cookie anónima (D-041, D-062, D-096): se ven iguales desde cualquier PC. Los fragmentos de una grabación solo los puede mandar el usuario que la empezó. La cookie `sti_client` deja de usarse para trabajos nuevos (la columna `client_id` queda por el historial viejo).
+- **Usuario del historial** (D-098): el nombre de la cuenta; para los trabajos viejos, la PC o IP como hasta ahora. El nombre de la PC se sigue guardando (sirve en el log y en el aviso).
+- **Lista de compañeros para avisar:** `GET /api/users/directory` da id y nombre de los usuarios activos, sin mails.
+
+**Etapas:**
+
+1. **Cuentas y sesión (server + pantalla de ingreso).** Migraciones, scrypt, sesiones, límite de intentos, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, 401 en el resto, comando `user:create-admin`. Trabajos y grabaciones a nombre del usuario; «Mis trabajos» y borrar por usuario. Web: pantalla de ingreso y nombre + «Salir» en la barra lateral (toca `Layout`, poco).
+2. **Administración y preferencias.** Página Usuarios (solo admin): crear, desactivar, contraseña provisoria, rol. Página «Mi cuenta»: nombre y cambio de contraseña; cambio obligatorio con provisoria.
+3. **Recuperación por mail.** `PUBLIC_URL`, `POST /api/auth/forgot`, `POST /api/auth/reset`, pantallas.
+4. **Avisos por usuario.** `notify_user_ids` al crear trabajos, aviso al terminar o fallar (grabación, descarga, conversión), selector «Avisar por mail» en Grabar, Descargar y Convertir, mail de prueba a quien lo pide, se quita `MAIL_TO`.
+5. **Prueba de punta a punta y despliegue.** Con un SMTP falso local; `DEPLOY.md` (crear el primer admin, `PUBLIC_URL`, quitar `MAIL_TO`), `CLAUDE.md` y SPEC actualizados.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5
