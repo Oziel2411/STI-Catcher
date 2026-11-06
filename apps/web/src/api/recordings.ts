@@ -4,7 +4,7 @@ import {
   apiErrorSchema,
 } from '@sti-catcher/shared';
 import type { CreateRecordingRequest } from '@sti-catcher/shared';
-import { ApiClientError, apiPost } from './client.ts';
+import { ApiClientError, apiPost, httpErrorMessage, NETWORK_ERROR_MESSAGE } from './client.ts';
 import type { SendChunk } from './chunk-uploader.ts';
 
 export const createRecording = (request: CreateRecordingRequest) =>
@@ -31,15 +31,11 @@ export const chunkSender =
         },
       );
     } catch {
-      throw new ApiClientError('No se pudo conectar con el servidor.', 'NETWORK_ERROR', null);
+      throw new ApiClientError(NETWORK_ERROR_MESSAGE, 'NETWORK_ERROR', null);
     }
     if (response.ok) return;
     const parsed = apiErrorSchema.safeParse(await response.json().catch(() => null));
     throw parsed.success
       ? new ApiClientError(parsed.data.error.message, parsed.data.error.code, response.status)
-      : new ApiClientError(
-          `El servidor respondió con un error (${String(response.status)}).`,
-          'HTTP_ERROR',
-          response.status,
-        );
+      : new ApiClientError(httpErrorMessage(response.status), 'HTTP_ERROR', response.status);
   };

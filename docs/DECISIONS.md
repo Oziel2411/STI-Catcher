@@ -661,6 +661,20 @@ Verificado con el server real: descargas MP4 y MP3, una descarga con GIF encaden
 
 Verificado en claro y oscuro a 1366 px y a 390 px (sin scroll horizontal en ninguna sección).
 
+### D-103 — Pulido: mensajes, textos con cero y nombres por fila · Vigente
+
+- **Errores que entiende cualquiera.** Cuando la respuesta no trae el formato `ApiError` de la app (la manda el proxy, un reinicio o un límite), el mensaje sale de `httpErrorMessage` (`api/client.ts`). Se usa en el cliente JSON, las subidas y los fragmentos de grabación:
+  - 502, 503 y 504: «El servidor no responde: puede estar reiniciándose…».
+  - 413: archivo demasiado grande. 429: demasiados pedidos.
+  - Otros 5xx: «error inesperado; si se repite, avisale a quien administra STI-Catcher».
+  - El resto: «No se pudo completar el pedido (error N)».
+
+  Sin conexión: «No se pudo conectar con el servidor. Revisá la red o probá de nuevo en unos segundos.» Una respuesta con forma inesperada pide recargar la página. Antes ese caso preguntaba si server y web estaban actualizados, que no le sirve al usuario. Los mensajes propios del server siguen teniendo prioridad.
+
+- **Sin «0»:** «Descargar 0 listos» pasa a «Descargar» y «Aplicar a 0» pasa a «Aplicar», los dos deshabilitados. El texto de ayuda del botón explica por qué.
+- **Cada control de una fila de Descargar nombra su video** para los lectores de pantalla: «Formato de «…»», «Quitar «…» de la lista», «Progreso de «…»», etc. Usa el título, o el link mientras se analiza (`rowName`). El Historial ya lo hacía (D-101). En Convertir el panel de detalle es de un solo archivo, con su nombre como título, así que no hace falta.
+- **Grabar en el celular:** no hubo que cambiar nada. Los navegadores de celular no tienen `getDisplayMedia`, y la página ya dice que no funciona en celulares. Las otras pantallas angostas (D-100, D-101) se desplazan sin romperse.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

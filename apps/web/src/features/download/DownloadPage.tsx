@@ -20,6 +20,7 @@ import { apiGet } from '../../api/client.ts';
 import { PageTitle } from '../../components/PageTitle.tsx';
 import { gifFpsOptions, gifWidthOptions } from '../../lib/convert.ts';
 import {
+  applyButtonLabel,
   editableChecked,
   FORMAT_GROUPS,
   formatLabel,
@@ -29,7 +30,9 @@ import {
   presetShortName,
   resultJob,
   rowError,
+  rowName,
   rowState,
+  startButtonLabel,
   startTargets,
 } from '../../lib/download-batch.ts';
 import type { DownloadItem, RowState } from '../../lib/download-batch.ts';
@@ -214,19 +217,21 @@ export function DownloadPage() {
                 batch.applyToChecked(bulkPreset);
               }}
             >
-              Aplicar a {checkedEditable}
+              {applyButtonLabel(checkedEditable)}
             </button>
             <button
               type="button"
               className="button toolbar-end"
               disabled={targets === 0 || batch.submitting}
               onClick={() => void batch.startReady()}
-              title="Los tildados que están listos; si no hay ninguno tildado, todos los listos."
+              title={
+                targets === 0
+                  ? 'Todavía no hay links listos para descargar.'
+                  : 'Los tildados que están listos; si no hay ninguno tildado, todos los listos.'
+              }
             >
               <DownloadSimpleIcon size={14} aria-hidden="true" />
-              {batch.submitting
-                ? 'Creando…'
-                : `Descargar ${String(targets)} ${targets === 1 ? 'listo' : 'listos'}`}
+              {startButtonLabel(targets, batch.submitting)}
             </button>
           </div>
 
@@ -299,7 +304,7 @@ function LinkRow({ item, batch, limits }: RowProps) {
         <td className="col-check">
           <input
             type="checkbox"
-            aria-label="Seleccionar"
+            aria-label={`Seleccionar «${rowName(item)}»`}
             checked={item.checked}
             disabled={item.status !== 'ready' && item.status !== 'analyzing'}
             onChange={(e) => {
@@ -314,7 +319,7 @@ function LinkRow({ item, batch, limits }: RowProps) {
           {editable && item.probe && item.preset ? (
             <select
               className="select-compact"
-              aria-label="Formato"
+              aria-label={`Formato de «${rowName(item)}»`}
               value={item.preset}
               onChange={(e) => {
                 batch.update(item.id, { preset: e.target.value as ConversionPresetId });
@@ -453,7 +458,7 @@ function QualityEditor({
       <div className="quality-pair">
         <select
           className="select-compact"
-          aria-label="Ancho del GIF"
+          aria-label={`Ancho del GIF de «${rowName(item)}»`}
           value={gif.width}
           onChange={(e) => {
             batch.update(item.id, { gif: { ...gif, width: Number(e.target.value) } });
@@ -467,7 +472,7 @@ function QualityEditor({
         </select>
         <select
           className="select-compact"
-          aria-label="Cuadros por segundo"
+          aria-label={`Cuadros por segundo de «${rowName(item)}»`}
           value={gif.fps}
           onChange={(e) => {
             batch.update(item.id, { gif: { ...gif, fps: Number(e.target.value) } });
@@ -488,7 +493,7 @@ function QualityEditor({
   const heights = (
     <select
       className="select-compact"
-      aria-label="Resolución"
+      aria-label={`Resolución de «${rowName(item)}»`}
       value={item.maxHeight ?? ''}
       onChange={(e) => {
         batch.update(item.id, {
@@ -511,7 +516,7 @@ function QualityEditor({
       {heights}
       <select
         className="select-compact"
-        aria-label="Codec"
+        aria-label={`Codec de «${rowName(item)}»`}
         value={item.videoMode}
         onChange={(e) => {
           batch.update(item.id, { videoMode: e.target.value as VideoMode });
@@ -596,7 +601,11 @@ function StateCell({ item, state }: { item: DownloadItem; state: RowState }) {
       return <span className="badge badge-muted">En cola</span>;
     case 'running':
       return (
-        <Progress job={item.job} text={progressDetails(item.job?.progress ?? null).join(' · ')} />
+        <Progress
+          name={rowName(item)}
+          job={item.job}
+          text={progressDetails(item.job?.progress ?? null).join(' · ')}
+        />
       );
     case 'converting': {
       const target = item.preset ? presetShortName(item.preset) : '';
@@ -607,7 +616,13 @@ function StateCell({ item, state }: { item: DownloadItem; state: RowState }) {
           : followUp?.status === 'queued'
             ? ' · en cola'
             : '';
-      return <Progress job={followUp} text={`Descargado · Convirtiendo a ${target}${details}`} />;
+      return (
+        <Progress
+          name={rowName(item)}
+          job={followUp}
+          text={`Descargado · Convirtiendo a ${target}${details}`}
+        />
+      );
     }
     case 'done': {
       const result = resultJob(item);
@@ -623,14 +638,14 @@ function StateCell({ item, state }: { item: DownloadItem; state: RowState }) {
   }
 }
 
-function Progress({ job, text }: { job: Job | null; text: string }) {
+function Progress({ name, job, text }: { name: string; job: Job | null; text: string }) {
   const percent = job?.status === 'running' ? (job.progress?.percent ?? null) : null;
   return (
     <div className="state-progress">
       <div
         className={`meter ${percent === null ? 'meter-indeterminate' : ''}`}
         role="progressbar"
-        aria-label="Progreso"
+        aria-label={`Progreso de «${name}»`}
         aria-valuemin={0}
         aria-valuemax={100}
         {...(percent !== null ? { 'aria-valuenow': Math.round(percent) } : {})}
@@ -658,7 +673,7 @@ function RowActions({
     <button
       type="button"
       className="button button-ghost button-icon"
-      aria-label="Quitar de la lista"
+      aria-label={`Quitar «${rowName(item)}» de la lista`}
       title="Quitar de la lista"
       onClick={() => {
         batch.remove(item.id);
@@ -705,7 +720,7 @@ function RowActions({
               className="button button-ghost button-icon"
               href={`/api/jobs/${result.id}/file`}
               download
-              aria-label="Descargar el archivo"
+              aria-label={`Descargar el archivo de «${rowName(item)}»`}
               title="Descargar el archivo"
             >
               <DownloadSimpleIcon size={15} aria-hidden="true" />
