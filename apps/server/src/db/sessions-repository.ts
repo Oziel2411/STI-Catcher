@@ -32,6 +32,8 @@ export type SessionsRepository = {
   delete(tokenHash: string): void;
   /** Corta todas las sesiones de una cuenta (desactivarla, cambiar la contraseña). */
   deleteForUser(userId: string): number;
+  /** Corta las demás sesiones de una cuenta (al cambiar la contraseña, queda la actual). */
+  deleteForUserExcept(userId: string, keepTokenHash: string): number;
   /** Borra las que no se usan desde antes de `before` (ISO). */
   deleteIdle(before: string): number;
 };
@@ -47,6 +49,9 @@ export function createSessionsRepository(db: Db): SessionsRepository {
   );
   const deleteStmt = db.prepare<[string]>('DELETE FROM sessions WHERE token_hash = ?');
   const deleteForUserStmt = db.prepare<[string]>('DELETE FROM sessions WHERE user_id = ?');
+  const deleteOthersStmt = db.prepare<[string, string]>(
+    'DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?',
+  );
   const deleteIdleStmt = db.prepare<[string]>('DELETE FROM sessions WHERE last_seen_at < ?');
 
   return {
@@ -65,6 +70,9 @@ export function createSessionsRepository(db: Db): SessionsRepository {
     },
     deleteForUser(userId) {
       return deleteForUserStmt.run(userId).changes;
+    },
+    deleteForUserExcept(userId, keepTokenHash) {
+      return deleteOthersStmt.run(userId, keepTokenHash).changes;
     },
     deleteIdle(before) {
       return deleteIdleStmt.run(before).changes;

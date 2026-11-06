@@ -23,7 +23,7 @@ function notifyIfUnauthenticated(status: number, code: string): void {
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH';
   /** Se envía como JSON. */
   body?: unknown;
   signal?: AbortSignal;
@@ -105,3 +105,6 @@ export async function apiDelete(url: string): Promise<void> {
         response.status,
       );
 }
+
+export const apiPatch = <S extends z.ZodType>(url: string, schema: S, body: unknown) =>
+  apiRequest(url, schema, { method: 'PATCH', body });

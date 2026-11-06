@@ -6,7 +6,10 @@ import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import { registerSession } from './http/session.ts';
+import type { UserRecord } from './db/users-repository.ts';
 import type { AuthService } from './modules/auth/auth-service.ts';
+import type { UsersService } from './modules/auth/users-service.ts';
+import { registerUserRoutes } from './routes/users.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { HttpError } from './http/validation.ts';
 import type { JobEventBus } from './jobs/event-bus.ts';
@@ -42,6 +45,9 @@ export type AppServices = {
   recordings: RecordingService;
   mail: MailService;
   auth: AuthService;
+  users: UsersService;
+  /** Cuenta por id (para devolver la sesión actualizada en «Mi cuenta»). */
+  getUser: (id: string) => UserRecord | null;
 };
 
 export type BuildAppOptions = {
@@ -120,6 +126,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     ...(options.extraOrigins ? { extraOrigins: options.extraOrigins } : {}),
   });
   registerAuthRoutes(app, options.services.auth, { secure: options.https !== null });
+  registerUserRoutes(app, options.services.users, options.services.getUser);
 
   registerHealthRoutes(app, options.services.health);
   registerJobRoutes(app, options.services.jobs);

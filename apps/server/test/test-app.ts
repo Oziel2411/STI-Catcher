@@ -17,6 +17,7 @@ import { createSessionsRepository } from '../src/db/sessions-repository.ts';
 import { createUsersRepository } from '../src/db/users-repository.ts';
 import { createAuthService } from '../src/modules/auth/auth-service.ts';
 import { createLoginLimiter } from '../src/modules/auth/login-limiter.ts';
+import { createUsersService } from '../src/modules/auth/users-service.ts';
 import { migrate } from '../src/db/migrate.ts';
 import { migrations } from '../src/db/migrations.ts';
 import { createJobEventBus } from '../src/jobs/event-bus.ts';
@@ -106,14 +107,24 @@ export async function makeTestApp(options: TestAppOptions = {}) {
   const users = createUsersRepository(db);
   const sessions = createSessionsRepository(db);
   const authLogger = { info: vi.fn(), warn: vi.fn() };
+  const loginLimiter = createLoginLimiter();
   const auth = createAuthService({
     users,
     sessions,
-    limiter: createLoginLimiter(),
+    limiter: loginLimiter,
     logger: authLogger,
     hash: fakeHash,
     verify: fakeVerify,
     ...(options.authNow ? { now: options.authNow } : {}),
+  });
+  const usersService = createUsersService({
+    users,
+    sessions,
+    auth,
+    limiter: loginLimiter,
+    logger: authLogger,
+    hash: fakeHash,
+    verify: fakeVerify,
   });
   const bus = createJobEventBus();
   const runs: PendingRun[] = [];
@@ -252,6 +263,8 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       recordings,
       mail,
       auth,
+      users: usersService,
+      getUser: (id) => users.get(id),
     },
     filesDir,
     webDistDir: options.webDistDir ?? null,

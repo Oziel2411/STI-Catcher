@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { fetchCurrentUser, logout as logoutRequest } from '../../api/auth.ts';
 import { SESSION_EXPIRED_EVENT } from '../../api/client.ts';
 import { startBackgroundClock } from '../recording/background-clock.ts';
+import { ForcedPasswordChange } from './ForcedPasswordChange.tsx';
 import { LoginPage } from './LoginPage.tsx';
 import { SessionContext } from './session-context.ts';
 import './auth.css';
@@ -16,14 +17,32 @@ import './auth.css';
  */
 const HEARTBEAT_MS = 10 * 60_000;
 
+type SignedIn = {
+  status: 'signed-in';
+  user: SessionUser;
+  /** El server dijo 401: hay que volver a ingresar. */
+  expired: boolean;
+  /**
+   * La app ya se mostró. Desde ahí no se desmonta (una grabación en curso
+   * seguiría): lo que haga falta pedir aparece encima.
+   */
+  appMounted: boolean;
+};
+
 type State =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | { status: 'anonymous' }
-  | { status: 'signed-in'; user: SessionUser; expired: boolean };
+  { status: 'loading' } | { status: 'error'; message: string } | { status: 'anonymous' } | SignedIn;
+
+/** Estado tras ingresar o actualizar la cuenta. Con contraseña provisoria la app no se monta. */
+const signedIn = (previous: State, user: SessionUser): SignedIn => ({
+  status: 'signed-in',
+  user,
+  expired: false,
+  appMounted: (previous.status === 'signed-in' && previous.appMounted) || !user.mustChangePassword,
+});
 
 /**
- * Login obligatorio (D-100). Sin sesión solo se ve la pantalla de ingreso.
+ * Login obligatorio (D-100). Sin sesión solo se ve la pantalla de ingreso; con
+ * una contraseña provisoria, solo la pantalla para cambiarla.
  *
  * Si la sesión se corta con la app abierta (se cerró en otra pestaña, o la
  * desactivaron), el ingreso aparece **encima** de la app sin desmontarla:
@@ -37,7 +56,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     fetchCurrentUser(controller.signal)
       .then((user) => {
-        setState(user ? { status: 'signed-in', user, expired: false } : { status: 'anonymous' });
+        setState((previous) => (user ? signedIn(previous, user) : { status: 'anonymous' }));
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -51,9 +70,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signedIn = state.status === 'signed-in';
+  const isSignedIn = state.status === 'signed-in';
   useEffect(() => {
-    if (!signedIn) return;
+    if (!isSignedIn) return;
     const onExpired = () => {
       setState((current) =>
         current.status === 'signed-in' ? { ...current, expired: true } : current,
@@ -68,7 +87,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
       stopClock();
     };
-  }, [signedIn]);
+  }, [isSignedIn]);
 
   const logout = useCallback(() => {
     void logoutRequest().then(() => {
@@ -77,8 +96,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const updateUser = useCallback((user: SessionUser) => {
+    setState((previous) => signedIn(previous, user));
+  }, []);
+
   const user = state.status === 'signed-in' ? state.user : null;
-  const session = useMemo(() => (user ? { user, logout } : null), [user, logout]);
+  const session = useMemo(
+    () => (user ? { user, logout, updateUser } : null),
+    [user, logout, updateUser],
+  );
 
   if (state.status === 'loading') return null;
   if (state.status === 'error') {
@@ -91,19 +117,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
   if (state.status === 'anonymous' || session === null) {
-    return (
-      <LoginPage
-        onLogin={(signedUser) => {
-          setState({ status: 'signed-in', user: signedUser, expired: false });
-        }}
-      />
-    );
+    return <LoginPage onLogin={updateUser} />;
+  }
+  if (!state.appMounted) {
+    return <ForcedPasswordChange onChanged={updateUser} onLogout={logout} />;
   }
 
   return (
     <SessionContext.Provider value={session}>
       {children}
-      {state.expired && (
+      {state.expired ? (
         <div className="login-overlay">
           <LoginPage
             notice="La sesión se cerró. Ingresá de nuevo para seguir."
@@ -112,10 +135,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 window.location.assign('/');
                 return;
               }
-              setState({ status: 'signed-in', user: signedUser, expired: false });
+              updateUser(signedUser);
             }}
           />
         </div>
+      ) : (
+        state.user.mustChangePassword && (
+          // Un admin le puso una provisoria mientras tenía la app abierta.
+          <div className="login-overlay">
+            <ForcedPasswordChange onChanged={updateUser} onLogout={logout} />
+          </div>
+        )
       )}
     </SessionContext.Provider>
   );

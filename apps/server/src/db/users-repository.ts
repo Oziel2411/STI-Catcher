@@ -56,8 +56,17 @@ export type UsersRepository = {
   /** Nombre de varias cuentas a la vez (historial). */
   namesByIds(ids: readonly string[]): Map<string, string>;
   setLastLogin(id: string, at: string): void;
+  /** Administradores activos. */
   countAdmins(): number;
+  /** Todas las cuentas, por nombre. */
+  list(): UserRecord[];
+  /** Cambia nombre, rol o si está activa. false si no existe. */
+  update(id: string, patch: UserPatch, at: string): boolean;
+  /** Guarda una contraseña nueva (ya hasheada). */
+  setPassword(id: string, passwordHash: string, mustChangePassword: boolean, at: string): boolean;
 };
+
+export type UserPatch = Partial<Pick<UserRecord, 'name' | 'role' | 'active'>>;
 
 export function createUsersRepository(db: Db): UsersRepository {
   const insertStmt = db.prepare<
@@ -84,6 +93,20 @@ export function createUsersRepository(db: Db): UsersRepository {
   );
   const countAdminsStmt = db.prepare<[], { total: number }>(
     "SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND active = 1",
+  );
+  const listStmt = db.prepare<[], UserRow>(
+    'SELECT * FROM users ORDER BY name COLLATE NOCASE, email',
+  );
+  const updateStmt = db.prepare<
+    [{ id: string; name: string | null; role: string | null; active: number | null; at: string }]
+  >(`
+    UPDATE users
+       SET name = COALESCE(@name, name), role = COALESCE(@role, role),
+           active = COALESCE(@active, active), updated_at = @at
+     WHERE id = @id
+  `);
+  const setPasswordStmt = db.prepare<[string, number, string, string]>(
+    'UPDATE users SET password_hash = ?, must_change_password = ?, updated_at = ? WHERE id = ?',
   );
 
   return {
@@ -125,6 +148,26 @@ export function createUsersRepository(db: Db): UsersRepository {
 
     countAdmins() {
       return countAdminsStmt.get()?.total ?? 0;
+    },
+
+    list() {
+      return listStmt.all().map(toUser);
+    },
+
+    update(id, patch, at) {
+      return (
+        updateStmt.run({
+          id,
+          name: patch.name ?? null,
+          role: patch.role ?? null,
+          active: patch.active === undefined ? null : patch.active ? 1 : 0,
+          at,
+        }).changes === 1
+      );
+    },
+
+    setPassword(id, passwordHash, mustChangePassword, at) {
+      return setPasswordStmt.run(passwordHash, mustChangePassword ? 1 : 0, at, id).changes === 1;
     },
   };
 }

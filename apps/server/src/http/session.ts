@@ -16,6 +16,17 @@ export const SESSION_COOKIE = 'sti_session';
 
 /** Rutas de la API que se pueden usar sin sesión. */
 const PUBLIC_API = new Set(['/api/auth/login', '/api/auth/logout', '/api/health']);
+/**
+ * Con una contraseña provisoria solo se puede cambiarla (D-100): el resto de
+ * la API responde 403 `PASSWORD_CHANGE_REQUIRED` hasta que se cambie.
+ */
+const ALLOWED_WITH_PROVISIONAL_PASSWORD = new Set([
+  '/api/auth/me',
+  '/api/auth/logout',
+  '/api/auth/login',
+  '/api/me/password',
+  '/api/health',
+]);
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /** Lee una cookie del header Cookie. null si no está. */
@@ -113,6 +124,13 @@ export function registerSession(app: FastifyInstance, options: SessionOptions): 
     request.sessionTokenHash = session?.tokenHash ?? null;
     if (session === null && !PUBLIC_API.has(path)) {
       throw new HttpError(401, 'UNAUTHENTICATED', 'Tenés que ingresar para usar STI-Catcher.');
+    }
+    if (session?.user.mustChangePassword === true && !ALLOWED_WITH_PROVISIONAL_PASSWORD.has(path)) {
+      throw new HttpError(
+        403,
+        'PASSWORD_CHANGE_REQUIRED',
+        'Tu contraseña es provisoria: cambiala para seguir.',
+      );
     }
   }
 }

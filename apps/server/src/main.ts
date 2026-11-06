@@ -26,6 +26,7 @@ import { createSessionsRepository } from './db/sessions-repository.ts';
 import { createUsersRepository } from './db/users-repository.ts';
 import { createAuthService } from './modules/auth/auth-service.ts';
 import { createLoginLimiter } from './modules/auth/login-limiter.ts';
+import { createUsersService } from './modules/auth/users-service.ts';
 import { createConversionRunner } from './modules/conversion/conversion-runner.ts';
 import { createConversionService } from './modules/conversion/conversion-service.ts';
 import { createUploadService } from './modules/conversion/upload-service.ts';
@@ -111,10 +112,14 @@ async function main(): Promise<void> {
   const repo = createJobsRepository(db);
   const users = createUsersRepository(db);
   // Login obligatorio (D-100). Sin cuentas nadie puede entrar: se avisa cómo crear la primera.
-  const auth = createAuthService({
+  const sessions = createSessionsRepository(db);
+  const loginLimiter = createLoginLimiter();
+  const auth = createAuthService({ users, sessions, limiter: loginLimiter, logger });
+  const usersService = createUsersService({
     users,
-    sessions: createSessionsRepository(db),
-    limiter: createLoginLimiter(),
+    sessions,
+    auth,
+    limiter: loginLimiter,
     logger,
   });
   if (users.countAdmins() === 0) {
@@ -301,6 +306,8 @@ async function main(): Promise<void> {
       recordings,
       mail,
       auth,
+      users: usersService,
+      getUser: (id) => users.get(id),
     },
     // En desarrollo la web la sirve Vite (otro puerto) y los POST llegan con su Origin.
     ...(config.nodeEnv === 'development'

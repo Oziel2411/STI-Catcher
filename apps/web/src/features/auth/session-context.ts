@@ -5,6 +5,8 @@ export type SessionContextValue = {
   user: SessionUser;
   /** Cierra la sesión y vuelve a la pantalla de ingreso. */
   logout: () => void;
+  /** Reemplaza los datos de la cuenta (después de cambiar el nombre o la contraseña). */
+  updateUser: (user: SessionUser) => void;
 };
 
 export const SessionContext = createContext<SessionContextValue | null>(null);

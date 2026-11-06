@@ -8,3 +8,4 @@ export * from './schemas/jobs.ts';
 export * from './schemas/mail.ts';
 export * from './schemas/media.ts';
 export * from './schemas/recording.ts';
+export * from './schemas/users.ts';
