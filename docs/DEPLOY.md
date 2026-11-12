@@ -105,7 +105,7 @@ Para usar STI-Catcher hay que ingresar con una cuenta (D-104). La primera se cre
 npm run user:create-admin
 ```
 
-Pide el mail (es el usuario para ingresar), el nombre que se va a ver en el historial y la contraseña dos veces (al menos 10 caracteres; no se muestra al escribirla). Usa el mismo `.env` y la misma base que el servicio, y se puede correr con el servicio andando. Si el servicio arranca sin ningún administrador, el log lo avisa. Las demás cuentas se crean desde la web: **Usuarios** (abajo, en la barra lateral, junto a tu nombre) → **Nueva cuenta**. Cada una arranca con una contraseña provisoria que la persona cambia al ingresar.
+Pide el mail (es el usuario para ingresar), el nombre que se va a ver en el historial y la contraseña dos veces (al menos 10 caracteres; no se muestra al escribirla). Usa el mismo `.env` y la misma base que el servicio, y se puede correr con el servicio andando. Si el servicio arranca sin ningún administrador, el log lo avisa. Las demás cuentas se crean desde la web: **Usuarios** (arriba a la derecha, junto a tu nombre) → **Nueva cuenta**. Cada una arranca con una contraseña provisoria que la persona cambia al ingresar.
 
 ## 5. Certificado HTTPS
 

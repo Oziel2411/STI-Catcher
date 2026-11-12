@@ -1,4 +1,4 @@
-/* Pantalla de ingreso y cuenta en la barra lateral (D-104). Aparte de
+/* Pantalla de ingreso y cuenta en la barra de arriba (D-104). Aparte de
    styles.css para no mezclarse con los estilos base. */
 
 .login {
@@ -64,73 +64,111 @@
   margin: 0;
 }
 
+/*
+ * Cuenta arriba a la derecha (D-105): iniciales, nombre y los enlaces, apenas
+ * más grandes que en la barra lateral de antes. En angosto, un menú.
+ */
 .session-box {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: auto 0 10px;
-  padding: 8px 6px 0;
-  font-size: 0.8333rem;
-  border-top: 1px solid var(--divider);
+  align-items: center;
+  min-width: 0;
 }
 
-/* La cuenta ocupa el lugar que empujaba el pie hacia abajo. */
-.session-box + .sidebar-footer {
-  margin-top: 0;
+.session-full {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.session-compact {
+  display: none;
+}
+
+.session-avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: 0.7333rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--accent-strong);
+  background: var(--accent-tint);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.session-full .session-avatar {
+  margin-right: -6px;
 }
 
 .session-name {
   overflow: hidden;
+  max-width: 16rem;
+  font-size: 0.9333rem;
+  font-weight: 500;
   color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.session-logout {
-  align-self: flex-start;
-  padding: 0;
-  font: inherit;
-  font-size: 0.8333rem;
-  color: var(--muted);
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-
-.session-logout:hover {
-  color: var(--accent-strong);
-  text-decoration: underline;
-}
-
-/* Barra arriba (pantallas angostas): la cuenta va en la misma fila, a la derecha. */
-@media (max-width: 759px) {
-  .session-box {
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-    margin: 0 0 0 auto;
-    padding: 0;
-    border-top: 0;
-  }
-}
-
-/* Mi cuenta y Usuarios (D-104, etapa 2). */
-.session-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
+.session-sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: var(--divider);
 }
 
 .session-link {
-  font-size: 0.8333rem;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font: inherit;
+  font-size: 0.9rem;
   color: var(--muted);
+  white-space: nowrap;
   text-decoration: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 
 .session-link:hover,
 .session-link.active {
   color: var(--accent-strong);
   text-decoration: underline;
+}
+
+.session-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 4px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 99px;
+  cursor: pointer;
+}
+
+.session-menu-button:hover,
+.session-menu-button[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+@media (max-width: 759px) {
+  .session-full {
+    display: none;
+  }
+
+  .session-compact {
+    display: flex;
+  }
 }
 
 .account-grid {

@@ -655,7 +655,7 @@ Verificado con el server real: descargas MP4 y MP3, una descarga con GIF encaden
 
 - **Logo nuevo** (`docs/design/logo/sti-catcher-logo.jpg`: timón con una flecha de descarga). En la barra lateral y la pestaña va solo el emblema, recortado en cuadrado (`emblem-512.png` → `public/logo-128.png` y `logo-64.png`), porque el texto no se lee a 34 px. Al lado va el nombre, con «STI» en el color de acento como en el logo. El `alt` del logo queda vacío porque el nombre ya está escrito. Reemplaza al escudo del Centro.
 - **El acento pasa de violeta a azul**, el de la flecha (`#2563d6` en claro, `#5b91f0` en oscuro, con contraste AA sobre los fondos). El modo oscuro toma el azul marino del fondo del logo (`--bg: #0f1624`). La estructura de Nocturne (D-090) no cambia: botones de contorno, Inter 400/500, mismos radios y espacios.
-- **Títulos de sección con ícono** (`PageTitle`, el mismo ícono de la barra lateral, en un cuadro con el tinte del acento). La sección activa de la barra lleva además una marca a la izquierda.
+- **Títulos de sección con ícono** (`PageTitle`, el mismo ícono de la barra lateral, en un cuadro con el tinte del acento). La sección activa de la barra lleva además una marca a la izquierda (con D-105, subrayada).
 - **Profundidad y movimiento:** las tarjetas tienen una sombra suave además del borde (`--shadow-card`). Hay un brillo azul muy tenue arriba a la derecha y transiciones de 0,15 s en botones, opciones y filas. Los estados vacíos llevan el ícono en un círculo. Con `prefers-reduced-motion` no hay giros ni desplazamientos.
 - **Estado como tablero:** arriba el aviso general con ícono, después Disco / Trabajos / Servidor con ícono (el de Disco se pone en rojo si falta espacio), después Herramientas, y «Probar sistema» y «Aviso por mail» lado a lado. Mientras llega la primera respuesta (las versiones tardan unos segundos) se ve un esqueleto con la forma de la página, y «Actualizar» gira mientras consulta.
 
@@ -674,6 +674,23 @@ Verificado en claro y oscuro a 1366 px y a 390 px (sin scroll horizontal en ning
 - **Sin «0»:** «Descargar 0 listos» pasa a «Descargar» y «Aplicar a 0» pasa a «Aplicar», los dos deshabilitados. El texto de ayuda del botón explica por qué.
 - **Cada control de una fila de Descargar nombra su video** para los lectores de pantalla: «Formato de «…»», «Quitar «…» de la lista», «Progreso de «…»», etc. Usa el título, o el link mientras se analiza (`rowName`). El Historial ya lo hacía (D-101). En Convertir el panel de detalle es de un solo archivo, con su nombre como título, así que no hace falta.
 - **Grabar en el celular:** no hubo que cambiar nada. Los navegadores de celular no tienen `getDisplayMedia`, y la página ya dice que no funciona en celulares. Las otras pantallas angostas (D-100, D-101) se desplazan sin romperse.
+
+### D-105 — Navegación arriba, en dos niveles · Vigente
+
+La barra lateral pasa a ser una barra arriba, fija al bajar por la página. Se eligió entre dos propuestas (una fila de 60 px o dos niveles de 96 px) mostradas a 1366, 1024 y 390 px.
+
+- **Dos niveles:** arriba el logo y la cuenta; abajo las secciones como pestañas. La activa va en el color de acento y subrayada (antes tenía fondo y una marca a la izquierda). Los contadores (D-096) y el indicador de grabación (D-094) van pegados al nombre de la sección.
+- **Lugar para más secciones:** las pestañas ocupan todo el ancho. A 1024 px entran seis o más. Si en una ventana angosta no entran, la fila se desliza de costado, y al cambiar de sección la activa se trae a la vista (también cuando termina de cargar la letra, que cambia los anchos).
+- **Cuenta apenas más grande:** un círculo con las iniciales (`initials`), el nombre a 0,9333 rem y «Mi cuenta», «Usuarios» y «Salir» a 0,9 rem, con ícono. Antes todo estaba a 0,8333 rem. Debajo de 760 px los tres enlaces pasan a un menú que se abre desde el círculo. Es el mismo `RowMenu` del Historial, que ahora acepta otro contenido para el botón.
+- **El pie** («Usar solo con contenido propio o con autorización») va al final de cada página. La barra y el pie siguen los mismos bordes que el contenido, también cuando se centra en monitores muy anchos (D-100).
+- Se quitó `--sidebar-w`.
+
+Verificado con un server de prueba aislado (datos en una carpeta temporal y cuenta de prueba), midiendo con el CSS final:
+
+- Sin scroll horizontal en las cinco secciones, Mi cuenta y Usuarios a 1366, 1024, 760 y 390 px en oscuro, y a 1366, 1024 y 390 px en claro. La sección activa siempre queda a la vista.
+- A 2560 px la fila de secciones llega a los bordes, y el logo, la primera pestaña, el contenido y el pie empiezan en la misma línea.
+- La barra queda arriba al bajar. En 390 px el menú de cuenta navega.
+- El ingreso que aparece cuando se corta la sesión (`.login-overlay`, z-index 100) queda encima de la barra (10).
 
 ## Usuarios y login
 

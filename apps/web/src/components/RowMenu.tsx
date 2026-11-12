@@ -19,7 +19,18 @@ type Position = { top: number; right: number };
  * scroll o al cambiar el tamaño de la ventana. Flechas arriba/abajo recorren
  * las opciones (patrón «menu button» de ARIA).
  */
-export function RowMenu({ label, items }: { label: string; items: readonly RowMenuItem[] }) {
+export function RowMenu({
+  label,
+  items,
+  trigger,
+  triggerClassName = 'button button-ghost button-icon',
+}: {
+  label: string;
+  items: readonly RowMenuItem[];
+  /** Lo que muestra el botón (por defecto, «…»). */
+  trigger?: ReactNode;
+  triggerClassName?: string;
+}) {
   const [position, setPosition] = useState<Position | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -100,7 +111,7 @@ export function RowMenu({ label, items }: { label: string; items: readonly RowMe
       <button
         ref={buttonRef}
         type="button"
-        className="button button-ghost button-icon"
+        className={triggerClassName}
         aria-label={label}
         title={label}
         aria-haspopup="menu"
@@ -108,7 +119,7 @@ export function RowMenu({ label, items }: { label: string; items: readonly RowMe
         aria-controls={open ? menuId : undefined}
         onClick={toggle}
       >
-        <DotsThreeIcon size={18} weight="bold" aria-hidden="true" />
+        {trigger ?? <DotsThreeIcon size={18} weight="bold" aria-hidden="true" />}
       </button>
       {position && (
         <div

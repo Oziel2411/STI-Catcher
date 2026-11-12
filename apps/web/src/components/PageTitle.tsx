@@ -1,7 +1,7 @@
 import type { Icon } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
-/** Título de una sección: ícono (el mismo de la barra lateral), nombre y una línea de ayuda. */
+/** Título de una sección: ícono (el mismo de la barra de secciones), nombre y una línea de ayuda. */
 export function PageTitle({
   icon: PageIcon,
   title,

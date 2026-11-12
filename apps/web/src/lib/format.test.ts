@@ -5,6 +5,7 @@ import {
   formatEta,
   formatSpeedRatio,
   formatUptime,
+  initials,
 } from './format.ts';
 
 describe('formatEta', () => {
@@ -62,5 +63,18 @@ describe('formatUptime', () => {
     expect(formatUptime(125)).toBe('2 min');
     expect(formatUptime(3725)).toBe('1 h 2 min');
     expect(formatUptime(2 * 86_400 + 3 * 3600)).toBe('2 d 3 h');
+  });
+});
+
+describe('initials', () => {
+  it('usa la primera letra del primer y del último nombre', () => {
+    expect(initials('María Gómez')).toBe('MG');
+    expect(initials('  juan carlos  pérez ')).toBe('JP');
+    expect(initials('admin')).toBe('A');
+    expect(initials('Ñandú')).toBe('Ñ');
+  });
+
+  it('devuelve un signo de pregunta si no hay nombre', () => {
+    expect(initials('   ')).toBe('?');
   });
 });
