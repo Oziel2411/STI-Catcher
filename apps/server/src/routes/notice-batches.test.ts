@@ -86,7 +86,7 @@ describe('aviso agrupado (D-105)', () => {
     // Van a las cuentas elegidas al abrir el pedido.
     expect(mail?.to).toEqual(['ana@capitanes.ar', 'beto@capitanes.ar']);
     expect(mail?.subject).toBe('Descargas terminadas: 2 de 3 listas');
-    expect(mail?.text).toContain('Terminó tu pedido de 3 descargas. 2 están en el Historial');
+    expect(mail?.text).toContain('Terminó un pedido de 3 descargas. 2 están en el Historial');
     // El tamaño lo mide la cola sobre el archivo (en el test, uno vacío).
     expect(mail?.text).toMatch(/Listas \(2\):\n- Uno \(.*, 1:05\)\n- Tres \(.*, 1:05\)/);
     expect(mail?.text).toContain(
@@ -259,5 +259,100 @@ describe('aviso agrupado (D-105)', () => {
     });
     expect(t.sentMails[0]?.subject).toBe('Conversiones terminadas: 2 de 2 listas');
     expect(t.sentMails[0]?.text).toContain('- A → MP3');
+  });
+
+  it('si se cancela todo, no avisa (como un trabajo cancelado solo)', async () => {
+    const t = await app();
+    const batchId = await openBatch(t, [t.ana.user.id]);
+    const uno = await download(t, { title: 'Uno', batchId });
+    const dos = await download(t, { title: 'Dos', batchId });
+    await close(t, batchId);
+    await waitRuns(t, 1);
+    // El segundo se cancela en cola; el primero, corriendo.
+    await t.app.inject({ method: 'POST', url: `/api/jobs/${dos.jobId ?? ''}/cancel` });
+    await t.app.inject({ method: 'POST', url: `/api/jobs/${uno.jobId ?? ''}/cancel` });
+    t.runs[0]?.reject(new Error('abortado'));
+    await vi.waitFor(() => {
+      expect(t.repo.get(uno.jobId ?? '')?.status).toBe('cancelled');
+    });
+    await flush();
+    t.notifyJob.sweep();
+    await flush();
+    expect(t.sentMails).toHaveLength(0);
+  });
+
+  it('si el último se cancela mientras espera en cola, el mail sale en el momento', async () => {
+    const t = await app();
+    const batchId = await openBatch(t, [t.ana.user.id]);
+    await download(t, { title: 'Uno', batchId });
+    await download(t, { title: 'Dos', batchId });
+    const tres = await download(t, { title: 'Tres', batchId });
+    await close(t, batchId);
+    await waitRuns(t, 1);
+    finishRun(t, 0);
+    await waitRuns(t, 2);
+    // «Tres» todavía está en cola (corre uno a la vez).
+    expect(t.repo.get(tres.jobId ?? '')?.status).toBe('queued');
+    await t.app.inject({ method: 'POST', url: `/api/jobs/${tres.jobId ?? ''}/cancel` });
+    finishRun(t, 1);
+    await vi.waitFor(() => {
+      expect(t.sentMails).toHaveLength(1);
+    });
+    expect(t.sentMails[0]?.subject).toBe('Descargas terminadas: 2 de 3 listas');
+    expect(t.sentMails[0]?.text).toContain('Canceladas (1):\n- Tres');
+  });
+
+  it('los trabajos interrumpidos por un reinicio avisan al arrancar', async () => {
+    const t = await app();
+    const job = await t.queue.enqueue({
+      type: 'download',
+      params: {},
+      title: 'Largo',
+      notifyUserIds: [t.ana.user.id],
+    });
+    await waitRuns(t, 1);
+    // Como lo deja `recoverOnStartup` después de un corte.
+    t.runs[0]?.reject(new JobError('Se interrumpió porque el servidor se reinició.'));
+    await vi.waitFor(() => {
+      expect(t.sentMails).toHaveLength(1);
+    });
+    t.sentMails.length = 0;
+    const record = t.repo.get(job.id);
+    if (!record) throw new Error('falta el job');
+    t.notifyJob.notifyInterrupted([record, { ...record, noticeBatchId: 'b' }]);
+    await vi.waitFor(() => {
+      expect(t.sentMails).toHaveLength(1);
+    });
+    expect(t.sentMails[0]?.subject).toBe('Falló la descarga: Largo');
+  });
+});
+
+describe('al detener el servicio', () => {
+  it('espera los avisos que se están mandando, con un tope', async () => {
+    let release: () => void = () => undefined;
+    const t = await makeTestApp({
+      sendMail: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+    storageDirs.push(t.storageDir);
+    await t.queue.enqueue({ type: 'download', params: {}, notifyUserIds: [t.ana.user.id] });
+    await waitRuns(t as unknown as TestApp, 1);
+    t.runs[0]?.reject(new JobError('Se cortó.'));
+    await flush();
+    await flush();
+
+    let drained = false;
+    const draining = t.notifyJob.drain(10_000).then(() => {
+      drained = true;
+    });
+    await flush();
+    expect(drained).toBe(false);
+    release();
+    await draining;
+    expect(drained).toBe(true);
+    // Sin envíos pendientes, vuelve enseguida.
+    await t.notifyJob.drain(10_000);
   });
 });

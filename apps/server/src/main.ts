@@ -372,6 +372,8 @@ async function main(): Promise<void> {
     notifyJob?.stop();
     queue
       .stop()
+      // Los avisos de los trabajos que cortó el apagado salen antes de cerrar.
+      .then(() => notifyJob?.drain(5000))
       .then(() => app.close())
       .then(() => {
         db.close();
@@ -395,10 +397,12 @@ async function main(): Promise<void> {
   retention.start();
   // Los que cortó un reinicio también avisan (D-105): solos o dentro de su pedido,
   // que revisa el barrido (que además cierra los pedidos abandonados).
-  for (const id of recovery.interruptedJobIds) {
-    const record = repo.get(id);
-    if (record && record.noticeBatchId === null) notifyJob?.(record);
-  }
+  notifyJob?.notifyInterrupted(
+    recovery.interruptedJobIds.flatMap((id) => {
+      const record = repo.get(id);
+      return record ? [record] : [];
+    }),
+  );
   notifyJob?.start();
   const protocol = config.server.https ? 'https' : 'http';
   logger.info(`Escuchando en ${protocol}://${config.server.host}:${String(config.server.port)}`);

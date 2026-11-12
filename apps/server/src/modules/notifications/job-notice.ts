@@ -210,7 +210,7 @@ export function batchNoticeMessage(
     to: [...to],
     subject,
     text: [
-      `Terminó tu pedido de ${total} ${words.many}. ${summary}`,
+      `Terminó un pedido de ${total} ${words.many}. ${summary}`,
       ...section('Listas', done, (m) => {
         const extra = [size(m.sizeBytes), duration(m.durationSeconds)].filter(
           (value): value is string => value !== null,
@@ -268,8 +268,12 @@ export function createJobNotice(
 ) {
   const now = deps.now ?? (() => new Date());
 
+  // Envíos en curso: al detener el servicio se esperan (D-105), si no el
+  // aviso de los trabajos que cortó el apagado se perdería.
+  const inFlight = new Set<Promise<void>>();
+
   const deliver = (message: MailMessage, log: object) => {
-    deps
+    const sending = deps
       .send(message)
       .then(() => {
         deps.logger.info(
@@ -286,7 +290,11 @@ export function createJobNotice(
           },
           'No se pudo enviar el aviso por mail',
         );
+      })
+      .finally(() => {
+        inFlight.delete(sending);
       });
+    inFlight.add(sending);
   };
 
   const notifySingle = (record: JobRecord): void => {
@@ -320,7 +328,8 @@ export function createJobNotice(
       notifySingle({ ...only, notifyUserIds: batch.notifyUserIds });
       return;
     }
-    if (items.length === 0) return;
+    // Todo cancelado (o nada): no se avisa, como un trabajo cancelado solo.
+    if (!items.some((m) => m.status === 'done' || m.status === 'failed')) return;
     const recipients = deps.recipients(batch.notifyUserIds);
     if (recipients.length === 0) return;
     const message = batchNoticeMessage(
@@ -353,10 +362,35 @@ export function createJobNotice(
     for (const id of batches.listClosedPending()) evaluateBatch(id);
   };
 
+  /**
+   * Al arrancar: los trabajos que cortó un reinicio (quedaron «interrumpido»)
+   * avisan como cualquier fallido. Los de un pedido los resuelve el barrido.
+   */
+  const notifyInterrupted = (records: readonly JobRecord[]): void => {
+    for (const record of records) {
+      if (record.noticeBatchId === null) notifySingle(record);
+    }
+  };
+
+  /** Espera los envíos en curso, hasta `timeoutMs` (al detener el servicio). */
+  const drain = async (timeoutMs: number): Promise<void> => {
+    if (inFlight.size === 0) return;
+    let timeout: NodeJS.Timeout | undefined;
+    await Promise.race([
+      Promise.allSettled([...inFlight]),
+      new Promise((resolve) => {
+        timeout = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+    clearTimeout(timeout);
+  };
+
   let timer: NodeJS.Timeout | null = null;
   return Object.assign(notify, {
     evaluateBatch,
     sweep,
+    notifyInterrupted,
+    drain,
     start() {
       timer = setInterval(sweep, SWEEP_INTERVAL_MS);
       timer.unref();

@@ -412,6 +412,8 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
       if (record.status === 'queued') {
         repo.finish(id, { status: 'cancelled', finishedAt: now().toISOString() });
         publishUpdated(id);
+        // Un cancelado solo no avisa, pero puede ser el último de un pedido (D-105).
+        notifyFinished(id);
         const updated = repo.get(id) ?? record;
         return { outcome: 'cancelled', job: toApi(updated) };
       }

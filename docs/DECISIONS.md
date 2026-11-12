@@ -776,7 +776,8 @@ Al descargar una lista de links (D-095) o convertir varios archivos, se crea un 
 
 - **Un mail al final:** cuando terminan **todos** los trabajos del pedido (bien, mal o cancelados) llega un único mail. Lista lo que quedó listo (con tamaño y duración), lo que falló (con el motivo) y lo cancelado. No hay mails parciales.
 - Vale para **Descargar y Convertir**. Un pedido de un solo trabajo manda el mail de siempre.
-- **Los trabajos que corta un reinicio del servidor también avisan** (quedan fallidos «interrumpido»): solos o dentro de su pedido. Antes no avisaban.
+- **Los trabajos que corta un reinicio del servidor también avisan** (quedan fallidos «interrumpido»): solos o dentro de su pedido. Antes no avisaban. Al detener el servicio se esperan hasta 5 s los avisos en curso; después de un corte, se avisa al arrancar.
+- **Si se cancela todo el pedido no llega nada**, igual que con un trabajo cancelado solo.
 
 **Detalles técnicos:**
 
@@ -794,7 +795,8 @@ Al descargar una lista de links (D-095) o convertir varios archivos, se crea un 
 - si todo termina antes del cierre, el mail sale al cerrar, y cerrar dos veces no lo repite;
 - con conversión encadenada, el mail espera las conversiones y lista los archivos finales;
 - con un solo trabajo llega el mail de siempre;
-- los cancelados se listan aparte;
+- los cancelados se listan aparte; si se cancela todo, no llega nada; si el último se cancela en cola, el mail sale en el momento;
+- un interrumpido avisa al arrancar, y al detener el servicio se esperan los envíos en curso;
 - un pedido abandonado se cierra solo y avisa;
 - el `batchId` de otra cuenta da 404 y uno cerrado da 409;
 - Convertir varios archivos también avisa con un solo mail.
