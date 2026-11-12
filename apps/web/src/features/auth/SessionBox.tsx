@@ -7,7 +7,7 @@ import { useSession } from './session-context.ts';
 
 /**
  * Cuenta actual, «Mi cuenta», «Usuarios» (admins) y «Salir», arriba a la
- * derecha de la barra (D-104, D-105). En pantallas angostas los enlaces van
+ * derecha de la barra (D-104, D-106). En pantallas angostas los enlaces van
  * en un menú que se abre desde el círculo con las iniciales.
  */
 export function SessionBox() {

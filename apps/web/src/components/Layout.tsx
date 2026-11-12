@@ -30,7 +30,7 @@ const NAV_ITEMS: readonly {
 ];
 
 /**
- * Barra arriba en dos niveles (D-105): marca y cuenta; abajo, las secciones.
+ * Barra arriba en dos niveles (D-106): marca y cuenta; abajo, las secciones.
  * Queda fija al bajar por la página. La grabación vive acá (`RecorderProvider`)
  * para que siga al cambiar de sección.
  */

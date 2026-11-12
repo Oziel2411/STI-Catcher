@@ -107,7 +107,7 @@ input[type='radio'] {
 }
 
 /*
- * Shell: barra arriba en dos niveles (D-105). Arriba la marca y la cuenta;
+ * Shell: barra arriba en dos niveles (D-106). Arriba la marca y la cuenta;
  * abajo las secciones como pestañas. Queda fija al bajar por la página.
  */
 .layout {
@@ -2069,7 +2069,7 @@ input[type='radio'] {
   color: var(--text);
 }
 
-/* La sección activa va subrayada (D-105). */
+/* La sección activa va subrayada (D-106). */
 .nav-link.active::after {
   position: absolute;
   right: 10px;
