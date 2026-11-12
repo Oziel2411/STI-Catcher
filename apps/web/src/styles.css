@@ -1453,7 +1453,12 @@ input[type='radio'] {
 }
 
 .links-table {
-  min-width: 58rem;
+  /*
+   * Las columnas fijas suman 52,2rem: el mínimo le deja a Video unos 18rem.
+   * Con menos, en ventanas angostas el título y el error se aplastaban a una
+   * palabra por renglón; mejor que la tabla se desplace de costado.
+   */
+  min-width: 70rem;
   /* Anchos fijos: las columnas no saltan cuando una fila cambia de estado. */
   table-layout: fixed;
 }
