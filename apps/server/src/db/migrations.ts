@@ -178,4 +178,25 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE recordings ADD COLUMN notify_user_ids TEXT NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    version: 9,
+    name: 'create-notice-batches',
+    sql: /* sql */ `
+      -- Aviso agrupado (D-105): varios trabajos pedidos de una vez (una lista
+      -- de links o de archivos) mandan un solo mail cuando terminan todos.
+      -- closed_at: la web terminó de crear los trabajos del pedido (o pasó el
+      -- tiempo de gracia). notified_at: el mail ya salió (se reclama una vez).
+      CREATE TABLE notice_batches (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        notify_user_ids TEXT NOT NULL,
+        created_at      TEXT NOT NULL,
+        closed_at       TEXT,
+        notified_at     TEXT
+      );
+      CREATE INDEX notice_batches_pending ON notice_batches (notified_at);
+      ALTER TABLE jobs ADD COLUMN notice_batch_id TEXT;
+      CREATE INDEX jobs_notice_batch ON jobs (notice_batch_id);
+    `,
+  },
 ];

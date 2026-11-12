@@ -4,14 +4,20 @@ import { HttpError, parseInput } from '../http/validation.ts';
 import { MediaRequestError } from '../modules/download/download-service.ts';
 import type { DownloadService } from '../modules/download/download-service.ts';
 import { rethrowJobRejection } from './jobs.ts';
+import type { NoticeBatchService } from '../modules/notifications/notice-batches.ts';
 import { requesterOf } from './history.ts';
+import { assertNoticeBatch } from './mail.ts';
 
 const toHttpError = (error: unknown): unknown =>
   error instanceof MediaRequestError
     ? new HttpError(error.status, error.code, error.message)
     : error;
 
-export function registerMediaRoutes(app: FastifyInstance, download: DownloadService): void {
+export function registerMediaRoutes(
+  app: FastifyInstance,
+  download: DownloadService,
+  noticeBatches: NoticeBatchService,
+): void {
   // Análisis previo: responde en segundos, no es un job.
   app.post('/api/media/probe', async (request) => {
     const { url } = parseInput(probeRequestSchema, request.body ?? {});
@@ -24,8 +30,12 @@ export function registerMediaRoutes(app: FastifyInstance, download: DownloadServ
 
   app.post('/api/jobs/download', async (request, reply) => {
     const body = parseInput(downloadRequestSchema, request.body ?? {});
+    const requester = requesterOf(request);
+    if (requester.userId !== null) {
+      assertNoticeBatch(noticeBatches, body.batchId, requester.userId);
+    }
     try {
-      const job = await download.enqueue(body, requesterOf(request));
+      const job = await download.enqueue(body, requester);
       return await reply.status(202).send({ jobId: job.id });
     } catch (error) {
       rethrowJobRejection(error);

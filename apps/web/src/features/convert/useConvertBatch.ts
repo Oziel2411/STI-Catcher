@@ -7,6 +7,7 @@ import type { ConversionOptionsResponse } from '@sti-catcher/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiClientError, apiGet, apiPost } from '../../api/client.ts';
 import { subscribeToJobsEvents } from '../../api/events.ts';
+import { withNoticeBatch } from '../../api/notice-batch.ts';
 import { uploadFile } from '../../api/upload.ts';
 import type { UploadHandle } from '../../api/upload.ts';
 import {
@@ -221,21 +222,28 @@ export function useConvertBatch(options: ConversionOptionsResponse | null) {
   const convertReady = async (notify: string[] = []) => {
     if (!options) return;
     setSubmitting(true);
-    for (const item of items.filter((entry) => isConvertible(entry, options.gif))) {
-      if (!item.sourceJobId || !item.preset) continue;
-      try {
-        const { jobId } = await apiPost('/api/jobs/convert', createJobResponseSchema, {
-          sourceJobId: item.sourceJobId,
-          preset: item.preset,
-          maxHeight: item.maxHeight,
-          ...(item.preset === 'gif' && item.gif ? { gif: item.gif } : {}),
-          notify,
-        });
-        update(item.id, { status: 'job', jobId, job: null, error: null });
-      } catch (error) {
-        update(item.id, { error: errorMessage(error) });
+    const targets = items.filter(
+      (entry) => isConvertible(entry, options.gif) && entry.sourceJobId && entry.preset,
+    );
+    // Varios archivos con aviso: un solo mail al terminar todos (D-105).
+    await withNoticeBatch(notify, targets.length, async (batchId) => {
+      for (const item of targets) {
+        if (!item.sourceJobId || !item.preset) continue;
+        try {
+          const { jobId } = await apiPost('/api/jobs/convert', createJobResponseSchema, {
+            sourceJobId: item.sourceJobId,
+            preset: item.preset,
+            maxHeight: item.maxHeight,
+            ...(item.preset === 'gif' && item.gif ? { gif: item.gif } : {}),
+            notify,
+            batchId,
+          });
+          update(item.id, { status: 'job', jobId, job: null, error: null });
+        } catch (error) {
+          update(item.id, { error: errorMessage(error) });
+        }
       }
-    }
+    });
     setSubmitting(false);
   };
 

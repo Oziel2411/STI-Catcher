@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { conversionPresetIdSchema } from '../presets/conversion.ts';
 import { jobSchema } from './jobs.ts';
 import { notifyUserIdsSchema } from './users.ts';
+import { noticeBatchIdSchema } from './mail.ts';
 
 /** Lo que tiene el archivo de origen (de ffprobe). */
 export const sourceMediaSchema = z.object({
@@ -61,6 +62,8 @@ export const conversionRequestSchema = z.object({
   gif: gifOptionsSchema.optional(),
   /** A quién avisar por mail al terminar o fallar (D-104). */
   notify: notifyUserIdsSchema,
+  /** Pedido de varios archivos con un solo aviso (D-105). */
+  batchId: noticeBatchIdSchema,
 });
 export type ConversionRequest = z.input<typeof conversionRequestSchema>;
 

@@ -39,6 +39,8 @@ import { createHostResolver } from './adapters/host-resolver.ts';
 import { createSmtpMailer } from './adapters/mailer.ts';
 import { createMailService } from './modules/notifications/mail-service.ts';
 import { createJobNotice } from './modules/notifications/job-notice.ts';
+import { createNoticeBatchService } from './modules/notifications/notice-batches.ts';
+import { createNoticeBatchesRepository } from './db/notice-batches-repository.ts';
 import { createJobFiles } from './modules/files/job-files.ts';
 import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
@@ -130,7 +132,7 @@ async function main(): Promise<void> {
     );
   }
 
-  await recoverOnStartup({
+  const recovery = await recoverOnStartup({
     repo,
     listProcesses,
     killProcessTree,
@@ -191,7 +193,7 @@ async function main(): Promise<void> {
     },
     // Aviso por mail al terminar o fallar (D-104), a las cuentas elegidas.
     onFinished: (record) => {
-      notifyJob(record);
+      notifyJob?.(record);
     },
     resolveHost: createHostResolver(),
     logger,
@@ -265,6 +267,8 @@ async function main(): Promise<void> {
     );
   }
   const mail = createMailService({ send: sendMail, from: config.mail?.from ?? null });
+  // Aviso agrupado (D-105): un pedido de varios trabajos avisa con un solo mail.
+  const noticeBatchesRepo = createNoticeBatchesRepository(db);
   const notifyJob = sendMail
     ? createJobNotice({
         send: sendMail,
@@ -273,8 +277,13 @@ async function main(): Promise<void> {
         userName: (id) => users.get(id)?.name ?? null,
         publicUrl: config.publicUrl,
         logger,
+        batches: { ...noticeBatchesRepo, members: (id) => repo.listByNoticeBatch(id) },
       })
-    : () => undefined;
+    : null;
+  const noticeBatches = createNoticeBatchService({
+    repo: noticeBatchesRepo,
+    onClosed: (id) => notifyJob?.evaluateBatch(id),
+  });
   if (config.mail) {
     logger.info(
       { host: config.mail.host, port: config.mail.port },
@@ -331,6 +340,7 @@ async function main(): Promise<void> {
       conversionOptions,
       recordings,
       mail,
+      noticeBatches,
       auth,
       users: usersService,
       passwordReset,
@@ -359,6 +369,7 @@ async function main(): Promise<void> {
     logger.info({ signal }, 'Deteniendo el servidor');
     recordings.stop();
     retention.stop();
+    notifyJob?.stop();
     queue
       .stop()
       .then(() => app.close())
@@ -382,6 +393,13 @@ async function main(): Promise<void> {
   recordings.start();
   // Retención: una pasada ahora y después cada hora (RETENTION_DAYS=0 la desactiva).
   retention.start();
+  // Los que cortó un reinicio también avisan (D-105): solos o dentro de su pedido,
+  // que revisa el barrido (que además cierra los pedidos abandonados).
+  for (const id of recovery.interruptedJobIds) {
+    const record = repo.get(id);
+    if (record && record.noticeBatchId === null) notifyJob?.(record);
+  }
+  notifyJob?.start();
   const protocol = config.server.https ? 'https' : 'http';
   logger.info(`Escuchando en ${protocol}://${config.server.host}:${String(config.server.port)}`);
 }

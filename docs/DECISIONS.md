@@ -768,6 +768,39 @@ Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie a
 - En el log no apareció ninguna contraseña, token de recuperación ni cookie.
 - Con el primer admin creado antes de instalar el servicio, la base queda a nombre de quien corrió el comando; `install-service.ps1` da a la cuenta del servicio permiso heredable sobre `DATA_DIR`, que `icacls` aplica también a los archivos que ya están.
 
+### D-105 — Un solo aviso por pedido de varios trabajos · Vigente
+
+Al descargar una lista de links (D-095) o convertir varios archivos, se crea un trabajo por cada uno y llegaba un mail por cada uno. El usuario pidió **un solo mail por pedido**, con la lista de lo que quedó listo.
+
+**Decidido con el usuario:**
+
+- **Un mail al final:** cuando terminan **todos** los trabajos del pedido (bien, mal o cancelados) llega un único mail. Lista lo que quedó listo (con tamaño y duración), lo que falló (con el motivo) y lo cancelado. No hay mails parciales.
+- Vale para **Descargar y Convertir**. Un pedido de un solo trabajo manda el mail de siempre.
+- **Los trabajos que corta un reinicio del servidor también avisan** (quedan fallidos «interrumpido»): solos o dentro de su pedido. Antes no avisaban.
+
+**Detalles técnicos:**
+
+- **El servidor no sabía qué es un «pedido»:** la web crea los trabajos de a uno. Ahora, si hay varios y alguien a quien avisar, la web abre un pedido (`POST /api/notice-batches { notify }` → `{ batchId }`), manda `batchId` en cada `POST /api/jobs/download` o `/api/jobs/convert`, y lo cierra al terminar de crearlos (`POST /api/notice-batches/:id/close`), aunque alguno haya fallado. Si no se puede abrir el pedido, cada trabajo avisa solo, como antes.
+- **Por qué hace falta cerrar:** el primer trabajo puede terminar mientras la web todavía crea el tercero; sin el cierre, el mail saldría con la lista incompleta. Mandar «cuántos van a ser» no alcanza: si un pedido falla (sin disco, URL inválida) o se cierra la pestaña a mitad, el número nunca se completa.
+- **Pedidos abandonados:** un barrido cada 5 minutos cierra los pedidos abiertos que llevan 15 minutos sin trabajos nuevos, y revisa los cerrados que no avisaron (por ejemplo, si el servidor se reinició justo al terminar el último).
+- **El mail sale una sola vez:** se reclama con `UPDATE … SET notified_at … WHERE notified_at IS NULL`, aunque dos trabajos terminen a la vez.
+- **El pedido es de quien lo abre:** un `batchId` de otra cuenta da 404 y uno cerrado da 409. El mail va a las cuentas elegidas al abrir el pedido.
+- **Descarga con conversión encadenada (D-093):** la conversión hereda el pedido. La fila se cuenta terminada cuando termina la conversión, y en la lista figura el archivo final («Video → MP3»).
+- Tabla nueva `notice_batches` (migración 9) y columna `jobs.notice_batch_id`.
+
+**Verificado:** con tests (mailer simulado):
+
+- tres links con uno fallido dan un solo mail «2 de 3 listas», con el motivo;
+- si todo termina antes del cierre, el mail sale al cerrar, y cerrar dos veces no lo repite;
+- con conversión encadenada, el mail espera las conversiones y lista los archivos finales;
+- con un solo trabajo llega el mail de siempre;
+- los cancelados se listan aparte;
+- un pedido abandonado se cierra solo y avisa;
+- el `batchId` de otra cuenta da 404 y uno cerrado da 409;
+- Convertir varios archivos también avisa con un solo mail.
+
+El envío real por SMTP no se probó.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

@@ -7,13 +7,16 @@ import { ConversionError } from '../modules/conversion/conversion-service.ts';
 import type { ConversionService } from '../modules/conversion/conversion-service.ts';
 import { UploadError } from '../modules/conversion/upload-service.ts';
 import type { UploadService } from '../modules/conversion/upload-service.ts';
+import type { NoticeBatchService } from '../modules/notifications/notice-batches.ts';
 import { requesterOf } from './history.ts';
+import { assertNoticeBatch } from './mail.ts';
 import { rethrowJobRejection } from './jobs.ts';
 
 export type ConversionRoutesOptions = {
   conversion: ConversionService;
   upload: UploadService;
   options: ConversionOptionsResponse;
+  noticeBatches: NoticeBatchService;
 };
 
 const toHttpError = (error: unknown): unknown =>
@@ -72,8 +75,12 @@ export function registerConversionRoutes(
 
   app.post('/api/jobs/convert', async (request, reply) => {
     const body = parseInput(conversionRequestSchema, request.body ?? {});
+    const requester = requesterOf(request);
+    if (requester.userId !== null) {
+      assertNoticeBatch(options.noticeBatches, body.batchId, requester.userId);
+    }
     try {
-      const job = await options.conversion.enqueue(body, requesterOf(request));
+      const job = await options.conversion.enqueue(body, requester);
       return await reply.status(202).send({ jobId: job.id });
     } catch (error) {
       rethrowJobRejection(error);

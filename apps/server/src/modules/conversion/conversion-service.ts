@@ -173,6 +173,7 @@ export function createConversionService(deps: ConversionServiceDeps) {
         parentJobId: record.id,
         userId: requester.userId,
         notifyUserIds: parsed.notify,
+        noticeBatchId: parsed.batchId,
         clientIp: requester.ip,
       };
       return deps.queue.enqueue(input);

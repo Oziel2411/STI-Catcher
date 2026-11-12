@@ -33,6 +33,8 @@ import { createFollowUps } from '../src/modules/download/follow-up.ts';
 import type { MailMessage, SendMail } from '../src/adapters/mailer.ts';
 import { createMailService } from '../src/modules/notifications/mail-service.ts';
 import { createJobNotice } from '../src/modules/notifications/job-notice.ts';
+import { createNoticeBatchService } from '../src/modules/notifications/notice-batches.ts';
+import { createNoticeBatchesRepository } from '../src/db/notice-batches-repository.ts';
 import { createJobFiles } from '../src/modules/files/job-files.ts';
 import { createHistoryService } from '../src/modules/history/history-service.ts';
 import type { HealthService } from '../src/modules/health/health-service.ts';
@@ -224,6 +226,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     ...(options.authNow ? { now: options.authNow } : {}),
   });
   const noticeLogger = { info: vi.fn(), warn: vi.fn() };
+  const noticeBatchesRepo = createNoticeBatchesRepository(db);
   const notifyJob = createJobNotice({
     send: sendMail,
     recipients: (ids) =>
@@ -231,6 +234,15 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     userName: (id) => users.get(id)?.name ?? null,
     publicUrl: options.publicUrl === undefined ? 'https://sti.test' : options.publicUrl,
     logger: noticeLogger,
+    batches: { ...noticeBatchesRepo, members: (id) => repo.listByNoticeBatch(id) },
+    now: () => clock.now,
+  });
+  const noticeBatches = createNoticeBatchService({
+    repo: noticeBatchesRepo,
+    onClosed: (id) => {
+      notifyJob.evaluateBatch(id);
+    },
+    now: () => clock.now,
   });
   const mail = createMailService({
     send: options.mailConfigured === true ? sendMail : null,
@@ -283,6 +295,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       conversionOptions,
       recordings,
       mail,
+      noticeBatches,
       auth,
       users: usersService,
       passwordReset,
@@ -345,6 +358,8 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     clock,
     sentMails,
     noticeLogger,
+    notifyJob,
+    noticeBatchesRepo,
   };
 }
 

@@ -30,6 +30,7 @@ const record = (patch: Partial<JobRecord> = {}): JobRecord => ({
   clientHost: 'PC-SALA',
   parentJobId: null,
   followUpJobId: null,
+  noticeBatchId: null,
   ...patch,
 });
 

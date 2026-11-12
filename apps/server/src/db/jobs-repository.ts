@@ -36,6 +36,7 @@ type JobRow = {
   client_host: string | null;
   parent_job_id: string | null;
   follow_up_job_id: string | null;
+  notice_batch_id: string | null;
 };
 
 /**
@@ -91,6 +92,7 @@ function toRecord(row: JobRow): JobRecord {
     clientHost: row.client_host,
     parentJobId: row.parent_job_id,
     followUpJobId: row.follow_up_job_id,
+    noticeBatchId: row.notice_batch_id,
   };
 }
 
@@ -114,14 +116,18 @@ export function createJobsRepository(db: Db): JobsRepository {
         userId: string | null;
         notifyUserIds: string;
         parentJobId: string | null;
+        noticeBatchId: string | null;
       },
     ]
   >(`
     INSERT INTO jobs (id, type, status, params, created_at, source_url, title, title_search,
-                      client_ip, user_id, notify_user_ids, parent_job_id)
+                      client_ip, user_id, notify_user_ids, parent_job_id, notice_batch_id)
     VALUES (@id, @type, 'queued', @params, @createdAt, @sourceUrl, @title, @titleSearch,
-            @clientIp, @userId, @notifyUserIds, @parentJobId)
+            @clientIp, @userId, @notifyUserIds, @parentJobId, @noticeBatchId)
   `);
+  const byNoticeBatchStmt = db.prepare<[string], JobRow>(
+    'SELECT * FROM jobs WHERE notice_batch_id = ? ORDER BY created_at, rowid',
+  );
   const getStmt = db.prepare<[string], JobRow>('SELECT * FROM jobs WHERE id = ?');
   const nextQueuedStmt = db.prepare<[], JobRow>(
     "SELECT * FROM jobs WHERE status = 'queued' ORDER BY created_at, rowid LIMIT 1",
@@ -247,6 +253,7 @@ export function createJobsRepository(db: Db): JobsRepository {
         userId: job.userId ?? null,
         notifyUserIds: JSON.stringify(job.notifyUserIds ?? []),
         parentJobId: job.parentJobId ?? null,
+        noticeBatchId: job.noticeBatchId ?? null,
       });
       const created = getStmt.get(job.id);
       if (!created) throw new Error(`No se pudo leer el job recién creado ${job.id}`);
@@ -383,6 +390,10 @@ export function createJobsRepository(db: Db): JobsRepository {
 
     listLiveFilePaths() {
       return liveFilePathsStmt.all().map((row) => row.file_path);
+    },
+
+    listByNoticeBatch(batchId) {
+      return byNoticeBatchStmt.all(batchId).map(toRecord);
     },
   };
 }
