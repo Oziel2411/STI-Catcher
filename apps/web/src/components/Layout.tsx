@@ -18,19 +18,22 @@ import { NavCount } from './NavCount.tsx';
 const NAV_ITEMS: readonly {
   to: string;
   label: string;
+  /** Nombre en pantallas angostas, si el completo es largo. */
+  shortLabel?: string;
   icon: Icon;
   /** Qué trabajos en curso se cuentan junto al nombre. */
   count?: keyof ActiveJobsResponse;
 }[] = [
   { to: '/descargar', label: 'Descargar', icon: DownloadSimpleIcon, count: 'download' },
-  { to: '/grabar', label: 'Grabar pantalla', icon: RecordIcon },
+  { to: '/grabar', label: 'Grabar pantalla', shortLabel: 'Grabar', icon: RecordIcon },
   { to: '/convertir', label: 'Convertir', icon: ArrowsLeftRightIcon, count: 'conversion' },
   { to: '/historial', label: 'Historial', icon: ClockCounterClockwiseIcon },
   { to: '/estado', label: 'Estado', icon: PulseIcon },
 ];
 
 /**
- * Barra arriba en dos niveles (D-106): marca y cuenta; abajo, las secciones.
+ * Barra arriba en dos niveles (D-106): marca y cuenta; abajo, las secciones en
+ * un grupo de botones centrado (D-107).
  * Queda fija al bajar por la página. La grabación vive acá (`RecorderProvider`)
  * para que siga al cambiar de sección.
  */
@@ -66,11 +69,18 @@ export function Layout() {
           </div>
           <nav ref={navRef} aria-label="Secciones" className="topbar-nav">
             <ul className="nav">
-              {NAV_ITEMS.map(({ to, label, icon: ItemIcon, count }) => (
+              {NAV_ITEMS.map(({ to, label, shortLabel, icon: ItemIcon, count }) => (
                 <li key={to}>
                   <NavLink to={to} className="nav-link">
-                    <ItemIcon size={16} aria-hidden="true" className="nav-icon" />
-                    {label}
+                    <ItemIcon size={18} aria-hidden="true" className="nav-icon" />
+                    {shortLabel === undefined ? (
+                      label
+                    ) : (
+                      <>
+                        <span className="nav-label-long">{label}</span>
+                        <span className="nav-label-short">{shortLabel}</span>
+                      </>
+                    )}
                     {to === '/grabar' ? (
                       <RecordingNavBadge processing={counts.recording} />
                     ) : (

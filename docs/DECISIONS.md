@@ -675,7 +675,7 @@ Verificado en claro y oscuro a 1366 px y a 390 px (sin scroll horizontal en ning
 - **Cada control de una fila de Descargar nombra su video** para los lectores de pantalla: «Formato de «…»», «Quitar «…» de la lista», «Progreso de «…»», etc. Usa el título, o el link mientras se analiza (`rowName`). El Historial ya lo hacía (D-101). En Convertir el panel de detalle es de un solo archivo, con su nombre como título, así que no hace falta.
 - **Grabar en el celular:** no hubo que cambiar nada. Los navegadores de celular no tienen `getDisplayMedia`, y la página ya dice que no funciona en celulares. Las otras pantallas angostas (D-100, D-101) se desplazan sin romperse.
 
-### D-106 — Navegación arriba, en dos niveles · Vigente
+### D-106 — Navegación arriba, en dos niveles · Vigente (con D-107: secciones como grupo de botones)
 
 La barra lateral pasa a ser una barra arriba, fija al bajar por la página. Se eligió entre dos propuestas (una fila de 60 px o dos niveles de 96 px) mostradas a 1366, 1024 y 390 px.
 
@@ -691,6 +691,23 @@ Verificado con un server de prueba aislado (datos en una carpeta temporal y cuen
 - A 2560 px la fila de secciones llega a los bordes, y el logo, la primera pestaña, el contenido y el pie empiezan en la misma línea.
 - La barra queda arriba al bajar. En 390 px el menú de cuenta navega.
 - El ingreso que aparece cuando se corta la sesión (`.login-overlay`, z-index 100) queda encima de la barra (10).
+
+### D-107 — Secciones centradas, como grupo de botones · Vigente
+
+Las secciones tenían poca presencia: letra de 13,5 px en gris, pegadas a la izquierda. Se mostraron tres modelos (pestañas centradas, repartidas en partes iguales y grupo de botones), con 5 y 7 secciones, y se eligió el grupo de botones.
+
+- **Un bloque centrado con fondo** (`--surface-2`, radio 12 px, borde fino). La activa resalta como una tecla apretada: fondo `--surface`, borde azul suave y una sombra chica. Reemplaza al subrayado de D-106.
+- **Más visibles:** letra de 1 rem (15 a 17 px), íconos de 18 px y el texto casi en el color principal (antes `--muted`).
+- **Se acomoda al agregar secciones:** el bloque crece desde el centro. Por debajo de 1200 px lleva menos relleno, así a 1024 px entran siete. Si igual no entra, la fila se desliza de costado. El centrado es «seguro» (`margin: auto` con `width: max-content`): cuando el bloque no entra, arranca desde el borde y no queda una parte inalcanzable.
+- **Nombre corto en el celular:** `shortLabel` en `NAV_ITEMS` («Grabar» en vez de «Grabar pantalla»). El nombre que no corresponde está con `display: none`, así que los lectores de pantalla leen uno solo.
+- La barra pasa de 96 px a 117 px de alto.
+
+Verificado con el server de prueba aislado, midiendo con el CSS final:
+
+- Sin scroll horizontal en las cinco secciones, Mi cuenta y Usuarios a 1366, 1024, 760 y 390 px, en claro y oscuro.
+- El bloque queda centrado a 1366 y a 2560 px (en el mismo centro que el contenido).
+- Con siete secciones (dos agregadas a mano en la página) entra a 1366 y a 1024 px. A 760 px se desliza y arranca desde el borde.
+- En 390 px la sección activa queda a la vista.
 
 ## Usuarios y login
 
