@@ -24,6 +24,7 @@ const screen1080p60: CompressionSource = {
   height: 1080,
   frameRate: 60,
   durationSeconds: 600,
+  hasAudio: true,
 };
 
 describe('presets de compresión', () => {
@@ -87,7 +88,7 @@ describe('outputVideo', () => {
   });
 
   it('nunca sube: un 480p con el preset 1080p queda en 480p', () => {
-    const small = { width: 854, height: 480, frameRate: 30, durationSeconds: 60 };
+    const small = { width: 854, height: 480, frameRate: 30, durationSeconds: 60, hasAudio: true };
     expect(outputVideo(small, parse({ preset: 'fast-1080p' }))).toMatchObject({
       width: 854,
       height: 480,
@@ -106,7 +107,13 @@ describe('outputVideo', () => {
   });
 
   it('ancho par con proporciones raras (vertical de celular)', () => {
-    const vertical = { width: 1080, height: 1920, frameRate: 30, durationSeconds: 30 };
+    const vertical = {
+      width: 1080,
+      height: 1920,
+      frameRate: 30,
+      durationSeconds: 30,
+      hasAudio: true,
+    };
     const out = outputVideo(vertical, parse({ preset: 'fast-720p' }));
     expect(out.height).toBe(720);
     expect(out.width % 2).toBe(0);
@@ -161,6 +168,19 @@ describe('tamaño objetivo', () => {
       reason: 'too-small',
       suggestedHeight: null,
     });
+  });
+
+  it('sin audio, todo el tamaño va al video (un caso que con audio no alcanzaría)', () => {
+    // 10 min a 24 MB en 360p: 202 kbps con audio de 96; sin audio, 298.
+    const options = parse({
+      preset: 'share-720p',
+      target: { mode: 'size', megabytes: 24 },
+      maxHeight: 480,
+    });
+    expect(planTargetSize(screen1080p60, options, TARGET_MARGIN.gpu).ok).toBe(false);
+    expect(
+      planTargetSize({ ...screen1080p60, hasAudio: false }, options, TARGET_MARGIN.gpu),
+    ).toEqual({ ok: true, videoKbps: 298 });
   });
 
   it('sin duración no hay cuenta posible', () => {

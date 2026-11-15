@@ -50,6 +50,11 @@ describe('parseFfprobeOutput (salidas reales)', () => {
     expect(webm.video?.frameRate).toBeNull();
   });
 
+  it('video vertical de celular (rotación 90°): ancho y alto como se ve', () => {
+    const rotated = parseFfprobeOutput(readJsonFixture('ffprobe-rotated-90-mp4.json'));
+    expect(rotated.video).toMatchObject({ width: 1080, height: 1920 });
+  });
+
   it('parseFrameRate: fracciones, desconocidos y absurdos', () => {
     expect(parseFrameRate('30000/1001')).toBeCloseTo(29.97, 2);
     expect(parseFrameRate('0/0')).toBeNull();

@@ -19,6 +19,8 @@ export type CompressionSource = {
   /** null cuando ffprobe no la da (p. ej. un WebM de MediaRecorder, de cuadros variables). */
   frameRate: number | null;
   durationSeconds: number | null;
+  /** Sin audio, todo el tamaño va al video (p. ej. una grabación sin sonido). */
+  hasAudio: boolean;
 };
 
 export type OutputVideo = {
@@ -60,6 +62,11 @@ export function outputVideo(source: CompressionSource, options: CompressionOptio
 
 export function effectiveAudioKbps(options: CompressionOptions): number {
   return options.audioKbps ?? COMPRESSION_PRESETS[options.preset].audioKbps;
+}
+
+/** Bitrate de audio de la salida: 0 si el original no tiene audio. */
+export function outputAudioKbps(source: CompressionSource, options: CompressionOptions): number {
+  return source.hasAudio ? effectiveAudioKbps(options) : 0;
 }
 
 /** Cuánto rinde cada códec respecto de H.264 (H.265 ≈ 40 % menos a igual calidad). */
@@ -133,7 +140,7 @@ export function planTargetSize(
   const videoKbps = videoKbpsForTarget({
     targetBytes: options.target.megabytes * BYTES_PER_MB,
     durationSeconds: duration,
-    audioKbps: effectiveAudioKbps(options),
+    audioKbps: outputAudioKbps(source, options),
     margin,
   });
   const video = outputVideo(source, options);
@@ -178,7 +185,8 @@ export function estimateCompressedSize(
   const rfFactor = 2 ** ((REFERENCE_RF - preset.quality) / 6) * CODEC_FACTOR[preset.codec];
   const pixelsPerSecond = video.width * video.height * video.fpsForMath;
   const bytesAt = (bitsPerPixel: number) => {
-    const kbps = kbpsFor(pixelsPerSecond, bitsPerPixel) * rfFactor + effectiveAudioKbps(options);
+    const kbps =
+      kbpsFor(pixelsPerSecond, bitsPerPixel) * rfFactor + outputAudioKbps(source, options);
     return Math.round(((kbps * 1000) / 8) * duration * (1 + CONTAINER_OVERHEAD));
   };
   return {
@@ -193,6 +201,7 @@ export function estimateCompressedSize(
  */
 export function retryVideoKbps(params: {
   previousVideoKbps: number;
+  /** El de la salida (0 sin audio: `outputAudioKbps`). */
   audioKbps: number;
   actualBytes: number;
   targetBytes: number;

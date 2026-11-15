@@ -8,6 +8,7 @@ export type MediaInfo = {
   sizeBytes: number | null;
   video: {
     codec: string;
+    /** Ancho y alto como se ve (con la rotación de los videos verticales ya aplicada). */
     width: number;
     height: number;
     pixFmt: string | null;
@@ -30,7 +31,15 @@ const streamSchema = z.looseObject({
   height: z.number().optional(),
   avg_frame_rate: z.string().optional(),
   disposition: z.looseObject({ attached_pic: z.number().optional() }).optional(),
+  /** La matriz de rotación de los videos verticales de celular. */
+  side_data_list: z.array(z.looseObject({ rotation: z.number().optional() })).optional(),
 });
+
+/** ±90° o ±270°: el video se ve con el ancho y el alto cambiados. */
+const isQuarterTurn = (stream: z.infer<typeof streamSchema>) =>
+  stream.side_data_list?.some(
+    (side) => side.rotation !== undefined && Math.abs(side.rotation) % 180 === 90,
+  ) ?? false;
 
 const ffprobeSchema = z.object({
   streams: z.array(streamSchema).default([]),
@@ -80,8 +89,9 @@ export function parseFfprobeOutput(json: unknown): MediaInfo {
       video?.codec_name && video.width && video.height
         ? {
             codec: video.codec_name,
-            width: video.width,
-            height: video.height,
+            // Medidas como se ven: ffmpeg aplica la rotación antes de los filtros (`-vf`).
+            width: isQuarterTurn(video) ? video.height : video.width,
+            height: isQuarterTurn(video) ? video.width : video.height,
             pixFmt: video.pix_fmt ?? null,
             frameRate: parseFrameRate(video.avg_frame_rate),
           }

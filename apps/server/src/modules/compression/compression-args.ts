@@ -94,12 +94,15 @@ export function buildCompressionArgs(params: CompressionArgsOptions): Compressio
       height: media.video.height,
       frameRate: media.video.frameRate,
       durationSeconds: media.durationSeconds,
+      hasAudio: media.audio !== null,
     },
     options,
   );
 
+  // Escala por alto con ancho par automático (-2): ffmpeg ya giró los videos verticales,
+  // así que el ancho lo calcula sobre la imagen como se ve.
   const filters = [
-    ...(out.scaled ? [`scale=${String(out.width)}:${String(out.height)}:flags=lanczos`] : []),
+    ...(out.scaled ? [`scale=-2:${String(out.height)}:flags=lanczos`] : []),
     ...(out.fpsCap !== null ? [`fps=${String(out.fpsCap)}`] : []),
     `format=${PIXEL_FORMAT[encoder]}`,
   ];

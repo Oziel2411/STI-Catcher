@@ -9,6 +9,7 @@ import type { CompressionArgsOptions } from './compression-args.ts';
 const iphoneHevc = parseFfprobeOutput(readJsonFixture('ffprobe-iphone-hevc-mov.json'));
 const chromeWebm = parseFfprobeOutput(readJsonFixture('ffprobe-mediarecorder-chrome-webm.json'));
 const voiceNote = parseFfprobeOutput(readJsonFixture('ffprobe-nota-de-voz-m4a.json'));
+const vertical = parseFfprobeOutput(readJsonFixture('ffprobe-rotated-90-mp4.json'));
 
 const build = (
   options: unknown,
@@ -49,7 +50,7 @@ describe('buildCompressionArgs', () => {
     expect(after(args, '-c:v')).toBe('libx264');
     expect(after(args, '-preset')).toBe('veryfast');
     expect(after(args, '-crf')).toBe('22');
-    expect(after(args, '-vf')).toBe('scale=1280:720:flags=lanczos,format=yuv420p');
+    expect(after(args, '-vf')).toBe('scale=-2:720:flags=lanczos,format=yuv420p');
     expect(after(args, '-c:a')).toBe('aac');
     expect(after(args, '-b:a')).toBe('128k');
     expect(args).not.toContain('-b:v');
@@ -59,7 +60,7 @@ describe('buildCompressionArgs', () => {
     const args = only(build({ preset: 'fast-720p' }, { encoder: 'qsv' }));
     expect(after(args, '-c:v')).toBe('h264_qsv');
     expect(after(args, '-global_quality')).toBe('22');
-    expect(after(args, '-vf')).toBe('scale=1280:720:flags=lanczos,format=nv12');
+    expect(after(args, '-vf')).toBe('scale=-2:720:flags=lanczos,format=nv12');
     expect(args).not.toContain('-crf');
   });
 
@@ -80,8 +81,14 @@ describe('buildCompressionArgs', () => {
 
   it('altura y audio elegidos por el usuario', () => {
     const args = only(build({ preset: 'fast-1080p', maxHeight: 480, audioKbps: 64 }));
-    expect(after(args, '-vf')).toBe('scale=854:480:flags=lanczos,format=yuv420p');
+    expect(after(args, '-vf')).toBe('scale=-2:480:flags=lanczos,format=yuv420p');
     expect(after(args, '-b:a')).toBe('64k');
+  });
+
+  it('video vertical de celular: se escala por el alto como se ve, sin deformar', () => {
+    // Guardado 1920×1080 con rotación de 90°: se ve 1080×1920, así que 720p lo baja.
+    const args = only(build({ preset: 'fast-720p' }, { media: vertical }));
+    expect(after(args, '-vf')).toBe('scale=-2:720:flags=lanczos,format=yuv420p');
   });
 
   it('WebM de MediaRecorder sin cuadros informados: aplica el tope de 30', () => {
