@@ -6,7 +6,14 @@ export type MediaInfo = {
   /** Nombre del contenedor según ffprobe, p. ej. "mov,mp4,m4a,3gp,3g2,mj2". */
   formatName: string | null;
   sizeBytes: number | null;
-  video: { codec: string; width: number; height: number; pixFmt: string | null } | null;
+  video: {
+    codec: string;
+    width: number;
+    height: number;
+    pixFmt: string | null;
+    /** Cuadros por segundo promedio; null si ffprobe no lo sabe (p. ej. WebM de MediaRecorder). */
+    frameRate: number | null;
+  } | null;
   audio: { codec: string; channels: number | null } | null;
 };
 
@@ -21,6 +28,7 @@ const streamSchema = z.looseObject({
   pix_fmt: z.string().optional(),
   channels: z.number().optional(),
   height: z.number().optional(),
+  avg_frame_rate: z.string().optional(),
   disposition: z.looseObject({ attached_pic: z.number().optional() }).optional(),
 });
 
@@ -40,6 +48,17 @@ const positiveNumber = (value: string | undefined): number | null => {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : null;
 };
+
+/** Más que esto no es un video real: es la base de tiempo (p. ej. "1000/1"). */
+const MAX_FRAME_RATE = 240;
+
+/** "30000/1001" → 29,97. "0/0" (desconocida) o valores absurdos → null. */
+export function parseFrameRate(value: string | undefined): number | null {
+  const match = /^(\d+)\/(\d+)$/.exec(value ?? '');
+  if (!match) return null;
+  const rate = Number(match[1]) / Number(match[2]);
+  return Number.isFinite(rate) && rate > 0 && rate <= MAX_FRAME_RATE ? rate : null;
+}
 
 /**
  * Parsea `ffprobe -print_format json -show_format -show_streams`.
@@ -64,6 +83,7 @@ export function parseFfprobeOutput(json: unknown): MediaInfo {
             width: video.width,
             height: video.height,
             pixFmt: video.pix_fmt ?? null,
+            frameRate: parseFrameRate(video.avg_frame_rate),
           }
         : null,
     audio: audio?.codec_name ? { codec: audio.codec_name, channels: audio.channels ?? null } : null,

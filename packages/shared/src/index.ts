@@ -1,3 +1,5 @@
+export * from './presets/compression.ts';
+export * from './presets/compression-size.ts';
 export * from './presets/conversion.ts';
 export * from './schemas/auth.ts';
 export * from './schemas/conversion.ts';
