@@ -37,8 +37,40 @@ export const createRecordingRequestSchema = z.object({
   title: z.string().trim().min(1).max(200),
   /** A quién avisar por mail cuando termine de procesarse o falle (D-104). */
   notify: notifyUserIdsSchema,
+  /**
+   * Programada (inicio a una hora o corte automático): avisa también al
+   * empezar (D-109).
+   */
+  programmed: z.boolean().default(false),
+  /** Corte previsto, para el aviso de inicio. */
+  stopAt: z.iso.datetime({ error: 'Hora de corte inválida.' }).nullable().default(null),
+  /** La programación registrada que se cumple al empezar (D-109). */
+  scheduleId: z.uuid({ error: 'Programación inválida.' }).nullable().default(null),
 });
 export type CreateRecordingRequest = z.input<typeof createRecordingRequestSchema>;
+
+/**
+ * Grabación con inicio a una hora (D-109): se registra en el server al
+ * programarla, para avisar si a la hora no empezó.
+ */
+export const createRecordingScheduleRequestSchema = z.object({
+  startAt: z.iso.datetime({ error: 'Hora de inicio inválida.' }),
+  stopAt: z.iso.datetime({ error: 'Hora de corte inválida.' }).nullable().default(null),
+  title: z.string().trim().min(1).max(200),
+  notify: notifyUserIdsSchema,
+});
+export type CreateRecordingScheduleRequest = z.input<typeof createRecordingScheduleRequestSchema>;
+
+export const createRecordingScheduleResponseSchema = z.object({ scheduleId: z.uuid() });
+
+export const recordingScheduleParamsSchema = z.object({
+  id: z.uuid({ error: 'Programación inválida.' }),
+});
+
+/** La pestaña vio que no se pudo empezar (se dejó de compartir, el navegador falló…). */
+export const failRecordingScheduleRequestSchema = z.object({
+  reason: z.string().trim().min(1).max(300),
+});
 
 export const createRecordingResponseSchema = z.object({
   recordingId: z.uuid(),

@@ -18,6 +18,7 @@ import type { JobQueue } from './jobs/queue.ts';
 import type { ConversionService } from './modules/conversion/conversion-service.ts';
 import type { UploadService } from './modules/conversion/upload-service.ts';
 import type { RecordingService } from './modules/recording/recording-service.ts';
+import type { ScheduleService } from './modules/recording/schedule-service.ts';
 import type { DownloadService } from './modules/download/download-service.ts';
 import type { HistoryService } from './modules/history/history-service.ts';
 import type { JobFiles } from './modules/files/job-files.ts';
@@ -45,6 +46,7 @@ export type AppServices = {
   upload: UploadService;
   conversionOptions: ConversionOptionsResponse;
   recordings: RecordingService;
+  recordingSchedules: ScheduleService;
   mail: MailService;
   noticeBatches: NoticeBatchService;
   auth: AuthService;
@@ -145,7 +147,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
 
   registerHistoryRoutes(app, options.services.history);
-  registerRecordingRoutes(app, options.services.recordings);
+  registerRecordingRoutes(app, options.services.recordings, options.services.recordingSchedules);
   registerConversionRoutes(app, {
     conversion: options.services.conversion,
     upload: options.services.upload,

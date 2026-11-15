@@ -336,6 +336,7 @@ function Recorder() {
             value={recorder.notify}
             onChange={recorder.setNotify}
             what="la grabación"
+            hint="Si está programada, también avisa al empezar (o si a la hora no pudo empezar)."
             disabled={locked}
           />
 

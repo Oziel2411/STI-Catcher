@@ -1,9 +1,11 @@
 import {
   createRecordingResponseSchema,
+  createRecordingScheduleResponseSchema,
   finishRecordingResponseSchema,
   apiErrorSchema,
 } from '@sti-catcher/shared';
-import type { CreateRecordingRequest } from '@sti-catcher/shared';
+import type { CreateRecordingRequest, CreateRecordingScheduleRequest } from '@sti-catcher/shared';
+import { z } from 'zod';
 import { ApiClientError, apiPost, httpErrorMessage, NETWORK_ERROR_MESSAGE } from './client.ts';
 import type { SendChunk } from './chunk-uploader.ts';
 
@@ -39,3 +41,16 @@ export const chunkSender =
       ? new ApiClientError(parsed.data.error.message, parsed.data.error.code, response.status)
       : new ApiClientError(httpErrorMessage(response.status), 'HTTP_ERROR', response.status);
   };
+
+/** Grabación programada (D-109): el server avisa si a la hora no empezó. */
+export const createRecordingSchedule = (request: CreateRecordingScheduleRequest) =>
+  apiPost('/api/recording-schedules', createRecordingScheduleResponseSchema, request);
+
+export const cancelRecordingSchedule = (scheduleId: string) =>
+  apiPost(`/api/recording-schedules/${encodeURIComponent(scheduleId)}/cancel`, z.null());
+
+/** La pestaña no pudo empezar: el server avisa en el momento. */
+export const failRecordingSchedule = (scheduleId: string, reason: string) =>
+  apiPost(`/api/recording-schedules/${encodeURIComponent(scheduleId)}/fail`, z.null(), {
+    reason: reason.slice(0, 300),
+  });

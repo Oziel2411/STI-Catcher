@@ -837,6 +837,45 @@ Al descargar una lista de links (D-095) o convertir varios archivos, se crea un 
 
 El envío real por SMTP no se probó.
 
+### D-109 — Avisos de la grabación programada · Vigente
+
+Hasta ahora «A mí» venía tildado en todas las grabaciones (D-104) y el aviso llegaba solo al terminar. Una grabación programada (D-097) se hace sin nadie mirando, y si no empezaba nadie se enteraba: la espera vive en la pestaña y el server no sabía nada hasta recibir la grabación.
+
+**Decidido con el usuario:**
+
+- **«A mí» viene sin tildar** y se tilda solo cuando la grabación se **programa**: inicio a una hora **o** corte automático (por minutos o a una hora). Se puede destildar. Si se vuelve a «al tocar el botón» y «al detener», se destilda, salvo que la persona lo haya tocado. El tildado automático no se recuerda para la próxima vez.
+- **Una programada manda dos avisos:**
+  - uno al **empezar**, con la hora de corte si la tiene, o si **no pudo empezar**;
+  - otro al **terminar o fallar**, que es el de siempre.
+- **«No pudo empezar» lo detecta el server:** al programar, la pestaña registra la hora de inicio en el server. Si a los 2 minutos de esa hora no empezó, sale el aviso. Cubre la pestaña cerrada, la PC suspendida y la conexión caída. Si la pestaña ve el problema (se dejó de compartir la pantalla, el navegador no pudo grabar), avisa en el momento con el motivo.
+
+**Detalles técnicos:**
+
+- Tabla nueva `recording_schedules` (migración 10). Una programación está pendiente hasta que empieza, se cancela o falla. Un barrido cada 30 s avisa una sola vez las vencidas, también las que vencieron mientras el server estaba apagado.
+- Rutas nuevas:
+  - `POST /api/recording-schedules` `{ startAt, stopAt?, title, notify }` responde 201 `{ scheduleId }`;
+  - `POST /api/recording-schedules/:id/cancel` responde 204;
+  - `POST /api/recording-schedules/:id/fail` `{ reason }` responde 204 y avisa en el momento.
+  - Una programación de otra cuenta da 404.
+- `POST /api/recordings` suma `programmed` (avisa al empezar), `stopAt` (para el texto del aviso) y `scheduleId`, que cumple la programación si es de quien graba.
+- Si registrar la programación falla, la grabación programada sigue igual, sin el aviso de «no empezó».
+- `recording_schedules.next_action` queda reservada para una acción encadenada al terminar (convertir o comprimir), según el análisis de trabajos encadenados. Todavía no se usa.
+
+**Verificado:**
+
+- Con tests (mailer simulado):
+  - aviso de inicio con la hora de corte; a mano no avisa;
+  - sin nadie elegido, no avisa;
+  - «no empezó» solo después del margen y una sola vez;
+  - una que empezó no avisa que no empezó;
+  - el fallo informado por la pestaña avisa en el momento y no se repite;
+  - cancelada no avisa;
+  - la programación de otra cuenta no se cumple ni se cancela.
+- En una instancia de prueba aparte (puerto 3100, SMTP falso):
+  - «A mí» arranca sin tildar, se tilda al programar y se destilda al desprogramar, sin guardarse;
+  - las rutas responden y los dos avisos intentan salir; con ese SMTP fallan con ESOCKET, como se esperaba.
+- **No verificado:** la grabación programada real (el selector de pantalla lo tiene que usar una persona) y el envío real por SMTP.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5

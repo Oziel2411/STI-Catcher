@@ -199,4 +199,33 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX jobs_notice_batch ON jobs (notice_batch_id);
     `,
   },
+  {
+    version: 10,
+    name: 'create-recording-schedules',
+    sql: /* sql */ `
+      -- Grabaciones programadas (D-109): la espera vive en la pestaña, pero el
+      -- server guarda la hora para avisar si no empezó (pestaña cerrada, PC
+      -- suspendida). Pendiente = sin started_at, cancelled_at ni failed_at.
+      -- next_action: lugar para una acción encadenada al terminar (convertir o
+      -- comprimir); todavía no se usa.
+      CREATE TABLE recording_schedules (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        title           TEXT NOT NULL,
+        notify_user_ids TEXT NOT NULL,
+        start_at        TEXT NOT NULL,
+        stop_at         TEXT,
+        client_ip       TEXT,
+        created_at      TEXT NOT NULL,
+        recording_id    TEXT,
+        started_at      TEXT,
+        cancelled_at    TEXT,
+        failed_at       TEXT,
+        failure         TEXT,
+        next_action     TEXT
+      );
+      CREATE INDEX recording_schedules_pending ON recording_schedules (start_at)
+        WHERE started_at IS NULL AND cancelled_at IS NULL AND failed_at IS NULL;
+    `,
+  },
 ];

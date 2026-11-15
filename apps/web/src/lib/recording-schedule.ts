@@ -141,3 +141,10 @@ export function formatCountdown(seconds: number): string {
   const s = String(total % 60).padStart(2, '0');
   return h > 0 ? `${String(h)}:${String(m).padStart(2, '0')}:${s}` : `${String(m)}:${s}`;
 }
+
+/**
+ * Programada = empieza a una hora o corta sola (D-109). Entonces «A mí» viene
+ * tildado y el aviso llega también al empezar.
+ */
+export const isProgrammed = (schedule: RecordingSchedule): boolean =>
+  schedule.startMode === 'at' || schedule.stopMode !== 'manual';

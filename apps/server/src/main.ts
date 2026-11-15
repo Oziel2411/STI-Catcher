@@ -46,6 +46,9 @@ import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
 import { createRecordingRunner } from './modules/recording/recording-runner.ts';
 import { createRecordingService } from './modules/recording/recording-service.ts';
+import { createScheduleService } from './modules/recording/schedule-service.ts';
+import { createRecordingSchedulesRepository } from './db/recording-schedules-repository.ts';
+import { createRecordingNotifier } from './modules/notifications/recording-notice.ts';
 import { createRetentionService } from './modules/retention/retention-service.ts';
 import { createSelftestRunner } from './modules/selftest/selftest-runner.ts';
 import packageJson from '../package.json' with { type: 'json' };
@@ -306,6 +309,12 @@ async function main(): Promise<void> {
     queue,
   });
   const conversionOptions = { gif: gifLimits, maxUploadBytes: config.limits.maxUploadBytes };
+  // Grabación programada (D-109): avisa al empezar y si a la hora no empezó.
+  const recordingSchedules = createScheduleService({
+    repo: createRecordingSchedulesRepository(db),
+    notifier: createRecordingNotifier(notifyJob),
+    logger,
+  });
   const recordings = createRecordingService({
     repo: createRecordingsRepository(db),
     recordingsDir: storage.recordingsDir,
@@ -314,6 +323,9 @@ async function main(): Promise<void> {
     queue,
     idleMinutes: config.recording.idleMinutes,
     logger,
+    onStarted: (start) => {
+      recordingSchedules.recordingStarted(start);
+    },
   });
 
   const retention = createRetentionService({
@@ -339,6 +351,7 @@ async function main(): Promise<void> {
       upload,
       conversionOptions,
       recordings,
+      recordingSchedules,
       mail,
       noticeBatches,
       auth,
@@ -368,6 +381,7 @@ async function main(): Promise<void> {
     closing = true;
     logger.info({ signal }, 'Deteniendo el servidor');
     recordings.stop();
+    recordingSchedules.stop();
     retention.stop();
     notifyJob?.stop();
     queue
@@ -393,6 +407,8 @@ async function main(): Promise<void> {
   queue.start();
   // Cierra grabaciones abandonadas, incluidas las que quedaron abiertas antes de un reinicio.
   recordings.start();
+  // Avisa las grabaciones programadas que no empezaron (también las de antes de un reinicio).
+  recordingSchedules.start();
   // Retención: una pasada ahora y después cada hora (RETENTION_DAYS=0 la desactiva).
   retention.start();
   // Los que cortó un reinicio también avisan (D-105): solos o dentro de su pedido,

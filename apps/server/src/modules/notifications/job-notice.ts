@@ -385,8 +385,25 @@ export function createJobNotice(
     clearTimeout(timeout);
   };
 
+  /**
+   * Un aviso armado aparte (p. ej. el de una grabación programada, D-109) a
+   * las cuentas activas de esa lista, por el mismo camino (log, apagado).
+   */
+  const sendTo = (
+    userIds: readonly string[],
+    build: (to: string[]) => MailMessage,
+    log: object,
+  ): void => {
+    const recipients = deps.recipients(userIds);
+    if (recipients.length === 0) return;
+    deliver(build(recipients.map((r) => r.email)), log);
+  };
+
   let timer: NodeJS.Timeout | null = null;
   return Object.assign(notify, {
+    sendTo,
+    userName: deps.userName,
+    publicUrl: deps.publicUrl,
     evaluateBatch,
     sweep,
     notifyInterrupted,

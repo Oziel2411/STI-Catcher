@@ -28,6 +28,9 @@ import type { JobContext, JobResult, JobRunner } from '../src/jobs/types.ts';
 import { createConversionService } from '../src/modules/conversion/conversion-service.ts';
 import { createUploadService } from '../src/modules/conversion/upload-service.ts';
 import { createRecordingService } from '../src/modules/recording/recording-service.ts';
+import { createScheduleService } from '../src/modules/recording/schedule-service.ts';
+import { createRecordingSchedulesRepository } from '../src/db/recording-schedules-repository.ts';
+import { createRecordingNotifier } from '../src/modules/notifications/recording-notice.ts';
 import { createDownloadService } from '../src/modules/download/download-service.ts';
 import { createFollowUps } from '../src/modules/download/follow-up.ts';
 import type { MailMessage, SendMail } from '../src/adapters/mailer.ts';
@@ -269,6 +272,12 @@ export async function makeTestApp(options: TestAppOptions = {}) {
   // Reloj controlable para probar el cierre por inactividad.
   const clock = { now: new Date('2026-10-29T12:00:00.000Z') };
   const recordingsRepo = createRecordingsRepository(db);
+  const recordingSchedules = createScheduleService({
+    repo: createRecordingSchedulesRepository(db),
+    notifier: createRecordingNotifier(notifyJob),
+    logger: { info: vi.fn() },
+    now: () => clock.now,
+  });
   const recordings = createRecordingService({
     repo: recordingsRepo,
     recordingsDir,
@@ -278,6 +287,9 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     idleMinutes: 2,
     logger: { info: vi.fn(), warn: vi.fn() },
     now: () => clock.now,
+    onStarted: (start) => {
+      recordingSchedules.recordingStarted(start);
+    },
   });
 
   const getHealth = vi.fn<HealthService['getHealth']>(() => Promise.resolve(sampleHealth));
@@ -294,6 +306,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       upload,
       conversionOptions,
       recordings,
+      recordingSchedules,
       mail,
       noticeBatches,
       auth,
@@ -354,6 +367,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     historyLogger,
     recordings,
     recordingsRepo,
+    recordingSchedules,
     recordingsDir,
     clock,
     sentMails,
