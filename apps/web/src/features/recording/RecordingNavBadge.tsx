@@ -4,7 +4,7 @@ import { formatClock } from '../../lib/recording-schedule.ts';
 import { useElapsedSeconds, useRecorder } from './recorder-context.ts';
 
 /**
- * Junto a «Grabar pantalla» en la barra lateral: muestra que se está grabando
+ * Junto a «Grabar pantalla» en la barra de secciones: muestra que se está grabando
  * (y cuánto) desde cualquier sección, porque la grabación sigue al navegar.
  */
 export function RecordingNavBadge({ processing }: { processing: number }) {

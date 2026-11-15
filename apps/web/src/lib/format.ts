@@ -68,3 +68,14 @@ export function formatDateTime(iso: string | null): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? '—' : dateTimeFormat.format(date);
 }
+
+/** Iniciales para el círculo de la cuenta: «María Gómez» → «MG», «admin» → «A». */
+export function initials(name: string): string {
+  const letters = name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word !== '')
+    .map((word) => String.fromCodePoint(word.codePointAt(0) ?? 63));
+  const picked = letters.length > 1 ? [letters[0], letters[letters.length - 1]] : letters;
+  return picked.join('').toLocaleUpperCase('es') || '?';
+}

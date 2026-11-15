@@ -68,7 +68,7 @@ export function subscribeToJobsEvents(
   return subscribeToStream(`/api/events?jobIds=${query}`, handlers, options);
 }
 
-/** Stream de todos los jobs (contadores de la barra lateral). */
+/** Stream de todos los jobs (contadores de la barra de secciones). */
 export function subscribeToAllEvents(
   handlers: JobEventHandlers,
   options: SubscribeOptions = {},
