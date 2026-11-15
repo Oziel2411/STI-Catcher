@@ -310,9 +310,10 @@ async function main(): Promise<void> {
   });
   const conversionOptions = { gif: gifLimits, maxUploadBytes: config.limits.maxUploadBytes };
   // Grabación programada (D-109): avisa al empezar y si a la hora no empezó.
+  const recordingNotifier = createRecordingNotifier(notifyJob);
   const recordingSchedules = createScheduleService({
     repo: createRecordingSchedulesRepository(db),
-    notifier: createRecordingNotifier(notifyJob),
+    notifier: recordingNotifier,
     logger,
   });
   const recordings = createRecordingService({
@@ -325,6 +326,9 @@ async function main(): Promise<void> {
     logger,
     onStarted: (start) => {
       recordingSchedules.recordingStarted(start);
+    },
+    onEmpty: (session) => {
+      recordingNotifier.empty(session);
     },
   });
 

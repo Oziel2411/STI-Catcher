@@ -68,6 +68,32 @@ export function recordingNotStartedMessage(
   };
 }
 
+/** Una grabación que no llegó a grabar nada (se descarta sin crear el trabajo). */
+export function recordingEmptyMessage(
+  info: RecordingNoticeInfo & { createdAt: string },
+  to: readonly string[],
+): MailMessage {
+  const requester = requesterLine(info);
+  return {
+    to: [...to],
+    subject: `Falló la grabación: ${info.title}`,
+    text: [
+      `La grabación «${info.title}» no se pudo completar.`,
+      '',
+      'Motivo: no llegó a grabarse nada (se cortó al empezar, o el servidor no pudo guardar los primeros fragmentos).',
+      ...(requester !== null ? [`Pedida por: ${requester}`] : []),
+      ...(mailDateTime(info.createdAt) !== null
+        ? [`Empezó: ${mailDateTime(info.createdAt) ?? ''}`]
+        : []),
+      ...footer(info).map((line) =>
+        line.startsWith('Te llega')
+          ? 'Te llega porque te eligieron para avisarte al pedir esta grabación.'
+          : line,
+      ),
+    ].join('\n'),
+  };
+}
+
 /** Lo que usa el notificador de la cola de avisos (`createJobNotice`). */
 export type NoticeSender = {
   sendTo: (userIds: readonly string[], build: (to: string[]) => MailMessage, log: object) => void;
@@ -104,6 +130,28 @@ export function createRecordingNotifier(notice: NoticeSender | null) {
       notice.sendTo(start.notifyUserIds, (to) => recordingStartedMessage(info, to), {
         recordingId: start.recordingId,
         notice: 'started',
+      });
+    },
+    /** Se descartó sin nada grabado: el aviso de «falló» que si no, no llegaría. */
+    empty(session: {
+      id: string;
+      title: string;
+      userId: string | null;
+      clientIp: string | null;
+      notifyUserIds: string[];
+      createdAt: string;
+    }): void {
+      if (notice === null) return;
+      const info = {
+        title: session.title,
+        requesterName: nameOf(session.userId),
+        clientIp: session.clientIp,
+        publicUrl: notice.publicUrl,
+        createdAt: session.createdAt,
+      };
+      notice.sendTo(session.notifyUserIds, (to) => recordingEmptyMessage(info, to), {
+        recordingId: session.id,
+        notice: 'empty',
       });
     },
     notStarted(

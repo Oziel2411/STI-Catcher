@@ -19,12 +19,15 @@ export function useNotifyChoice(key: string, defaultMe: boolean) {
     }
     return defaultMe ? [user.id] : [];
   });
-  /** `persist: false`: cambio automático (D-109), no se recuerda para la próxima vez. */
-  const change = (next: string[], persist = true) => {
+  /**
+   * `persist: false`: cambio automático (D-109), no se recuerda para la próxima
+   * vez. `stored`: lo que se recuerda, si no es igual a lo elegido ahora.
+   */
+  const change = (next: string[], persist = true, stored: string[] = next) => {
     setIds(next);
     if (!persist) return;
     try {
-      localStorage.setItem(storageKey(user.id, key), JSON.stringify(next));
+      localStorage.setItem(storageKey(user.id, key), JSON.stringify(stored));
     } catch {
       // Sin localStorage (modo privado estricto): se recuerda solo en esta pestaña.
     }

@@ -168,3 +168,44 @@ describe('grabación programada (D-109)', () => {
     ]);
   });
 });
+
+describe('grabación que no llegó a grabar nada (D-109)', () => {
+  it('al detenerla vacía avisa que falló', async () => {
+    const t = await app();
+    const created = createRecordingResponseSchema.parse(
+      (await startRecording(t, { notify: [t.ana.user.id] })).json(),
+    );
+    const finished = await t.app.inject({
+      method: 'POST',
+      url: `/api/recordings/${created.recordingId}/finish`,
+    });
+    expect(finished.statusCode).toBe(409);
+    await flush();
+    expect(t.sentMails.map((m) => m.subject)).toEqual(['Falló la grabación: Reunión de armadores']);
+    expect(t.sentMails[0]?.text).toContain('Motivo: no llegó a grabarse nada');
+  });
+
+  it('abandonada sin fragmentos (pestaña cerrada al empezar): avisa al descartarla', async () => {
+    const t = await app();
+    await startRecording(t, { notify: [t.ana.user.id], programmed: true });
+    await flush();
+    expect(t.sentMails.map((m) => m.subject)).toEqual([
+      'Empezó la grabación: Reunión de armadores',
+    ]);
+    t.clock.now = minutes(t, 10);
+    await t.recordings.sweepIdle();
+    await flush();
+    expect(t.sentMails.map((m) => m.subject)).toEqual([
+      'Empezó la grabación: Reunión de armadores',
+      'Falló la grabación: Reunión de armadores',
+    ]);
+  });
+
+  it('sin nadie elegido, no avisa', async () => {
+    const t = await app();
+    const created = createRecordingResponseSchema.parse((await startRecording(t, {})).json());
+    await t.app.inject({ method: 'POST', url: `/api/recordings/${created.recordingId}/finish` });
+    await flush();
+    expect(t.sentMails).toHaveLength(0);
+  });
+});

@@ -272,9 +272,10 @@ export async function makeTestApp(options: TestAppOptions = {}) {
   // Reloj controlable para probar el cierre por inactividad.
   const clock = { now: new Date('2026-10-29T12:00:00.000Z') };
   const recordingsRepo = createRecordingsRepository(db);
+  const recordingNotifier = createRecordingNotifier(notifyJob);
   const recordingSchedules = createScheduleService({
     repo: createRecordingSchedulesRepository(db),
-    notifier: createRecordingNotifier(notifyJob),
+    notifier: recordingNotifier,
     logger: { info: vi.fn() },
     now: () => clock.now,
   });
@@ -289,6 +290,9 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     now: () => clock.now,
     onStarted: (start) => {
       recordingSchedules.recordingStarted(start);
+    },
+    onEmpty: (session) => {
+      recordingNotifier.empty(session);
     },
   });
 

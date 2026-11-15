@@ -47,6 +47,8 @@ export type RecordingServiceDeps = {
   idleMinutes: number;
   /** Al empezar una grabación: cumple su programación y avisa si es programada (D-109). */
   onStarted?: (start: RecordingStart) => void;
+  /** Se descartó una grabación sin nada grabado: avisa que falló (D-109). */
+  onEmpty?: (session: RecordingSession) => void;
   logger: {
     info: (obj: object, msg: string) => void;
     warn: (obj: object, msg: string) => void;
@@ -253,6 +255,7 @@ export function createRecordingService(deps: RecordingServiceDeps) {
         }
         if (session.sizeBytes === 0) {
           deps.repo.discard(id);
+          deps.onEmpty?.(session);
           throw new RecordingError('EMPTY', 'No se llegó a grabar nada.', 409);
         }
         return finalize(session);
@@ -272,6 +275,7 @@ export function createRecordingService(deps: RecordingServiceDeps) {
           if (session?.status !== 'recording') return;
           if (session.sizeBytes === 0) {
             deps.repo.discard(session.id);
+            deps.onEmpty?.(session);
             await rm(rawRecordingPath(deps.recordingsDir, session.id, session.extension), {
               force: true,
             });

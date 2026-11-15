@@ -859,6 +859,9 @@ Hasta ahora «A mí» venía tildado en todas las grabaciones (D-104) y el aviso
   - Una programación de otra cuenta da 404.
 - `POST /api/recordings` suma `programmed` (avisa al empezar), `stopAt` (para el texto del aviso) y `scheduleId`, que cumple la programación si es de quien graba.
 - Si registrar la programación falla, la grabación programada sigue igual, sin el aviso de «no empezó».
+- **Una grabación que no llegó a grabar nada** (se cortó al empezar, o el server rechazó los primeros fragmentos) se descarta sin crear trabajo. Antes eso no avisaba nada; ahora manda «Falló la grabación» a quienes se eligió, al detenerla o cuando el barrido de inactividad la descarta. Vale para toda grabación con alguien elegido, programada o no.
+- El tildado automático de «A mí» no se guarda, aunque después se sume a un compañero.
+- `startAt` usa el reloj de la PC que graba. Si esa PC atrasa más de 2 minutos respecto del servidor, llega un «no empezó» de más y después el «empezó».
 - `recording_schedules.next_action` queda reservada para una acción encadenada al terminar (convertir o comprimir), según el análisis de trabajos encadenados. Todavía no se usa.
 
 **Verificado:**
@@ -870,11 +873,14 @@ Hasta ahora «A mí» venía tildado en todas las grabaciones (D-104) y el aviso
   - una que empezó no avisa que no empezó;
   - el fallo informado por la pestaña avisa en el momento y no se repite;
   - cancelada no avisa;
-  - la programación de otra cuenta no se cumple ni se cancela.
-- En una instancia de prueba aparte (puerto 3100, SMTP falso):
+  - la programación de otra cuenta no se cumple ni se cancela;
+  - una grabación vacía avisa que falló, al detenerla o al descartarla por inactividad.
+- En una instancia de prueba aparte (puerto 3100, SMTP falso), con la página real y una pantalla simulada (canvas en lugar del selector):
   - «A mí» arranca sin tildar, se tilda al programar y se destilda al desprogramar, sin guardarse;
-  - las rutas responden y los dos avisos intentan salir; con ese SMTP fallan con ESOCKET, como se esperaba.
-- **No verificado:** la grabación programada real (el selector de pantalla lo tiene que usar una persona) y el envío real por SMTP.
+  - programar registra la hora; «Cancelar programación» la cancela; «dejar de compartir» antes de hora manda el fallo con su motivo;
+  - programada para el minuto siguiente, empezó sola a la hora, mandó `scheduleId` y `programmed`, la programación quedó cumplida y terminó en MP4 H.264;
+  - los avisos (inicio, no empezó, vacía, fin) intentaron salir; con ese SMTP fallan con ESOCKET, como se esperaba.
+- **No verificado:** el selector de pantalla real y el envío real por SMTP.
 
 ## Deuda técnica
 

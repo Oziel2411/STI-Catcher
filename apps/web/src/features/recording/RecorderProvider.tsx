@@ -81,8 +81,18 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
   // «A mí» lo tildó la programación (no la persona): se saca si se desprograma.
   const autoTickedRef = useRef(false);
   const setNotify = (ids: string[]) => {
-    autoTickedRef.current = false;
     notifyRef.current = ids;
+    // Sumar o sacar a otro no convierte en elección propia el «A mí» automático:
+    // se sigue sin recordar (y se saca al desprogramar).
+    if (autoTickedRef.current && ids.includes(user.id)) {
+      setNotifyState(
+        ids,
+        true,
+        ids.filter((id) => id !== user.id),
+      );
+      return;
+    }
+    autoTickedRef.current = false;
     setNotifyState(ids);
   };
   const setNotifyAuto = (ids: string[]) => {
