@@ -103,7 +103,7 @@ Todo en PowerShell **como administrador**, en `D:\STI-Catcher\app`, después de 
 
    No tiene que mostrar nada.
 
-7. `.\scripts\install-service.ps1` (sin `-DisableSleep`). Al final tiene que decir «Responde en https://localhost:3000/api/health».
+7. `.\scripts\install-service.ps1 -RemoteAddress 192.168.3.0/24` (sin `-DisableSleep`). La regla de firewall de Windows queda solo para la red de los clientes. Al final tiene que decir «Responde en https://localhost:3000/api/health».
 
 Hasta el día del corte, la base de SRV-SYSCCUOMM está vacía: para probar, creá una cuenta con `npm run user:create-admin` (se pisa con la base migrada en el paso E).
 
@@ -129,7 +129,7 @@ Corte de unos minutos. Avisá antes a los compañeros.
 1. **En SRV-SYSCCUOMM:** `Stop-Service sti-catcher`.
 2. **En SISTEMAS2-PC:** `Stop-Service sti-catcher`. Desde acá nadie usa la app hasta el paso 6.
 3. Copiá de SISTEMAS2-PC a `D:\STI-Catcher\data\` de SRV-SYSCCUOMM: `sti-catcher.db` (y `sti-catcher.db-wal` / `sti-catcher.db-shm` si están). **No** copies `certs\`, `sti-catcher.pid` ni `storage\`.
-4. **Dejar solo las cuentas:** borrar el historial de la base copiada, conservando usuarios y contraseñas. **Pendiente:** hace falta un comando nuevo (ver [Cambios propuestos](#cambios-propuestos)). Sin él, la alternativa es base vacía y crear las cuentas de nuevo en **Usuarios**.
+4. **Dejar solo las cuentas:** en `D:\STI-Catcher\app`, `npm run db:keep-accounts`. Muestra cuántas cuentas quedan y cuántos trabajos, grabaciones, avisos y sesiones se borran; escribí `BORRAR` para seguir. Con el servicio andando no hace nada. La base original sigue en SISTEMAS2-PC.
 5. **En SRV-SYSCCUOMM:** `Start-Service sti-catcher`. Entrá con tu cuenta de siempre y revisá **Usuarios**. **Estado → Mandar mail de prueba.**
 6. Avisá la dirección nueva: `https://192.168.3.78:3000`. Cada PC tiene que instalar la CA nueva antes de entrar (si no, ve «La conexión no es privada» y no puede grabar).
 7. **SISTEMAS2-PC:** dejalo detenido unos días por si hay que volver atrás (`Start-Service sti-catcher` ahí). Cuando esté todo bien: `.\scripts\uninstall-service.ps1`.
@@ -144,16 +144,9 @@ Corte de unos minutos. Avisá antes a los compañeros.
 
 | Tema                    | Qué pasa                                                                                                                                                     | Quién             |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
-| Red 192.168.5.x         | La regla de firewall abre el 3000 para cualquier IP en redes Privadas. La red 5.x también es Privada: desde ahí también se llega, aunque no se use.          | propuesta abajo   |
+| Red 192.168.5.x         | La red 5.x también es Privada. Con `-RemoteAddress 192.168.3.0/24` (paso C.7), la regla de Windows solo deja entrar a la red de los clientes.                | resuelto          |
 | Dos puertas de enlace   | El adaptador tiene 192.168.3.2 y 192.168.5.1. No afecta a la app, pero puede dar salidas a internet erráticas.                                               | Juan Pablo        |
 | Sin DNS interno         | El nombre se resuelve por la red local, no por DNS. Si falla en alguna PC, se entra por IP.                                                                  | —                 |
 | Reinicios               | Windows Update o un corte de luz reinician el equipo: el servicio arranca solo (inicio automático retrasado), y los trabajos en curso quedan «interrumpido». | Juan Pablo        |
 | Driver de video de 2020 | Quick Sync puede fallar o rendir menos. Si falla, la compresión va por CPU (más lenta).                                                                      | ventana con Carli |
 | ESET                    | Puede poner en cuarentena un binario después de una actualización de yt-dlp. Síntoma: la página Estado no muestra la versión.                                | Juan Pablo        |
-
-## Cambios propuestos
-
-Esperan el OK antes de hacerse:
-
-1. **Comando para dejar solo las cuentas** (`npm run db:keep-accounts`): sobre una base copiada, borra trabajos, grabaciones, avisos, programaciones, sesiones y links de recuperación, y deja usuarios con sus contraseñas. Se niega a correr si el servicio está usando esa base y pide confirmación escrita. Hace falta para el paso 4 del corte.
-2. **`install-service.ps1 -RemoteAddress 192.168.3.0/24`**: limita la regla de firewall a la red de los clientes.

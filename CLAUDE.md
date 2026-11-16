@@ -31,6 +31,7 @@ Se trabaja de a una fase: tests + commit + resumen, y **esperar el OK** antes de
 npm install
 npm run dev          # server (tsx watch, :3000) + web (Vite, http://127.0.0.1:5173)
 npm run user:create-admin   # crea una cuenta de administrador (pide mail, nombre y contraseña)
+npm run db:keep-accounts    # migrar sin historial: deja solo las cuentas en la base (servicio detenido)
 npm run build        # web (apps/web/dist) + server (apps/server/dist)
 npm start            # producción: un proceso, un puerto (requiere NODE_ENV=production en .env)
 npm test             # Vitest, todos los proyectos

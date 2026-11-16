@@ -147,6 +147,8 @@ Qué hace:
 - **Con `-DisableSleep`**, configura el equipo para que no se suspenda ni hiberne enchufado. Un servidor suspendido deja a todos sin servicio. Revisá también que nadie apague la PC al irse.
 - **Prueba** `https://localhost/api/health` al terminar.
 
+Para limitar quién se conecta, `-RemoteAddress` deja la regla solo para esas direcciones (una subred, un rango o una IP, separadas por coma): `.\scripts\install-service.ps1 -RemoteAddress 192.168.3.0/24`.
+
 Para ver qué haría sin instalar nada: `.\scripts\install-service.ps1 -DryRun`.
 
 Si falla al arrancar, el motivo está en `C:\STI-Catcher\logs\service\sti-catcher.err.log`. Lo más común es un valor inválido en el `.env`: el mensaje dice cuál.
@@ -215,6 +217,7 @@ Para pasar STI-Catcher de un equipo (el «viejo») a otro (el «nuevo») conserv
 4. **Copiá del viejo al nuevo:**
    - `DATA_DIR\sti-catcher.db` (y `sti-catcher.db-wal` / `sti-catcher.db-shm` si están) al `DATA_DIR` del nuevo. **No** copies `certs\` ni `sti-catcher.pid`.
    - `STORAGE_DIR\files` y `STORAGE_DIR\recordings`, si querés conservar los archivos. Si no, el historial queda y los archivos figuran como «expirado».
+   - **Solo las cuentas, sin historial:** copiá la base igual y, en el nuevo, con el servicio detenido, `npm run db:keep-accounts`. Deja las cuentas con sus contraseñas y borra trabajos, grabaciones, avisos, programaciones, sesiones y links de recuperación (pide escribir `BORRAR`). Sin argumento usa la base del `.env`; para otra: `npm run db:keep-accounts D:\ruta\sti-catcher.db`.
 5. **En el nuevo:** `.\scripts\install-service.ps1 -DisableSleep` (paso 6). Abrí **Estado**, revisá el historial y mandá el mail de prueba.
 6. **En el viejo:** `.\scripts\uninstall-service.ps1`. Si llevaste la CA y el viejo deja de ser de confianza, borrá su carpeta `-CAROOT`.
 7. **Alias DNS:** que apunte a la IP del nuevo. Probá desde una PC cliente: descargar, convertir y grabar.
