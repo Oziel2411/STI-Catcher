@@ -36,23 +36,23 @@ Respuestas del responsable de la app:
 
 ## Decisiones para este equipo
 
-| Qué          | Valor                                                                                             | Por qué                                                               |
-| ------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Puerto       | `PORT=3000`                                                                                       | 443 es de Apache; 3000 está libre y es el mismo de hoy.               |
-| Dirección    | **`https://192.168.3.78:3000`** (y `https://srv-sysccuomm:3000` si el nombre resuelve en las PCs) | Sin DNS interno, la IP es lo único seguro. **A confirmar.**           |
-| `PUBLIC_URL` | `https://192.168.3.78:3000`                                                                       | El link para recuperar la contraseña tiene que abrir en cualquier PC. |
-| Código       | `C:\STI-Catcher\app` (SSD)                                                                        | Arranque y `node_modules` en el disco rápido.                         |
-| Datos        | `D:\STI-Catcher\storage`, `D:\STI-Catcher\data`, `D:\STI-Catcher\logs`                            | D: está vacío y es el disco de almacenamiento.                        |
-| Backups      | `E:\STI-Catcher` (lo administra Juan Pablo)                                                       | E: es el disco de backups.                                            |
-| Certificado  | CA nueva con mkcert; incluye `srv-sysccuomm`, 192.168.3.78, 192.168.5.191 y localhost             | `new-certificate.ps1` toma el nombre y todas las IPs solo.            |
-| Suspensión   | No hace falta `-DisableSleep`                                                                     | Ya está en «nunca».                                                   |
-| Trabajos     | `MAX_CONCURRENT_JOBS=2`                                                                           | 4 núcleos, compartidos con los otros sistemas del equipo.             |
+| Qué          | Valor                                                                                             | Por qué                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Puerto       | `PORT=3000`                                                                                       | 443 es de Apache; 3000 está libre y es el mismo de hoy.                                              |
+| Dirección    | **`https://192.168.3.78:3000`** (y `https://srv-sysccuomm:3000` si el nombre resuelve en las PCs) | Sin DNS interno, la IP es lo único seguro. **A confirmar.**                                          |
+| `PUBLIC_URL` | `https://192.168.3.78:3000`                                                                       | El link para recuperar la contraseña tiene que abrir en cualquier PC.                                |
+| Código       | `D:\STI-Catcher\app`                                                                              | Criterio de Juan Pablo: C: sistema y programas; D: apps propias, cada una en su carpeta; E: backups. |
+| Datos        | `D:\STI-Catcher\storage`, `D:\STI-Catcher\data`, `D:\STI-Catcher\logs`                            | Todo lo de la app junto en `D:\STI-Catcher`. Node.js queda en C: (es un programa).                   |
+| Backups      | `E:\STI-Catcher` (lo administra Juan Pablo)                                                       | E: es el disco de backups.                                                                           |
+| Certificado  | CA nueva con mkcert; incluye `srv-sysccuomm`, 192.168.3.78, 192.168.5.191 y localhost             | `new-certificate.ps1` toma el nombre y todas las IPs solo.                                           |
+| Suspensión   | No hace falta `-DisableSleep`                                                                     | Ya está en «nunca».                                                                                  |
+| Trabajos     | `MAX_CONCURRENT_JOBS=2`                                                                           | 4 núcleos, compartidos con los otros sistemas del equipo.                                            |
 
 ## Antes del día (no corta el servicio actual)
 
 ### A. Con Juan Pablo (o quien administre ESET)
 
-1. **Excepción en ESET** para `C:\STI-Catcher\app\bin\` (yt-dlp, ffmpeg, ffprobe, deno, mkcert) y `C:\STI-Catcher\app\service\` (WinSW). Son ejecutables descargados de internet y un antivirus puede ponerlos en cuarentena.
+1. **Excepción en ESET** para `D:\STI-Catcher\app\bin\` (yt-dlp, ffmpeg, ffprobe, deno, mkcert) y `D:\STI-Catcher\app\service\` (WinSW). Son ejecutables descargados de internet y un antivirus puede ponerlos en cuarentena.
 2. **Firewall de ESET:** permitir TCP **3000** de entrada desde **192.168.3.0/24**. La regla de Windows la crea `install-service.ps1`, pero si ESET filtra la entrada (como pasa con el 443 de Apache), no alcanza.
 3. **Windows Update:** que no reinicie solo (horas activas o pausar), porque el equipo no se puede reiniciar. El driver de video de 2020 también conviene actualizarlo, pero solo en una ventana con reinicio acordada con Carli: no es requisito.
 
@@ -66,19 +66,19 @@ El servidor no tiene git y la versión a instalar está solo en SISTEMAS2-PC (`m
    git archive --format=zip -o C:\temp\sti-catcher.zip main
    ```
 
-2. Copiá `sti-catcher.zip` a SRV-SYSCCUOMM (pendrive o carpeta compartida) y descomprimilo en `C:\STI-Catcher\app`. Tienen que quedar `C:\STI-Catcher\app\package.json`, `scripts\`, `apps\`, etc. (no una subcarpeta más).
+2. Copiá `sti-catcher.zip` a SRV-SYSCCUOMM (pendrive o carpeta compartida) y descomprimilo en `D:\STI-Catcher\app`. Tienen que quedar `D:\STI-Catcher\app\package.json`, `scripts\`, `apps\`, etc. (no una subcarpeta más).
 3. En SRV-SYSCCUOMM, PowerShell como administrador:
 
    ```powershell
-   Get-ChildItem -Recurse C:\STI-Catcher\app | Unblock-File
+   Get-ChildItem -Recurse D:\STI-Catcher\app | Unblock-File
    ```
 
 ### C. Instalar (pasos 2 a 6 de DEPLOY.md)
 
-Todo en PowerShell **como administrador**, en `C:\STI-Catcher\app`, después de `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
+Todo en PowerShell **como administrador**, en `D:\STI-Catcher\app`, después de `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
 
 1. `.\scripts\setup.ps1`: crea el `.env` y descarga los binarios. Node 26.13 ya está.
-2. Editá `C:\STI-Catcher\app\.env` con el Bloc de notas:
+2. Editá `D:\STI-Catcher\app\.env` con el Bloc de notas:
 
    ```ini
    NODE_ENV=production
@@ -136,7 +136,7 @@ Corte de unos minutos. Avisá antes a los compañeros.
 
 ## Después
 
-- **Backups** (Juan Pablo): `D:\STI-Catcher\data` (base y certificados) y `C:\STI-Catcher\app\.env`, a `E:\STI-Catcher`. Copiar la base con el servicio andando puede dejar una copia inconsistente: detenerlo un momento, o esperar la propuesta de backup automático.
+- **Backups** (Juan Pablo): `D:\STI-Catcher\data` (base y certificados) y `D:\STI-Catcher\app\.env`, a `E:\STI-Catcher`. Copiar la base con el servicio andando puede dejar una copia inconsistente: detenerlo un momento, o esperar la propuesta de backup automático.
 - **Actualizar la app:** nuevo ZIP como en el paso B, descomprimido encima **sin pisar `.env`**, `npm ci`, `npm run build`, `Restart-Service sti-catcher`.
 - **Cambio de IP:** `new-certificate.ps1 -Force` e `install-service.ps1` (DEPLOY.md, Mantenimiento).
 
