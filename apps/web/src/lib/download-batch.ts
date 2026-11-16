@@ -120,9 +120,42 @@ export type ParsedLinks = {
   duplicates: number;
 };
 
+// Donde empieza otro link pegado al anterior: «…watch?v=ahttps://…». No corta
+// uno que va como parámetro de otro («?u=https://…»).
+const GLUED_LINK = /(?<=[^\s=%/])(?=https?:\/\/)/gi;
+const LEADING = /^[<([{"'«“]+/;
+const TRAILING = /[>\]}"'»”.,;:!?]+$/;
+
+/** Saca lo que rodea a un link al copiarlo de un texto: comillas, «<…>», la coma final. */
+function trimLink(token: string): string {
+  let out = token.replace(LEADING, '').replace(TRAILING, '');
+  // El «)» final es del texto salvo que el link tenga su «(» (Wikipedia).
+  while (out.endsWith(')') && out.split('(').length <= out.split(')').length - 1) {
+    out = out.slice(0, -1).replace(TRAILING, '');
+  }
+  return out;
+}
+
 /**
- * Texto pegado → links. Uno o varios por renglón (separados por espacios).
- * Se valida con el mismo esquema que usa el server.
+ * Los links de un renglón: separados por espacios, comas, «;» o «|», o pegados
+ * uno detrás del otro sin separar.
+ */
+export function linkTokens(line: string): string[] {
+  return line
+    .split(/[\s,;|]+/)
+    .flatMap((chunk) => chunk.split(GLUED_LINK))
+    .map(trimLink)
+    .filter((token) => token !== '');
+}
+
+/** Texto pegado → un link por renglón (lo que no es link queda en su renglón). */
+export function splitLinkText(text: string): string {
+  return text.split(/\r?\n/).flatMap(linkTokens).join('\n');
+}
+
+/**
+ * Texto pegado → links (`linkTokens` en cada renglón). Se valida con el mismo
+ * esquema que usa el server.
  */
 export function parseLinks(text: string, existing: readonly string[]): ParsedLinks {
   const seen = new Set(existing);
@@ -130,7 +163,7 @@ export function parseLinks(text: string, existing: readonly string[]): ParsedLin
   const invalid: ParsedLinks['invalid'] = [];
   let duplicates = 0;
   text.split(/\r?\n/).forEach((line, index) => {
-    for (const token of line.split(/\s+/).filter((part) => part !== '')) {
+    for (const token of linkTokens(line)) {
       const parsed = httpUrlSchema.safeParse(token);
       if (!parsed.success) {
         invalid.push({ line: index + 1, text: token });

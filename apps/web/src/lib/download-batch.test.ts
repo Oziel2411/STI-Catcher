@@ -9,11 +9,13 @@ import {
   isStartable,
   LIVE_MESSAGE,
   newLinkItem,
+  linkTokens,
   parseLinks,
   restoreLinks,
   resultJob,
   rowState,
   serializeLinks,
+  splitLinkText,
   startTargets,
   trackedJobIds,
   withProbe,
@@ -100,8 +102,42 @@ describe('parseLinks', () => {
       { line: 3, text: 'youtube' },
       { line: 3, text: 'video' },
       { line: 3, text: 'clase' },
-      { line: 5, text: 'www.' },
+      { line: 5, text: 'www' },
     ]);
+  });
+
+  it('separa los links pegados juntos, con comas o con signos alrededor', () => {
+    const text = [
+      'https://youtu.be/ahttps://youtu.be/b',
+      'https://youtu.be/c,https://youtu.be/d; https://youtu.be/e | https://youtu.be/f',
+      'Mirá esto: <https://youtu.be/g>, y (https://youtu.be/h).',
+      '«https://youtu.be/i»',
+    ].join('\n');
+    const parsed = parseLinks(text, []);
+    expect(parsed.urls).toEqual(
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((id) => `https://youtu.be/${id}`),
+    );
+    expect(parsed.invalid.map((entry) => entry.text)).toEqual(['Mirá', 'esto', 'y']);
+  });
+
+  it('no corta un link que va como parámetro de otro ni el «)» de Wikipedia', () => {
+    expect(linkTokens('https://x.com/r?u=https://youtu.be/a')).toEqual([
+      'https://x.com/r?u=https://youtu.be/a',
+    ]);
+    expect(linkTokens('(https://es.wikipedia.org/wiki/Gato_(desambiguación))')).toEqual([
+      'https://es.wikipedia.org/wiki/Gato_(desambiguación)',
+    ]);
+  });
+});
+
+describe('splitLinkText', () => {
+  it('deja un link por renglón y saca los renglones vacíos', () => {
+    expect(splitLinkText('https://youtu.be/a https://youtu.be/bhttps://youtu.be/c\n\n')).toBe(
+      'https://youtu.be/a\nhttps://youtu.be/b\nhttps://youtu.be/c',
+    );
+  });
+  it('un solo link queda igual', () => {
+    expect(splitLinkText('https://youtu.be/a')).toBe('https://youtu.be/a');
   });
 
   it('no repite los que ya están en la lista ni los pegados dos veces', () => {

@@ -26,6 +26,7 @@ import {
   formatLabel,
   itemProblems,
   parseLinks,
+  splitLinkText,
   presetAvailable,
   presetShortName,
   resultJob,
@@ -122,7 +123,8 @@ export function DownloadPage() {
     <section className="page">
       <header className="page-header">
         <PageTitle icon={DownloadSimpleIcon} title="Descargar videos">
-          YouTube, Instagram, X y otros sitios. Pegá uno o varios links, uno por línea.
+          YouTube, Instagram, X y otros sitios. Pegá uno o varios links, como vengan: se separan
+          solos.
         </PageTitle>
       </header>
 
@@ -143,6 +145,19 @@ export function DownloadPage() {
             value={text}
             onChange={(e) => {
               setText(e.target.value);
+            }}
+            onPaste={(e) => {
+              // Al pegar, cada link queda en su renglón aunque vengan juntos.
+              const pasted = e.clipboardData.getData('text');
+              const split = splitLinkText(pasted);
+              if (split === pasted) return;
+              e.preventDefault();
+              const box = e.currentTarget;
+              const before = box.value.slice(0, box.selectionStart);
+              const after = box.value.slice(box.selectionEnd);
+              const glue = (left: string, right: string) =>
+                left === '' || right === '' || /\n$/.test(left) || /^\n/.test(right) ? '' : '\n';
+              setText(before + glue(before, split) + split + glue(split, after) + after);
             }}
             onKeyDown={(e) => {
               // Ctrl+Enter analiza (Enter solo agrega un renglón).
