@@ -338,6 +338,7 @@ describe('GET /api/active-jobs', () => {
     expect(activeJobsResponseSchema.parse(response.json())).toEqual({
       download: 2,
       conversion: 1,
+      compression: 0,
       recording: 1,
     });
   });
@@ -345,7 +346,7 @@ describe('GET /api/active-jobs', () => {
   it('una cuenta sin trabajos ve todo en cero', async () => {
     const testApp = await app();
     const response = await testApp.app.inject({ method: 'GET', url: '/api/active-jobs' });
-    expect(response.json()).toEqual({ download: 0, conversion: 0, recording: 0 });
+    expect(response.json()).toEqual({ download: 0, conversion: 0, compression: 0, recording: 0 });
   });
 });
 

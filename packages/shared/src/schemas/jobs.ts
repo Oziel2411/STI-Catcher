@@ -1,7 +1,14 @@
 import { z } from 'zod';
 
 /** Tipos de trabajo. `selftest` genera un video sintético para verificar el sistema (D-030). */
-export const JOB_TYPES = ['download', 'upload', 'conversion', 'recording', 'selftest'] as const;
+export const JOB_TYPES = [
+  'download',
+  'upload',
+  'conversion',
+  'compression',
+  'recording',
+  'selftest',
+] as const;
 export const jobTypeSchema = z.enum(JOB_TYPES);
 export type JobType = z.infer<typeof jobTypeSchema>;
 

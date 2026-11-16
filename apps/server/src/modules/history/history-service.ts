@@ -21,7 +21,7 @@ export const HISTORY_TYPES: readonly JobType[] = HISTORY_JOB_TYPES;
 const USER_PREFIX = 'user:';
 
 /** Tipos que se pueden reintentar con los mismos parámetros. */
-const RETRYABLE_TYPES: readonly JobType[] = ['download', 'conversion', 'recording'];
+const RETRYABLE_TYPES: readonly JobType[] = ['download', 'conversion', 'compression', 'recording'];
 
 /** Error con mensaje para el usuario; las rutas lo traducen al código HTTP. */
 export class HistoryError extends Error {
@@ -218,11 +218,14 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
     },
 
     activeCounts(requester) {
-      if (requester.userId === null) return { download: 0, conversion: 0, recording: 0 };
+      if (requester.userId === null) {
+        return { download: 0, conversion: 0, compression: 0, recording: 0 };
+      }
       const counts = deps.repo.countActiveByUser(requester.userId);
       return {
         download: counts.download ?? 0,
         conversion: counts.conversion ?? 0,
+        compression: counts.compression ?? 0,
         recording: counts.recording ?? 0,
       };
     },

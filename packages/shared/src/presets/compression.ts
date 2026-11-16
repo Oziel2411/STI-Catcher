@@ -21,6 +21,19 @@ export type CompressionPresetId = z.infer<typeof compressionPresetIdSchema>;
 
 export type CompressionCodec = 'h264' | 'hevc';
 
+/**
+ * Con qué codifica el server cada códec: CPU (x264/x265) o la GPU Intel
+ * (Quick Sync). Lo decide al arrancar, con una codificación de prueba.
+ */
+export const VIDEO_ENCODERS = ['cpu', 'qsv'] as const;
+export const videoEncoderSchema = z.enum(VIDEO_ENCODERS);
+export type VideoEncoder = z.infer<typeof videoEncoderSchema>;
+export const resolvedEncodersSchema = z.object({
+  h264: videoEncoderSchema,
+  hevc: videoEncoderSchema,
+});
+export type ResolvedEncoders = z.infer<typeof resolvedEncodersSchema>;
+
 /** Velocidad del encoder: más lento comprime mejor al mismo tamaño. */
 export type CompressionSpeed = 'fast' | 'balanced';
 

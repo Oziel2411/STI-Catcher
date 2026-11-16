@@ -12,6 +12,7 @@ export const HISTORY_JOB_TYPES = [
   'download',
   'upload',
   'conversion',
+  'compression',
   'recording',
 ] as const satisfies readonly JobType[];
 
@@ -74,6 +75,7 @@ export type HistoryResponse = z.infer<typeof historyResponseSchema>;
 export const activeJobsResponseSchema = z.object({
   download: z.number().int().nonnegative(),
   conversion: z.number().int().nonnegative(),
+  compression: z.number().int().nonnegative(),
   recording: z.number().int().nonnegative(),
 });
 export type ActiveJobsResponse = z.infer<typeof activeJobsResponseSchema>;

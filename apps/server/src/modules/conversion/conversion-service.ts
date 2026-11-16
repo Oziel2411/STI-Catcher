@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { availablePresets, CONVERSION_PRESETS } from '@sti-catcher/shared';
 import type {
   ConversionRequest,
@@ -11,6 +10,7 @@ import { conversionRequestSchema } from '@sti-catcher/shared';
 import type { Ffprobe, MediaInfo } from '../../adapters/ffprobe.ts';
 import type { EnqueueInput, JobQueue } from '../../jobs/queue.ts';
 import type { JobRecord } from '../../jobs/types.ts';
+import { resolveJobFile } from '../files/job-files.ts';
 import type { Requester } from '../history/history-service.ts';
 import type { ConversionParams } from './conversion-runner.ts';
 
@@ -49,17 +49,6 @@ export const toSourceMedia = (media: MediaInfo): SourceMedia => ({
   videoCodec: media.video?.codec ?? null,
   audioCodec: media.audio?.codec ?? null,
 });
-
-/** Archivo de un job terminado, solo si queda dentro de STORAGE_DIR/files. */
-export function resolveJobFile(
-  record: JobRecord,
-  storageDir: string,
-  filesDir: string,
-): string | null {
-  if (record.filePath === null) return null;
-  const absolute = path.resolve(storageDir, record.filePath);
-  return absolute.startsWith(path.resolve(filesDir) + path.sep) ? absolute : null;
-}
 
 /** Margen al comparar el fin del GIF con la duración (redondeos de ffprobe). */
 const DURATION_TOLERANCE = 0.1;

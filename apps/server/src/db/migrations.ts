@@ -1,3 +1,4 @@
+import type { Db } from './connection.ts';
 import type { Migration } from './migrate.ts';
 import { normalizeSearchText } from './search.ts';
 
@@ -228,4 +229,62 @@ export const migrations: readonly Migration[] = [
         WHERE started_at IS NULL AND cancelled_at IS NULL AND failed_at IS NULL;
     `,
   },
+  {
+    version: 11,
+    name: 'add-compression-job-type',
+    // Compresión de video (D-108): un tipo de job nuevo. SQLite no sabe cambiar
+    // un CHECK, así que se reconstruye la tabla (ver rebuildJobsTypeCheck).
+    sql: '',
+    migrate: (db) => {
+      rebuildJobsTypeCheck(db, [
+        'download',
+        'upload',
+        'conversion',
+        'compression',
+        'recording',
+        'selftest',
+      ]);
+    },
+    foreignKeysOff: true,
+  },
 ];
+
+/**
+ * Cambia la lista de tipos del `CHECK` de `jobs.type` reconstruyendo la tabla
+ * (el procedimiento de la documentación de SQLite para cambios que ALTER TABLE
+ * no hace). Parte del `CREATE TABLE` guardado en la base, que ya incluye las
+ * columnas agregadas después: así no se pierde ninguna aunque otra migración
+ * haya sumado columnas. Copia los datos, cambia el nombre y vuelve a crear los
+ * índices tal como estaban. Corre con las claves foráneas apagadas
+ * (`foreignKeysOff`), para que borrar la tabla vieja no toque las referencias.
+ */
+export function rebuildJobsTypeCheck(db: Db, types: readonly string[]): void {
+  if (!types.every((type) => /^[a-z]+$/.test(type))) {
+    throw new Error('Tipos de job inválidos para el CHECK');
+  }
+  const table = db
+    .prepare<[], { sql: string }>(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'jobs'",
+    )
+    .get();
+  const indexes = db
+    .prepare<[], { sql: string }>(
+      "SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'jobs' AND sql IS NOT NULL",
+    )
+    .all();
+  const check = /CHECK \(type IN \([^)]*\)\)/;
+  const create = /^CREATE TABLE "?jobs"? \(/;
+  if (!table || !check.test(table.sql) || !create.test(table.sql)) {
+    throw new Error('La tabla jobs no tiene la forma esperada para cambiar sus tipos');
+  }
+  const list = types.map((type) => `'${type}'`).join(', ');
+  db.exec(
+    table.sql
+      .replace(check, `CHECK (type IN (${list}))`)
+      .replace(create, 'CREATE TABLE jobs_rebuild ('),
+  );
+  db.exec('INSERT INTO jobs_rebuild SELECT * FROM jobs');
+  db.exec('DROP TABLE jobs');
+  db.exec('ALTER TABLE jobs_rebuild RENAME TO jobs');
+  for (const index of indexes) db.exec(index.sql);
+}

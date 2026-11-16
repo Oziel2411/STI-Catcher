@@ -4,6 +4,7 @@ import {
   COMPRESSION_PRESETS,
   type CompressionCodec,
   type CompressionOptions,
+  type VideoEncoder,
 } from './compression.ts';
 
 /**
@@ -21,6 +22,8 @@ export type CompressionSource = {
   durationSeconds: number | null;
   /** Sin audio, todo el tamaño va al video (p. ej. una grabación sin sonido). */
   hasAudio: boolean;
+  /** Tamaño del original: si ya entra en el tamaño pedido, no se lo infla. */
+  sizeBytes?: number | null;
 };
 
 export type OutputVideo = {
@@ -88,6 +91,11 @@ const CONTAINER_OVERHEAD = 0.01;
  */
 export const TARGET_MARGIN = { gpu: 0.9, cpu: 0.97 } as const;
 
+/** Margen del modo tamaño según con qué codifica el server ese preset. */
+export function targetMarginFor(encoder: VideoEncoder): number {
+  return encoder === 'qsv' ? TARGET_MARGIN.gpu : TARGET_MARGIN.cpu;
+}
+
 const kbpsFor = (pixelsPerSecond: number, bitsPerPixel: number) =>
   (pixelsPerSecond * bitsPerPixel) / 1000;
 
@@ -154,6 +162,20 @@ export function planTargetSize(
   return { ok: false, reason: 'too-small', suggestedHeight };
 }
 
+/** Por qué no se puede llegar al tamaño pedido, para el usuario. */
+export function targetSizeProblem(
+  plan: Exclude<TargetSizePlan, { ok: true }>,
+  megabytes: number,
+): string {
+  if (plan.reason === 'no-duration') {
+    return 'No se sabe cuánto dura el archivo, así que no se puede calcular un tamaño. Usá un preset de calidad.';
+  }
+  const size = `${String(megabytes).replace('.', ',')} MB`;
+  return plan.suggestedHeight === null
+    ? `Es demasiado largo para que entre en ${size} sin que se rompa la imagen. Elegí un tamaño mayor.`
+    : `Para que entre en ${size} sin que se rompa la imagen, bajá la resolución a ${String(plan.suggestedHeight)}p o elegí un tamaño mayor.`;
+}
+
 /**
  * Rango aproximado de bits por píxel y cuadro con calidad constante a RF 22
  * en H.264: abajo, una grabación de pantalla casi quieta; arriba, video de
@@ -175,7 +197,11 @@ export function estimateCompressedSize(
 ): SizeEstimate | null {
   const duration = source.durationSeconds;
   if (duration === null || duration <= 0) return null;
-  if (options.target.mode === 'size') {
+  // Si el original ya entra, se comprime con la calidad del preset (ver el runner).
+  const fits =
+    options.target.mode === 'size' &&
+    (source.sizeBytes ?? Infinity) <= options.target.megabytes * BYTES_PER_MB;
+  if (options.target.mode === 'size' && !fits) {
     const bytes = Math.round(options.target.megabytes * BYTES_PER_MB);
     return { minBytes: Math.round(bytes * TARGET_MARGIN.gpu), maxBytes: bytes };
   }

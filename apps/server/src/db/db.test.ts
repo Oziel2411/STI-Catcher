@@ -21,9 +21,11 @@ function freshDb() {
 describe('migrate', () => {
   it('aplica las pendientes una sola vez', () => {
     const db = openDatabase(':memory:');
-    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(migrate(db, migrations).map((m) => m.version)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    ]);
     expect(migrate(db, migrations)).toEqual([]);
-    expect(db.pragma('user_version', { simple: true })).toBe(10);
+    expect(db.pragma('user_version', { simple: true })).toBe(11);
   });
 
   it('revierte una migración que falla y no avanza la versión', () => {
@@ -36,6 +38,60 @@ describe('migrate', () => {
     expect(db.pragma('user_version', { simple: true })).toBe(1);
     // La tabla b no quedó creada a medias.
     expect(() => db.prepare('SELECT * FROM b').all()).toThrow();
+  });
+
+  it('la migración 11 rehace jobs sin perder columnas, índices, datos ni referencias', () => {
+    const db = openDatabase(':memory:');
+    migrate(
+      db,
+      migrations.filter((m) => m.version <= 10),
+    );
+    const columns = () => db.pragma('table_info(jobs)') as unknown[];
+    const indexes = () =>
+      db
+        .prepare(
+          "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'jobs' ORDER BY name",
+        )
+        .all();
+    const before = { columns: columns(), indexes: indexes() };
+
+    const insert = db.prepare(
+      "INSERT INTO jobs (id, type, status, created_at, parent_job_id, follow_up_job_id, title) VALUES (?, ?, 'done', 't', ?, ?, ?)",
+    );
+    insert.run(ids.a, 'download', null, null, 'Origen');
+    insert.run(ids.b, 'conversion', ids.a, null, 'Conversión');
+    db.prepare('UPDATE jobs SET follow_up_job_id = ? WHERE id = ?').run(ids.b, ids.a);
+    db.prepare(
+      "INSERT INTO recordings (id, status, mime_type, extension, fps, title, created_at, job_id) VALUES ('r', 'finalized', 'video/webm', 'webm', 30, 'Grabación', 't', ?)",
+    ).run(ids.a);
+
+    migrate(db, migrations);
+
+    expect(columns()).toEqual(before.columns);
+    expect(indexes()).toEqual(before.indexes);
+    // Borrar la tabla vieja no disparó los ON DELETE SET NULL.
+    expect(
+      db.prepare('SELECT id, parent_job_id, follow_up_job_id, title FROM jobs ORDER BY id').all(),
+    ).toEqual([
+      { id: ids.a, parent_job_id: null, follow_up_job_id: ids.b, title: 'Origen' },
+      { id: ids.b, parent_job_id: ids.a, follow_up_job_id: null, title: 'Conversión' },
+    ]);
+    expect(db.prepare("SELECT job_id FROM recordings WHERE id = 'r'").get()).toEqual({
+      job_id: ids.a,
+    });
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+
+    // El tipo nuevo entra; uno inventado sigue rechazado, y las referencias siguen vivas.
+    insert.run(ids.c, 'compression', ids.a, null, 'Compresión');
+    expect(() => insert.run('x', 'otro', null, null, null)).toThrow(/CHECK/);
+    db.prepare('DELETE FROM jobs WHERE id = ?').run(ids.a);
+    expect(db.prepare('SELECT parent_job_id FROM jobs WHERE id = ?').get(ids.c)).toEqual({
+      parent_job_id: null,
+    });
+    expect(db.prepare("SELECT job_id FROM recordings WHERE id = 'r'").get()).toEqual({
+      job_id: null,
+    });
   });
 
   it('rechaza numeración con huecos', () => {

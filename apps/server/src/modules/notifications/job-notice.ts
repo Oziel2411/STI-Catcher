@@ -63,6 +63,11 @@ const KINDS = {
     done: 'Conversión terminada',
     failed: 'Falló la conversión',
   },
+  compression: {
+    noun: 'La compresión',
+    done: 'Compresión terminada',
+    failed: 'Falló la compresión',
+  },
 } as const;
 
 type NoticeKind = keyof typeof KINDS;

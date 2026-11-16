@@ -1,13 +1,14 @@
 import { COMPRESSION_PRESETS, effectiveAudioKbps, outputVideo } from '@sti-catcher/shared';
-import type { CompressionCodec, CompressionOptions, CompressionSpeed } from '@sti-catcher/shared';
+import type {
+  CompressionCodec,
+  CompressionOptions,
+  CompressionSpeed,
+  VideoEncoder,
+} from '@sti-catcher/shared';
 import { FFMPEG_BASE_ARGS } from '../../adapters/ffmpeg.ts';
 import type { MediaInfo } from '../../adapters/ffprobe.ts';
 
-/**
- * Con qué se codifica: CPU (x264/x265) o la GPU Intel (Quick Sync). Lo decide
- * el server al arrancar, con una codificación de prueba por códec.
- */
-export type VideoEncoder = 'cpu' | 'qsv';
+export type { VideoEncoder };
 
 export type CompressionArgsOptions = {
   inputPath: string;

@@ -34,6 +34,11 @@ export type JobQueueDeps = {
   /** tempDir y filesDir deben estar en STORAGE_DIR (mismo volumen: mover es instantáneo). */
   paths: { tempDir: string; filesDir: string };
   maxConcurrent: number;
+  /**
+   * Tope por tipo, dentro de `maxConcurrent` (p. ej. una compresión a la vez:
+   * D-108). Los de ese tipo esperan, pero los demás siguen pasando.
+   */
+  maxConcurrentByType?: Partial<Record<JobType, number>>;
   minFreeDiskBytes: number;
   readFreeDiskBytes: () => Promise<number>;
   logger: QueueLogger;
@@ -115,7 +120,7 @@ export type JobQueue = {
   stop(): Promise<void>;
 };
 
-type RunningJob = { controller: AbortController; done: Promise<void> };
+type RunningJob = { type: JobType; controller: AbortController; done: Promise<void> };
 
 const GB = 1024 ** 3;
 const formatGb = (bytes: number) => `${(bytes / GB).toFixed(1).replace('.', ',')} GB`;
@@ -330,7 +335,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
     if (!repo.markRunning(record.id, now().toISOString())) return; // lo cancelaron mientras tanto
 
     const controller = new AbortController();
-    const entry: RunningJob = { controller, done: Promise.resolve() };
+    const entry: RunningJob = { type: record.type, controller, done: Promise.resolve() };
     running.set(record.id, entry);
     publishUpdated(record.id);
     logger.info({ jobId: record.id, type: record.type }, 'Job iniciado');
@@ -338,6 +343,17 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
     const started = repo.get(record.id) ?? record;
     entry.done = runJob(started, runner, controller).finally(() => {
       void pump();
+    });
+  };
+
+  /** Tipos que ya tienen corriendo todos los que admite su tope. */
+  const typesAtCap = (): JobType[] => {
+    const caps = deps.maxConcurrentByType ?? {};
+    return (Object.keys(caps) as JobType[]).filter((type) => {
+      const cap = caps[type] ?? Infinity;
+      let count = 0;
+      for (const entry of running.values()) if (entry.type === type) count += 1;
+      return count >= cap;
     });
   };
 
@@ -351,7 +367,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
       do {
         pumpAgain = false;
         while (accepting && running.size < deps.maxConcurrent) {
-          const next = repo.nextQueued();
+          const next = repo.nextQueued(typesAtCap());
           if (!next) break;
           const diskProblem = await checkDisk();
           if (diskProblem !== null) {

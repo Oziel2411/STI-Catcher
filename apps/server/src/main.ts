@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readDiskSpace } from './adapters/disk.ts';
 import { createFfmpegRunner } from './adapters/ffmpeg.ts';
+import { createEncoderRegistry, detectVideoEncoders } from './adapters/video-encoders.ts';
 import { createFfprobe } from './adapters/ffprobe.ts';
 import { fileOps } from './adapters/files.ts';
 import { acquireInstanceLock, InstanceLockError } from './adapters/instance-lock.ts';
@@ -29,6 +30,8 @@ import { createLoginLimiter } from './modules/auth/login-limiter.ts';
 import { createUsersService } from './modules/auth/users-service.ts';
 import { createPasswordReset } from './modules/auth/password-reset.ts';
 import { createPasswordResetsRepository } from './db/password-resets-repository.ts';
+import { createCompressionRunner } from './modules/compression/compression-runner.ts';
+import { createCompressionService } from './modules/compression/compression-service.ts';
 import { createConversionRunner } from './modules/conversion/conversion-runner.ts';
 import { createConversionService } from './modules/conversion/conversion-service.ts';
 import { createUploadService } from './modules/conversion/upload-service.ts';
@@ -152,6 +155,12 @@ async function main(): Promise<void> {
   });
   const runFfmpeg = createFfmpegRunner(runStreaming, config.tools.ffmpeg);
   const ffprobe = createFfprobe(runCommand, config.tools.ffprobe);
+  // GPU o CPU para comprimir (D-108): se prueba en segundo plano al arrancar.
+  const encoderDetection = detectVideoEncoders(runCommand, config.tools.ffmpeg, logger);
+  void encoderDetection.then((encoders) => {
+    logger.info({ encoders }, 'Encoders de video para comprimir');
+  });
+  const encoders = createEncoderRegistry(encoderDetection);
   const checkUrl = createUrlGuard({ enabled: config.download.blockPrivateUrls });
   const ytdlp = createYtdlp({
     runCommand,
@@ -178,6 +187,16 @@ async function main(): Promise<void> {
         ffprobe,
         runFfmpeg,
       }),
+      compression: createCompressionRunner({
+        getJob: (id) => repo.get(id),
+        storageDir: config.paths.storage,
+        filesDir: storage.filesDir,
+        ffprobe,
+        runFfmpeg,
+        encoders,
+        fileSize: fileOps.fileSize,
+        logger,
+      }),
       recording: createRecordingRunner({
         recordingsDir: storage.recordingsDir,
         ffprobe,
@@ -188,6 +207,8 @@ async function main(): Promise<void> {
     files: fileOps,
     paths: storage,
     maxConcurrent: config.limits.maxConcurrentJobs,
+    // Una compresión a la vez (D-108): es lo que más CPU usa, y la PC es compartida.
+    maxConcurrentByType: { compression: 1 },
     minFreeDiskBytes: config.limits.minFreeDiskBytes,
     readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,
     // La conversión encadenada necesita el servicio de conversión, que necesita la cola.
@@ -250,6 +271,14 @@ async function main(): Promise<void> {
     ffprobe,
     queue,
     gifLimits,
+  });
+  const compression = createCompressionService({
+    getJob: (id) => repo.get(id),
+    storageDir: config.paths.storage,
+    filesDir: storage.filesDir,
+    ffprobe,
+    encoders,
+    queue,
   });
   const followUps = createFollowUps({ conversion, queue, repo, logger });
   // Aviso por mail al terminar una grabación (D-099). Sin SMTP o sin MAIL_TO, nada.
@@ -352,6 +381,7 @@ async function main(): Promise<void> {
       jobFiles,
       history,
       conversion,
+      compression,
       upload,
       conversionOptions,
       recordings,

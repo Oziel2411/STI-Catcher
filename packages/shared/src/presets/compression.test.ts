@@ -220,6 +220,14 @@ describe('estimateCompressedSize', () => {
     expect(archive1080.maxBytes).toBeLessThan(fast1080.maxBytes * 2);
   });
 
+  it('tamaño objetivo mayor que el original: estima como calidad constante (no se infla)', () => {
+    const small = { ...screen1080p60, durationSeconds: 20, sizeBytes: 1 * MB };
+    const options = parse({ preset: 'share-720p', target: { mode: 'size', megabytes: 5 } });
+    expect(estimateCompressedSize(small, options)).toEqual(
+      estimateCompressedSize(small, parse({ preset: 'share-720p' })),
+    );
+  });
+
   it('sin duración: no hay estimación', () => {
     expect(
       estimateCompressedSize(

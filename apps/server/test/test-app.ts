@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { HealthResponse, ProbeResponse } from '@sti-catcher/shared';
+import type { HealthResponse, ProbeResponse, ResolvedEncoders } from '@sti-catcher/shared';
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { pino } from 'pino';
 import { vi } from 'vitest';
@@ -25,6 +25,7 @@ import { migrations } from '../src/db/migrations.ts';
 import { createJobEventBus } from '../src/jobs/event-bus.ts';
 import { createJobQueue } from '../src/jobs/queue.ts';
 import type { JobContext, JobResult, JobRunner } from '../src/jobs/types.ts';
+import { createCompressionService } from '../src/modules/compression/compression-service.ts';
 import { createConversionService } from '../src/modules/conversion/conversion-service.ts';
 import { createUploadService } from '../src/modules/conversion/upload-service.ts';
 import { createRecordingService } from '../src/modules/recording/recording-service.ts';
@@ -66,6 +67,8 @@ export type TestAppOptions = {
   checkUrl?: UrlGuard;
   /** ffprobe falso para subidas y conversiones (por defecto: video H.264 + AAC de 12 s). */
   ffprobe?: Ffprobe;
+  /** Encoders de la compresión (por defecto: H.264 por GPU, H.265 por CPU). */
+  encoders?: ResolvedEncoders;
   maxUploadBytes?: number;
   /** IP → nombre de la PC (por defecto no se resuelve). */
   resolveHost?: (ip: string) => Promise<string | null>;
@@ -154,7 +157,13 @@ export async function makeTestApp(options: TestAppOptions = {}) {
   const queue = createJobQueue({
     repo,
     bus,
-    runners: { selftest: runner, download: runner, conversion: runner, recording: runner },
+    runners: {
+      selftest: runner,
+      download: runner,
+      conversion: runner,
+      compression: runner,
+      recording: runner,
+    },
     files: {
       removeByPrefix: () => Promise.resolve(0),
       moveFile: () => Promise.resolve(),
@@ -208,6 +217,14 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     ffprobe,
     queue,
     gifLimits: testGifLimits,
+  });
+  const compression = createCompressionService({
+    getJob: (id) => repo.get(id),
+    storageDir,
+    filesDir,
+    ffprobe,
+    encoders: { current: () => Promise.resolve(options.encoders ?? { h264: 'qsv', hevc: 'cpu' }) },
+    queue,
   });
   const followUps = createFollowUps({ conversion, queue, repo, logger: { warn: vi.fn() } });
   const sentMails: MailMessage[] = [];
@@ -307,6 +324,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       jobFiles,
       history,
       conversion,
+      compression,
       upload,
       conversionOptions,
       recordings,

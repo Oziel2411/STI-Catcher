@@ -129,8 +129,11 @@ export function createJobsRepository(db: Db): JobsRepository {
     'SELECT * FROM jobs WHERE notice_batch_id = ? ORDER BY created_at, rowid',
   );
   const getStmt = db.prepare<[string], JobRow>('SELECT * FROM jobs WHERE id = ?');
-  const nextQueuedStmt = db.prepare<[], JobRow>(
-    "SELECT * FROM jobs WHERE status = 'queued' ORDER BY created_at, rowid LIMIT 1",
+  // Los tipos a saltear van como JSON: json_each los vuelve filas (una lista vacía no saltea nada).
+  const nextQueuedStmt = db.prepare<[string], JobRow>(
+    `SELECT * FROM jobs
+     WHERE status = 'queued' AND type NOT IN (SELECT value FROM json_each(?))
+     ORDER BY created_at, rowid LIMIT 1`,
   );
   const markRunningStmt = db.prepare<[string, string]>(
     "UPDATE jobs SET status = 'running', started_at = ? WHERE id = ? AND status = 'queued'",
@@ -190,7 +193,7 @@ export function createJobsRepository(db: Db): JobsRepository {
   `);
   const activeByUserStmt = db.prepare<[string], { kind: string; total: number }>(`
     SELECT CASE
-             WHEN j.type = 'conversion'
+             WHEN j.type IN ('conversion', 'compression')
               AND EXISTS (SELECT 1 FROM jobs d WHERE d.follow_up_job_id = j.id) THEN 'download'
              ELSE j.type
            END AS kind,
@@ -286,8 +289,8 @@ export function createJobsRepository(db: Db): JobsRepository {
         .map(toRecord);
     },
 
-    nextQueued() {
-      const row = nextQueuedStmt.get();
+    nextQueued(skipTypes = []) {
+      const row = nextQueuedStmt.get(JSON.stringify(skipTypes));
       return row ? toRecord(row) : null;
     },
 

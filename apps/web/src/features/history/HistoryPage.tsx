@@ -2,6 +2,7 @@ import {
   ClockCounterClockwiseIcon,
   ArrowSquareOutIcon,
   ArrowsClockwiseIcon,
+  ArrowsInSimpleIcon,
   ArrowsLeftRightIcon,
   DownloadSimpleIcon,
   FunnelSimpleIcon,
@@ -496,6 +497,7 @@ const TYPE_ICONS = {
   download: DownloadSimpleIcon,
   upload: UploadSimpleIcon,
   conversion: ArrowsLeftRightIcon,
+  compression: ArrowsInSimpleIcon,
   recording: RecordIcon,
   selftest: ArrowsClockwiseIcon,
 } as const;

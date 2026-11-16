@@ -98,8 +98,8 @@ export type JobsRepository = {
   insert(job: NewJob): JobRecord;
   get(id: string): JobRecord | null;
   list(filter: ListJobsFilter): JobRecord[];
-  /** El job queued más antiguo, o null. */
-  nextQueued(): JobRecord | null;
+  /** El job queued más antiguo, salteando los tipos que ya llegaron a su tope, o null. */
+  nextQueued(skipTypes?: readonly JobType[]): JobRecord | null;
   /** queued → running. false si el job ya no estaba queued (p. ej. lo cancelaron). */
   markRunning(id: string, startedAt: string): boolean;
   /** queued|running → estado final. false si el job ya había terminado. */

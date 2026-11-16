@@ -11,7 +11,7 @@ import type { Ffprobe } from '../../adapters/ffprobe.ts';
 import { JobError } from '../../jobs/errors.ts';
 import type { JobRecord, JobRunner } from '../../jobs/types.ts';
 import { buildConversionArgs } from './conversion-args.ts';
-import { resolveJobFile } from './conversion-service.ts';
+import { resolveJobFile } from '../files/job-files.ts';
 
 export const conversionParamsSchema = z.object({
   sourceJobId: z.uuid(),
