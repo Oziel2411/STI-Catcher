@@ -340,6 +340,13 @@ function Recorder() {
             disabled={locked}
           />
 
+          {(phase.kind === 'idle' || phase.kind === 'tracking') && (
+            <div className="alert alert-warn" role="status">
+              Falta elegir qué compartir: tocá «{CHOOSE_LABELS[sourceKind]}» para{' '}
+              {schedule.startMode === 'at' ? 'programar' : 'empezar'} la grabación.
+            </div>
+          )}
+
           {recording ? (
             <button
               type="button"
