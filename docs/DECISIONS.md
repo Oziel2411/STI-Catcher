@@ -882,6 +882,26 @@ Hasta ahora «A mí» venía tildado en todas las grabaciones (D-104) y el aviso
   - los avisos (inicio, no empezó, vacía, fin) intentaron salir; con ese SMTP fallan con ESOCKET, como se esperaba.
 - **No verificado:** el selector de pantalla real y el envío real por SMTP.
 
+## Compresión
+
+### D-108 — Comprimir video, al estilo de HandBrake · Etapa 1 de 5 · Vigente
+
+Sección propia «Comprimir», separada de Convertir: Convertir cambia el formato; Comprimir achica el archivo (para mandarlo por mail o WhatsApp, subirlo a una plataforma o archivarlo). Sale el resultado del cuestionario con el usuario (2026-11-12).
+
+- **Presets cerrados** en `packages/shared/src/presets/compression.ts`: Rápido 1080p30 y 720p30, Para compartir 720p y Grabación de pantalla (H.264), y Archivar 1080p y original (H.265). Cada uno describe la intención: códec, calidad RF (la escala de HandBrake), velocidad, tope de altura y de cuadros, y audio. Salida siempre **MP4** (H.264 o H.265 + AAC, `faststart`; H.265 con etiqueta `hvc1`). H.265 solo en los de archivar: comprime ~40 % más, pero algunas PCs con Windows no lo abren sin una extensión.
+- **Opciones** (`compressionOptionsSchema`, lo mismo para la sección, para encadenar a una descarga o a una grabación): preset, modo (`quality` = el RF del preset, o `size` = «que pese como mucho N MB», 5 a 4000 MB, con atajos Mail 24, WhatsApp 95, Teams/Drive 250), altura (solo hacia abajo) y audio (64, 96, 128 o 160 kbps). 1 MB = 1024², como el Explorador.
+- **Cuentas en shared** (`compression-size.ts`, puras): resolución y cuadros de la salida, bitrate para un tamaño, si el tamaño alcanza a esa resolución (piso de 0,02 bits por píxel y cuadro en H.264; si no alcanza, se sugiere la resolución más alta a la que sí), estimación y bitrate del reintento. La web estima al instante con las mismas funciones que el server usa para validar. En calidad constante la estimación es un rango amplio (depende mucho del contenido); en modo tamaño, el pedido.
+- **CPU o GPU lo decide el server**, no el preset: con una codificación de prueba por códec al arrancar (etapa 2). En SISTEMAS2-PC (Intel HD 630) Quick Sync codifica H.264 y H.265; H.265 solo con `nv12` (con el formato por defecto da «unsupported»), así que la cadena de filtros siempre termina en `format=nv12` (QSV) o `format=yuv420p` (CPU), que además pasa a 8 bits los originales de 10.
+- **Modo tamaño:** con CPU, dos pasadas (clava el tamaño; el log va en `tempDir` con el id del job). Con QSV, que no tiene dos pasadas, una pasada con bitrate variable apuntando al 90 % y techo de 1,5×; si igual se pasa, el runner reintenta más bajo (etapa 2).
+- **Cuadros:** `MediaInfo.video.frameRate` sale de `avg_frame_rate`. El WebM de MediaRecorder no lo informa (`0/0`): ahí se aplica el tope del preset y las cuentas suponen 30.
+- **Videos verticales de celular:** se guardan apaisados con una matriz de rotación y ffmpeg los gira antes de `-vf`. `MediaInfo` da ahora ancho y alto **como se ven** (con ±90° se intercambian), y se escala con `scale=-2:H` (ancho par automático sobre la imagen ya girada), como Convertir.
+- **Sin audio,** todo el tamaño objetivo va al video (`CompressionSource.hasAudio`).
+- `buildCompressionArgs` (`modules/compression/compression-args.ts`, pura) arma una o dos ejecuciones de ffmpeg; siempre recodifica.
+
+Verificado con el ffmpeg real, corriendo los argumentos tal como los arma `buildCompressionArgs` (1080p60 de prueba, 20 s, audio 5.1): los 6 presets por CPU y por QSV dieron MP4 válidos con la resolución, los cuadros, `yuv420p` y el audio estéreo esperados. 5 MB objetivo: H.264 CPU 4,84 MB (dos pasadas) y QSV 4,56 MB; H.265 CPU 4,78 MB (dos pasadas, 54 s) y QSV 4,39 MB (18 s). El mismo video con rotación de 90° salió 406×720 con Rápido 720p. A igual RF, QSV dio archivos 25–70 % más grandes que x264 con este video sintético; la equivalencia de calidad se ajusta en la etapa 2 con videos reales.
+
+Pendiente (etapas siguientes): runner, tipo de job `compression`, API y tope de una compresión a la vez con prioridad baja (2); la sección en la web (3); modo tamaño completo con estimación (4); comprimir al terminar una descarga (5). Encadenar a una grabación lo define la sesión de encadenar trabajos.
+
 ## Deuda técnica
 
 ### DT-001 — Archivos subidos como jobs `upload` · Fase 5
