@@ -14,7 +14,7 @@
      solo en STORAGE_DIR, DATA_DIR y LOG_DIR; la clave del certificado la leen
      solo esa cuenta, SYSTEM y Administradores.
   5. Regla de entrada en el Firewall de Windows para el puerto (perfiles
-     Dominio y Privado).
+     Dominio y Privado; con -RemoteAddress, solo desde esas direcciones).
   6. Inicia el servicio y prueba https://localhost:<PORT>/api/health.
 
   Si el servicio ya existe, lo detiene y lo vuelve a instalar (sirve para
@@ -24,6 +24,12 @@
   Además, configura el plan de energía para que el equipo no se suspenda ni
   hiberne con corriente alterna. El servidor no puede suspenderse.
 
+.PARAMETER RemoteAddress
+  Direcciones desde las que se acepta la conexión, como las entiende el
+  Firewall de Windows: una subred (192.168.3.0/24), un rango o una IP, o
+  'LocalSubnet'. Varias, separadas por coma. Sin este parámetro, cualquier
+  equipo de una red Privada o de Dominio.
+
 .PARAMETER DryRun
   No instala nada: verifica, descarga WinSW, genera el XML y muestra lo que haría.
   No requiere administrador.
@@ -31,11 +37,16 @@
 .EXAMPLE
   .\scripts\install-service.ps1 -DisableSleep
 .EXAMPLE
+  .\scripts\install-service.ps1 -RemoteAddress 192.168.3.0/24
+.EXAMPLE
   .\scripts\install-service.ps1 -DryRun
 #>
 [CmdletBinding()]
 param(
   [switch]$DisableSleep,
+  # Se valida antes de instalar: un error acá, en el paso del firewall, dejaría el servicio a medias.
+  [ValidatePattern('^(Any|LocalSubnet|\d{1,3}(\.\d{1,3}){3}(/\d{1,2}|-\d{1,3}(\.\d{1,3}){3})?)$')]
+  [string[]]$RemoteAddress = @('Any'),
   [switch]$DryRun
 )
 
@@ -248,12 +259,13 @@ if ($config.KeyPath) {
 
 # --- 5. Firewall ------------------------------------------------------------------
 Write-Step 'Firewall'
-Invoke-Action "Regla de entrada TCP $($config.Port) (perfiles Dominio y Privado)" {
+$remoteText = if ($RemoteAddress -contains 'Any') { 'cualquier equipo' } else { 'solo desde ' + ($RemoteAddress -join ', ') }
+Invoke-Action "Regla de entrada TCP $($config.Port) (perfiles Dominio y Privado; $remoteText)" {
   Get-NetFirewallRule -Name $FirewallRuleName -ErrorAction SilentlyContinue | Remove-NetFirewallRule
   New-NetFirewallRule -Name $FirewallRuleName -DisplayName "STI-Catcher (TCP $($config.Port))" `
     -Description 'Acceso de la red interna a STI-Catcher. Creada por install-service.ps1.' `
     -Direction Inbound -Action Allow -Protocol TCP -LocalPort $config.Port `
-    -Profile Domain, Private | Out-Null
+    -Profile Domain, Private -RemoteAddress $RemoteAddress | Out-Null
 }
 $publicNetworks = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue |
     Where-Object { $_.NetworkCategory -eq 'Public' })
