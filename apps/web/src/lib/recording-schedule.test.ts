@@ -4,6 +4,7 @@ import {
   describeSchedule,
   formatCountdown,
   formatSpan,
+  isProgrammed,
   nextOccurrence,
   parseClock,
   plannedStart,
@@ -117,4 +118,13 @@ it('formatos de tiempo', () => {
   expect(formatCountdown(65)).toBe('1:05');
   expect(formatCountdown(3725)).toBe('1:02:05');
   expect(formatCountdown(-3)).toBe('0:00');
+});
+
+describe('isProgrammed (D-109)', () => {
+  it('programada = empieza a una hora o corta sola', () => {
+    expect(isProgrammed(DEFAULT_SCHEDULE)).toBe(false);
+    expect(isProgrammed({ ...DEFAULT_SCHEDULE, startMode: 'at', startAt: '14:00' })).toBe(true);
+    expect(isProgrammed({ ...DEFAULT_SCHEDULE, stopMode: 'after' })).toBe(true);
+    expect(isProgrammed({ ...DEFAULT_SCHEDULE, stopMode: 'at', stopAt: '15:00' })).toBe(true);
+  });
 });

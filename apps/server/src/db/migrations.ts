@@ -178,4 +178,54 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE recordings ADD COLUMN notify_user_ids TEXT NOT NULL DEFAULT '[]';
     `,
   },
+  {
+    version: 9,
+    name: 'create-notice-batches',
+    sql: /* sql */ `
+      -- Aviso agrupado (D-105): varios trabajos pedidos de una vez (una lista
+      -- de links o de archivos) mandan un solo mail cuando terminan todos.
+      -- closed_at: la web terminó de crear los trabajos del pedido (o pasó el
+      -- tiempo de gracia). notified_at: el mail ya salió (se reclama una vez).
+      CREATE TABLE notice_batches (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        notify_user_ids TEXT NOT NULL,
+        created_at      TEXT NOT NULL,
+        closed_at       TEXT,
+        notified_at     TEXT
+      );
+      CREATE INDEX notice_batches_pending ON notice_batches (notified_at);
+      ALTER TABLE jobs ADD COLUMN notice_batch_id TEXT;
+      CREATE INDEX jobs_notice_batch ON jobs (notice_batch_id);
+    `,
+  },
+  {
+    version: 10,
+    name: 'create-recording-schedules',
+    sql: /* sql */ `
+      -- Grabaciones programadas (D-109): la espera vive en la pestaña, pero el
+      -- server guarda la hora para avisar si no empezó (pestaña cerrada, PC
+      -- suspendida). Pendiente = sin started_at, cancelled_at ni failed_at.
+      -- next_action: lugar para una acción encadenada al terminar (convertir o
+      -- comprimir); todavía no se usa.
+      CREATE TABLE recording_schedules (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        title           TEXT NOT NULL,
+        notify_user_ids TEXT NOT NULL,
+        start_at        TEXT NOT NULL,
+        stop_at         TEXT,
+        client_ip       TEXT,
+        created_at      TEXT NOT NULL,
+        recording_id    TEXT,
+        started_at      TEXT,
+        cancelled_at    TEXT,
+        failed_at       TEXT,
+        failure         TEXT,
+        next_action     TEXT
+      );
+      CREATE INDEX recording_schedules_pending ON recording_schedules (start_at)
+        WHERE started_at IS NULL AND cancelled_at IS NULL AND failed_at IS NULL;
+    `,
+  },
 ];

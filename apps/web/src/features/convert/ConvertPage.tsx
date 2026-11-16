@@ -144,7 +144,14 @@ export function ConvertPage() {
         )}
       </header>
 
-      {!empty && <NotifyPicker value={notify} onChange={setNotify} what="cada conversión" />}
+      {!empty && (
+        <NotifyPicker
+          value={notify}
+          onChange={setNotify}
+          what="la conversión"
+          hint="Si convertís varios archivos a la vez, llega un solo mail con la lista cuando terminan todos."
+        />
+      )}
 
       <input
         ref={inputRef}

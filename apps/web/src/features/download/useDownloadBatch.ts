@@ -7,6 +7,7 @@ import type { ConversionPresetId, GifLimits } from '@sti-catcher/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiClientError, apiPost } from '../../api/client.ts';
 import { subscribeToJobsEvents } from '../../api/events.ts';
+import { withNoticeBatch } from '../../api/notice-batch.ts';
 import {
   activeJob,
   applyEventToItems,
@@ -145,19 +146,25 @@ export function useDownloadBatch(limits: GifLimits | null) {
   const startReady = async (notify: string[] = []) => {
     if (!limits) return;
     setSubmitting(true);
-    for (const item of startTargets(items, limits)) {
+    const targets = startTargets(items, limits).flatMap((item) => {
       const request = downloadRequest(item);
-      if (!request) continue;
-      try {
-        const { jobId } = await apiPost('/api/jobs/download', createJobResponseSchema, {
-          ...request,
-          notify,
-        });
-        update(item.id, { status: 'job', jobId, job: null, followUp: null, checked: false });
-      } catch (error) {
-        update(item.id, { error: errorMessage(error) });
+      return request ? [{ item, request }] : [];
+    });
+    // Varios links con aviso: un solo mail al terminar todos (D-105).
+    await withNoticeBatch(notify, targets.length, async (batchId) => {
+      for (const { item, request } of targets) {
+        try {
+          const { jobId } = await apiPost('/api/jobs/download', createJobResponseSchema, {
+            ...request,
+            notify,
+            batchId,
+          });
+          update(item.id, { status: 'job', jobId, job: null, followUp: null, checked: false });
+        } catch (error) {
+          update(item.id, { error: errorMessage(error) });
+        }
       }
-    }
+    });
     setSubmitting(false);
   };
 

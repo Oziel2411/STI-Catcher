@@ -29,6 +29,8 @@ type Props = {
   onChange: (ids: string[]) => void;
   /** «la grabación», «las descargas»… para el texto de ayuda. */
   what: string;
+  /** Texto que se agrega a la ayuda (p. ej. cómo avisa un pedido de varios). */
+  hint?: string;
   disabled?: boolean;
 };
 
@@ -37,7 +39,7 @@ type Props = {
  * (D-104). Sin servidor de correo no se muestra. Las cuentas desactivadas que
  * hubieran quedado elegidas se descartan solas.
  */
-export function NotifyPicker({ value, onChange, what, disabled = false }: Props) {
+export function NotifyPicker({ value, onChange, what, hint, disabled = false }: Props) {
   const { user } = useSession();
   const [options, setOptions] = useState<NotifyOptions | null>(null);
 
@@ -70,7 +72,7 @@ export function NotifyPicker({ value, onChange, what, disabled = false }: Props)
         Avisar por mail
       </legend>
       <p className="muted small notify-help">
-        Cuando {what} termine o falle, le llega un mail a quien elijas.
+        Cuando {what} termine o falle, le llega un mail a quien elijas.{hint ? ` ${hint}` : ''}
       </p>
       <div className="notify-row">
         <label className="choice">

@@ -21,9 +21,9 @@ function freshDb() {
 describe('migrate', () => {
   it('aplica las pendientes una sola vez', () => {
     const db = openDatabase(':memory:');
-    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(migrate(db, migrations).map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(migrate(db, migrations)).toEqual([]);
-    expect(db.pragma('user_version', { simple: true })).toBe(8);
+    expect(db.pragma('user_version', { simple: true })).toBe(10);
   });
 
   it('revierte una migración que falla y no avanza la versión', () => {

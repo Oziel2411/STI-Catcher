@@ -11,6 +11,7 @@ import type { RecordingSession, RecordingsRepository } from '../../db/recordings
 import type { JobQueue } from '../../jobs/queue.ts';
 import type { Requester } from '../history/history-service.ts';
 import type { RecordingParams } from './recording-runner.ts';
+import type { RecordingStart } from './schedule-service.ts';
 
 /** Tamaño máximo de un fragmento (cada uno son ~2 s; 1080p60 ronda 2–4 MB). */
 export const MAX_CHUNK_BYTES = 64 * 1024 ** 2;
@@ -44,6 +45,10 @@ export type RecordingServiceDeps = {
   readFreeDiskBytes: () => Promise<number>;
   queue: Pick<JobQueue, 'enqueue'>;
   idleMinutes: number;
+  /** Al empezar una grabación: cumple su programación y avisa si es programada (D-109). */
+  onStarted?: (start: RecordingStart) => void;
+  /** Se descartó una grabación sin nada grabado: avisa que falló (D-109). */
+  onEmpty?: (session: RecordingSession) => void;
   logger: {
     info: (obj: object, msg: string) => void;
     warn: (obj: object, msg: string) => void;
@@ -156,6 +161,17 @@ export function createRecordingService(deps: RecordingServiceDeps) {
         clientIp: requester.ip,
         createdAt: now().toISOString(),
       });
+      deps.onStarted?.({
+        recordingId: session.id,
+        title: session.title,
+        userId: session.userId,
+        clientIp: session.clientIp,
+        notifyUserIds: session.notifyUserIds,
+        startedAt: session.createdAt,
+        programmed: request.programmed ?? false,
+        stopAt: request.stopAt ?? null,
+        scheduleId: request.scheduleId ?? null,
+      });
       return { recordingId: session.id, maxChunkBytes: MAX_CHUNK_BYTES };
     },
 
@@ -239,6 +255,7 @@ export function createRecordingService(deps: RecordingServiceDeps) {
         }
         if (session.sizeBytes === 0) {
           deps.repo.discard(id);
+          deps.onEmpty?.(session);
           throw new RecordingError('EMPTY', 'No se llegó a grabar nada.', 409);
         }
         return finalize(session);
@@ -258,6 +275,7 @@ export function createRecordingService(deps: RecordingServiceDeps) {
           if (session?.status !== 'recording') return;
           if (session.sizeBytes === 0) {
             deps.repo.discard(session.id);
+            deps.onEmpty?.(session);
             await rm(rawRecordingPath(deps.recordingsDir, session.id, session.extension), {
               force: true,
             });

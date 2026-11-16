@@ -2,17 +2,24 @@ import type { Readable } from 'node:stream';
 import {
   chunkQuerySchema,
   createRecordingRequestSchema,
+  createRecordingScheduleRequestSchema,
+  failRecordingScheduleRequestSchema,
+  recordingScheduleParamsSchema,
   recordingIdParamsSchema,
 } from '@sti-catcher/shared';
 import type { FastifyInstance } from 'fastify';
 import { HttpError, parseInput } from '../http/validation.ts';
 import { RecordingError } from '../modules/recording/recording-service.ts';
 import type { RecordingService } from '../modules/recording/recording-service.ts';
+import { ScheduleError } from '../modules/recording/schedule-service.ts';
+import type { ScheduleService } from '../modules/recording/schedule-service.ts';
 import { requesterOf } from './history.ts';
 import { rethrowJobRejection } from './jobs.ts';
 
 const toHttpError = (error: unknown): unknown =>
-  error instanceof RecordingError ? new HttpError(error.status, error.code, error.message) : error;
+  error instanceof RecordingError || error instanceof ScheduleError
+    ? new HttpError(error.status, error.code, error.message)
+    : error;
 
 /**
  * Grabación de pantalla (SPEC §6):
@@ -20,7 +27,11 @@ const toHttpError = (error: unknown): unknown =>
  * 2. POST /api/recordings/:id/chunks?seq=N (binario) → un fragmento, en orden.
  * 3. POST /api/recordings/:id/finish → crea el job que normaliza a MP4.
  */
-export function registerRecordingRoutes(app: FastifyInstance, recordings: RecordingService): void {
+export function registerRecordingRoutes(
+  app: FastifyInstance,
+  recordings: RecordingService,
+  schedules: ScheduleService,
+): void {
   app.post('/api/recordings', async (request, reply) => {
     const body = parseInput(createRecordingRequestSchema, request.body ?? {});
     try {
@@ -63,5 +74,34 @@ export function registerRecordingRoutes(app: FastifyInstance, recordings: Record
       rethrowJobRejection(error);
       throw toHttpError(error);
     }
+  });
+
+  // Grabación programada (D-109): la hora de inicio queda en el server para
+  // avisar si no empezó. La espera y el inicio siguen en la pestaña.
+  app.post('/api/recording-schedules', async (request, reply) => {
+    const body = parseInput(createRecordingScheduleRequestSchema, request.body ?? {});
+    const scheduleId = schedules.create(body, requesterOf(request));
+    return reply.status(201).send({ scheduleId });
+  });
+
+  app.post('/api/recording-schedules/:id/cancel', async (request, reply) => {
+    const { id } = parseInput(recordingScheduleParamsSchema, request.params);
+    try {
+      schedules.cancel(id, requesterOf(request));
+    } catch (error) {
+      throw toHttpError(error);
+    }
+    return reply.status(204).send();
+  });
+
+  app.post('/api/recording-schedules/:id/fail', async (request, reply) => {
+    const { id } = parseInput(recordingScheduleParamsSchema, request.params);
+    const { reason } = parseInput(failRecordingScheduleRequestSchema, request.body ?? {});
+    try {
+      schedules.fail(id, reason, requesterOf(request));
+    } catch (error) {
+      throw toHttpError(error);
+    }
+    return reply.status(204).send();
   });
 }

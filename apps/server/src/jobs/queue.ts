@@ -72,6 +72,8 @@ export type EnqueueInput = {
   /** A quién avisar por mail al terminar o fallar (D-104). */
   notifyUserIds?: string[];
   parentJobId?: string | null;
+  /** Pedido de varios trabajos con un solo aviso por mail (D-105). */
+  noticeBatchId?: string | null;
 };
 
 export type CancelResult =
@@ -394,6 +396,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         userId: input.userId ?? null,
         notifyUserIds: input.notifyUserIds ?? [],
         parentJobId: input.parentJobId ?? null,
+        noticeBatchId: input.noticeBatchId ?? null,
       });
       annotateHost(record.id, input.clientIp);
       bus.publish({ type: 'job.updated', job: toApi(record) });
@@ -409,6 +412,8 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
       if (record.status === 'queued') {
         repo.finish(id, { status: 'cancelled', finishedAt: now().toISOString() });
         publishUpdated(id);
+        // Un cancelado solo no avisa, pero puede ser el último de un pedido (D-105).
+        notifyFinished(id);
         const updated = repo.get(id) ?? record;
         return { outcome: 'cancelled', job: toApi(updated) };
       }
@@ -463,6 +468,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         userId: input.userId ?? null,
         notifyUserIds: input.notifyUserIds ?? [],
         parentJobId: input.parentJobId ?? null,
+        noticeBatchId: input.noticeBatchId ?? null,
       });
       annotateHost(input.id, input.clientIp);
       repo.markRunning(input.id, timestamp);
@@ -485,6 +491,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
         userId: input.userId ?? null,
         notifyUserIds: input.notifyUserIds ?? [],
         parentJobId: input.parentJobId ?? null,
+        noticeBatchId: input.noticeBatchId ?? null,
       });
       annotateHost(record.id, input.clientIp);
       repo.finish(record.id, { status: 'failed', finishedAt: now().toISOString(), error });

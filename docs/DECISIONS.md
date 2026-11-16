@@ -802,6 +802,86 @@ Hasta ahora no había login (SPEC §1 y §8): cada navegador tenía una cookie a
 - En el log no apareció ninguna contraseña, token de recuperación ni cookie.
 - Con el primer admin creado antes de instalar el servicio, la base queda a nombre de quien corrió el comando; `install-service.ps1` da a la cuenta del servicio permiso heredable sobre `DATA_DIR`, que `icacls` aplica también a los archivos que ya están.
 
+### D-105 — Un solo aviso por pedido de varios trabajos · Vigente
+
+Al descargar una lista de links (D-095) o convertir varios archivos, se crea un trabajo por cada uno y llegaba un mail por cada uno. El usuario pidió **un solo mail por pedido**, con la lista de lo que quedó listo.
+
+**Decidido con el usuario:**
+
+- **Un mail al final:** cuando terminan **todos** los trabajos del pedido (bien, mal o cancelados) llega un único mail. Lista lo que quedó listo (con tamaño y duración), lo que falló (con el motivo) y lo cancelado. No hay mails parciales.
+- Vale para **Descargar y Convertir**. Un pedido de un solo trabajo manda el mail de siempre.
+- **Los trabajos que corta un reinicio del servidor también avisan** (quedan fallidos «interrumpido»): solos o dentro de su pedido. Antes no avisaban. Al detener el servicio se esperan hasta 5 s los avisos en curso; después de un corte, se avisa al arrancar.
+- **Si se cancela todo el pedido no llega nada**, igual que con un trabajo cancelado solo.
+
+**Detalles técnicos:**
+
+- **El servidor no sabía qué es un «pedido»:** la web crea los trabajos de a uno. Ahora, si hay varios y alguien a quien avisar, la web abre un pedido (`POST /api/notice-batches { notify }` → `{ batchId }`), manda `batchId` en cada `POST /api/jobs/download` o `/api/jobs/convert`, y lo cierra al terminar de crearlos (`POST /api/notice-batches/:id/close`), aunque alguno haya fallado. Si no se puede abrir el pedido, cada trabajo avisa solo, como antes.
+- **Por qué hace falta cerrar:** el primer trabajo puede terminar mientras la web todavía crea el tercero; sin el cierre, el mail saldría con la lista incompleta. Mandar «cuántos van a ser» no alcanza: si un pedido falla (sin disco, URL inválida) o se cierra la pestaña a mitad, el número nunca se completa.
+- **Pedidos abandonados:** un barrido cada 5 minutos cierra los pedidos abiertos que llevan 15 minutos sin trabajos nuevos, y revisa los cerrados que no avisaron (por ejemplo, si el servidor se reinició justo al terminar el último).
+- **El mail sale una sola vez:** se reclama con `UPDATE … SET notified_at … WHERE notified_at IS NULL`, aunque dos trabajos terminen a la vez.
+- **El pedido es de quien lo abre:** un `batchId` de otra cuenta da 404 y uno cerrado da 409. El mail va a las cuentas elegidas al abrir el pedido.
+- **Descarga con conversión encadenada (D-093):** la conversión hereda el pedido. La fila se cuenta terminada cuando termina la conversión, y en la lista figura el archivo final («Video → MP3»).
+- Tabla nueva `notice_batches` (migración 9) y columna `jobs.notice_batch_id`.
+
+**Verificado:** con tests (mailer simulado):
+
+- tres links con uno fallido dan un solo mail «2 de 3 listas», con el motivo;
+- si todo termina antes del cierre, el mail sale al cerrar, y cerrar dos veces no lo repite;
+- con conversión encadenada, el mail espera las conversiones y lista los archivos finales;
+- con un solo trabajo llega el mail de siempre;
+- los cancelados se listan aparte; si se cancela todo, no llega nada; si el último se cancela en cola, el mail sale en el momento;
+- un interrumpido avisa al arrancar, y al detener el servicio se esperan los envíos en curso;
+- un pedido abandonado se cierra solo y avisa;
+- el `batchId` de otra cuenta da 404 y uno cerrado da 409;
+- Convertir varios archivos también avisa con un solo mail.
+
+El envío real por SMTP no se probó.
+
+### D-109 — Avisos de la grabación programada · Vigente
+
+Hasta ahora «A mí» venía tildado en todas las grabaciones (D-104) y el aviso llegaba solo al terminar. Una grabación programada (D-097) se hace sin nadie mirando, y si no empezaba nadie se enteraba: la espera vive en la pestaña y el server no sabía nada hasta recibir la grabación.
+
+**Decidido con el usuario:**
+
+- **«A mí» viene sin tildar** y se tilda solo cuando la grabación se **programa**: inicio a una hora **o** corte automático (por minutos o a una hora). Se puede destildar. Si se vuelve a «al tocar el botón» y «al detener», se destilda, salvo que la persona lo haya tocado. El tildado automático no se recuerda para la próxima vez.
+- **Una programada manda dos avisos:**
+  - uno al **empezar**, con la hora de corte si la tiene, o si **no pudo empezar**;
+  - otro al **terminar o fallar**, que es el de siempre.
+- **«No pudo empezar» lo detecta el server:** al programar, la pestaña registra la hora de inicio en el server. Si a los 2 minutos de esa hora no empezó, sale el aviso. Cubre la pestaña cerrada, la PC suspendida y la conexión caída. Si la pestaña ve el problema (se dejó de compartir la pantalla, el navegador no pudo grabar), avisa en el momento con el motivo.
+
+**Detalles técnicos:**
+
+- Tabla nueva `recording_schedules` (migración 10). Una programación está pendiente hasta que empieza, se cancela o falla. Un barrido cada 30 s avisa una sola vez las vencidas, también las que vencieron mientras el server estaba apagado.
+- Rutas nuevas:
+  - `POST /api/recording-schedules` `{ startAt, stopAt?, title, notify }` responde 201 `{ scheduleId }`;
+  - `POST /api/recording-schedules/:id/cancel` responde 204;
+  - `POST /api/recording-schedules/:id/fail` `{ reason }` responde 204 y avisa en el momento.
+  - Una programación de otra cuenta da 404.
+- `POST /api/recordings` suma `programmed` (avisa al empezar), `stopAt` (para el texto del aviso) y `scheduleId`, que cumple la programación si es de quien graba.
+- Si registrar la programación falla, la grabación programada sigue igual, sin el aviso de «no empezó».
+- **Una grabación que no llegó a grabar nada** (se cortó al empezar, o el server rechazó los primeros fragmentos) se descarta sin crear trabajo. Antes eso no avisaba nada; ahora manda «Falló la grabación» a quienes se eligió, al detenerla o cuando el barrido de inactividad la descarta. Vale para toda grabación con alguien elegido, programada o no.
+- El tildado automático de «A mí» no se guarda, aunque después se sume a un compañero.
+- `startAt` usa el reloj de la PC que graba. Si esa PC atrasa más de 2 minutos respecto del servidor, llega un «no empezó» de más y después el «empezó».
+- `recording_schedules.next_action` queda reservada para una acción encadenada al terminar (convertir o comprimir), según el análisis de trabajos encadenados. Todavía no se usa.
+
+**Verificado:**
+
+- Con tests (mailer simulado):
+  - aviso de inicio con la hora de corte; a mano no avisa;
+  - sin nadie elegido, no avisa;
+  - «no empezó» solo después del margen y una sola vez;
+  - una que empezó no avisa que no empezó;
+  - el fallo informado por la pestaña avisa en el momento y no se repite;
+  - cancelada no avisa;
+  - la programación de otra cuenta no se cumple ni se cancela;
+  - una grabación vacía avisa que falló, al detenerla o al descartarla por inactividad.
+- En una instancia de prueba aparte (puerto 3100, SMTP falso), con la página real y una pantalla simulada (canvas en lugar del selector):
+  - «A mí» arranca sin tildar, se tilda al programar y se destilda al desprogramar, sin guardarse;
+  - programar registra la hora; «Cancelar programación» la cancela; «dejar de compartir» antes de hora manda el fallo con su motivo;
+  - programada para el minuto siguiente, empezó sola a la hora, mandó `scheduleId` y `programmed`, la programación quedó cumplida y terminó en MP4 H.264;
+  - los avisos (inicio, no empezó, vacía, fin) intentaron salir; con ese SMTP fallan con ESOCKET, como se esperaba.
+- **No verificado:** el selector de pantalla real y el envío real por SMTP.
+
 ## Compresión
 
 ### D-108 — Comprimir video, al estilo de HandBrake · Etapa 1 de 5 · Vigente

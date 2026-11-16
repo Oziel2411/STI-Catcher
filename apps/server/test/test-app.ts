@@ -28,11 +28,16 @@ import type { JobContext, JobResult, JobRunner } from '../src/jobs/types.ts';
 import { createConversionService } from '../src/modules/conversion/conversion-service.ts';
 import { createUploadService } from '../src/modules/conversion/upload-service.ts';
 import { createRecordingService } from '../src/modules/recording/recording-service.ts';
+import { createScheduleService } from '../src/modules/recording/schedule-service.ts';
+import { createRecordingSchedulesRepository } from '../src/db/recording-schedules-repository.ts';
+import { createRecordingNotifier } from '../src/modules/notifications/recording-notice.ts';
 import { createDownloadService } from '../src/modules/download/download-service.ts';
 import { createFollowUps } from '../src/modules/download/follow-up.ts';
 import type { MailMessage, SendMail } from '../src/adapters/mailer.ts';
 import { createMailService } from '../src/modules/notifications/mail-service.ts';
 import { createJobNotice } from '../src/modules/notifications/job-notice.ts';
+import { createNoticeBatchService } from '../src/modules/notifications/notice-batches.ts';
+import { createNoticeBatchesRepository } from '../src/db/notice-batches-repository.ts';
 import { createJobFiles } from '../src/modules/files/job-files.ts';
 import { createHistoryService } from '../src/modules/history/history-service.ts';
 import type { HealthService } from '../src/modules/health/health-service.ts';
@@ -224,6 +229,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     ...(options.authNow ? { now: options.authNow } : {}),
   });
   const noticeLogger = { info: vi.fn(), warn: vi.fn() };
+  const noticeBatchesRepo = createNoticeBatchesRepository(db);
   const notifyJob = createJobNotice({
     send: sendMail,
     recipients: (ids) =>
@@ -231,6 +237,15 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     userName: (id) => users.get(id)?.name ?? null,
     publicUrl: options.publicUrl === undefined ? 'https://sti.test' : options.publicUrl,
     logger: noticeLogger,
+    batches: { ...noticeBatchesRepo, members: (id) => repo.listByNoticeBatch(id) },
+    now: () => clock.now,
+  });
+  const noticeBatches = createNoticeBatchService({
+    repo: noticeBatchesRepo,
+    onClosed: (id) => {
+      notifyJob.evaluateBatch(id);
+    },
+    now: () => clock.now,
   });
   const mail = createMailService({
     send: options.mailConfigured === true ? sendMail : null,
@@ -257,6 +272,13 @@ export async function makeTestApp(options: TestAppOptions = {}) {
   // Reloj controlable para probar el cierre por inactividad.
   const clock = { now: new Date('2026-10-29T12:00:00.000Z') };
   const recordingsRepo = createRecordingsRepository(db);
+  const recordingNotifier = createRecordingNotifier(notifyJob);
+  const recordingSchedules = createScheduleService({
+    repo: createRecordingSchedulesRepository(db),
+    notifier: recordingNotifier,
+    logger: { info: vi.fn() },
+    now: () => clock.now,
+  });
   const recordings = createRecordingService({
     repo: recordingsRepo,
     recordingsDir,
@@ -266,6 +288,12 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     idleMinutes: 2,
     logger: { info: vi.fn(), warn: vi.fn() },
     now: () => clock.now,
+    onStarted: (start) => {
+      recordingSchedules.recordingStarted(start);
+    },
+    onEmpty: (session) => {
+      recordingNotifier.empty(session);
+    },
   });
 
   const getHealth = vi.fn<HealthService['getHealth']>(() => Promise.resolve(sampleHealth));
@@ -282,7 +310,9 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       upload,
       conversionOptions,
       recordings,
+      recordingSchedules,
       mail,
+      noticeBatches,
       auth,
       users: usersService,
       passwordReset,
@@ -341,10 +371,13 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     historyLogger,
     recordings,
     recordingsRepo,
+    recordingSchedules,
     recordingsDir,
     clock,
     sentMails,
     noticeLogger,
+    notifyJob,
+    noticeBatchesRepo,
   };
 }
 

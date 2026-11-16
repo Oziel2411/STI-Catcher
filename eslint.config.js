@@ -25,6 +25,8 @@ export default tseslint.config(
       'storage/**',
       'data/**',
       'logs/**',
+      // Worktrees de Claude Code: copias del repo; recorrerlas agota la memoria.
+      '.claude/**',
       // Mockups de diseño: referencia, no código de la app.
       'docs/design/**',
     ],

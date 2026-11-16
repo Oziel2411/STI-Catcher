@@ -36,6 +36,7 @@ describe('downloadRequestSchema', () => {
       title: null,
       then: null,
       notify: [],
+      batchId: null,
     });
   });
 

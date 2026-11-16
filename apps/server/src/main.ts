@@ -39,11 +39,16 @@ import { createHostResolver } from './adapters/host-resolver.ts';
 import { createSmtpMailer } from './adapters/mailer.ts';
 import { createMailService } from './modules/notifications/mail-service.ts';
 import { createJobNotice } from './modules/notifications/job-notice.ts';
+import { createNoticeBatchService } from './modules/notifications/notice-batches.ts';
+import { createNoticeBatchesRepository } from './db/notice-batches-repository.ts';
 import { createJobFiles } from './modules/files/job-files.ts';
 import { createHistoryService } from './modules/history/history-service.ts';
 import { createHealthService } from './modules/health/health-service.ts';
 import { createRecordingRunner } from './modules/recording/recording-runner.ts';
 import { createRecordingService } from './modules/recording/recording-service.ts';
+import { createScheduleService } from './modules/recording/schedule-service.ts';
+import { createRecordingSchedulesRepository } from './db/recording-schedules-repository.ts';
+import { createRecordingNotifier } from './modules/notifications/recording-notice.ts';
 import { createRetentionService } from './modules/retention/retention-service.ts';
 import { createSelftestRunner } from './modules/selftest/selftest-runner.ts';
 import packageJson from '../package.json' with { type: 'json' };
@@ -130,7 +135,7 @@ async function main(): Promise<void> {
     );
   }
 
-  await recoverOnStartup({
+  const recovery = await recoverOnStartup({
     repo,
     listProcesses,
     killProcessTree,
@@ -191,7 +196,7 @@ async function main(): Promise<void> {
     },
     // Aviso por mail al terminar o fallar (D-104), a las cuentas elegidas.
     onFinished: (record) => {
-      notifyJob(record);
+      notifyJob?.(record);
     },
     resolveHost: createHostResolver(),
     logger,
@@ -265,6 +270,8 @@ async function main(): Promise<void> {
     );
   }
   const mail = createMailService({ send: sendMail, from: config.mail?.from ?? null });
+  // Aviso agrupado (D-105): un pedido de varios trabajos avisa con un solo mail.
+  const noticeBatchesRepo = createNoticeBatchesRepository(db);
   const notifyJob = sendMail
     ? createJobNotice({
         send: sendMail,
@@ -273,8 +280,13 @@ async function main(): Promise<void> {
         userName: (id) => users.get(id)?.name ?? null,
         publicUrl: config.publicUrl,
         logger,
+        batches: { ...noticeBatchesRepo, members: (id) => repo.listByNoticeBatch(id) },
       })
-    : () => undefined;
+    : null;
+  const noticeBatches = createNoticeBatchService({
+    repo: noticeBatchesRepo,
+    onClosed: (id) => notifyJob?.evaluateBatch(id),
+  });
   if (config.mail) {
     logger.info(
       { host: config.mail.host, port: config.mail.port },
@@ -297,6 +309,13 @@ async function main(): Promise<void> {
     queue,
   });
   const conversionOptions = { gif: gifLimits, maxUploadBytes: config.limits.maxUploadBytes };
+  // Grabación programada (D-109): avisa al empezar y si a la hora no empezó.
+  const recordingNotifier = createRecordingNotifier(notifyJob);
+  const recordingSchedules = createScheduleService({
+    repo: createRecordingSchedulesRepository(db),
+    notifier: recordingNotifier,
+    logger,
+  });
   const recordings = createRecordingService({
     repo: createRecordingsRepository(db),
     recordingsDir: storage.recordingsDir,
@@ -305,6 +324,12 @@ async function main(): Promise<void> {
     queue,
     idleMinutes: config.recording.idleMinutes,
     logger,
+    onStarted: (start) => {
+      recordingSchedules.recordingStarted(start);
+    },
+    onEmpty: (session) => {
+      recordingNotifier.empty(session);
+    },
   });
 
   const retention = createRetentionService({
@@ -330,7 +355,9 @@ async function main(): Promise<void> {
       upload,
       conversionOptions,
       recordings,
+      recordingSchedules,
       mail,
+      noticeBatches,
       auth,
       users: usersService,
       passwordReset,
@@ -358,9 +385,13 @@ async function main(): Promise<void> {
     closing = true;
     logger.info({ signal }, 'Deteniendo el servidor');
     recordings.stop();
+    recordingSchedules.stop();
     retention.stop();
+    notifyJob?.stop();
     queue
       .stop()
+      // Los avisos de los trabajos que cortó el apagado salen antes de cerrar.
+      .then(() => notifyJob?.drain(5000))
       .then(() => app.close())
       .then(() => {
         db.close();
@@ -380,8 +411,19 @@ async function main(): Promise<void> {
   queue.start();
   // Cierra grabaciones abandonadas, incluidas las que quedaron abiertas antes de un reinicio.
   recordings.start();
+  // Avisa las grabaciones programadas que no empezaron (también las de antes de un reinicio).
+  recordingSchedules.start();
   // Retención: una pasada ahora y después cada hora (RETENTION_DAYS=0 la desactiva).
   retention.start();
+  // Los que cortó un reinicio también avisan (D-105): solos o dentro de su pedido,
+  // que revisa el barrido (que además cierra los pedidos abandonados).
+  notifyJob?.notifyInterrupted(
+    recovery.interruptedJobIds.flatMap((id) => {
+      const record = repo.get(id);
+      return record ? [record] : [];
+    }),
+  );
+  notifyJob?.start();
   const protocol = config.server.https ? 'https' : 'http';
   logger.info(`Escuchando en ${protocol}://${config.server.host}:${String(config.server.port)}`);
 }

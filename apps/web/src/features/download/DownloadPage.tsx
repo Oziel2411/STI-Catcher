@@ -238,7 +238,12 @@ export function DownloadPage() {
             </button>
           </div>
 
-          <NotifyPicker value={notify} onChange={setNotify} what="cada descarga" />
+          <NotifyPicker
+            value={notify}
+            onChange={setNotify}
+            what="la descarga"
+            hint="Si descargás varios links a la vez, llega un solo mail con la lista cuando terminan todos."
+          />
 
           <div className="table-wrap">
             <table className="table links-table">

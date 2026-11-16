@@ -3,11 +3,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChunkUploader } from '../../api/chunk-uploader.ts';
 import type { UploaderState } from '../../api/chunk-uploader.ts';
-import { chunkSender, createRecording, finishRecording } from '../../api/recordings.ts';
+import {
+  cancelRecordingSchedule,
+  chunkSender,
+  createRecording,
+  createRecordingSchedule,
+  failRecordingSchedule,
+  finishRecording,
+} from '../../api/recordings.ts';
 import { useMicrophone } from '../../hooks/useMicrophone.ts';
 import {
   DEFAULT_SCHEDULE,
   formatClock,
+  isProgrammed,
   plannedStart,
   plannedStop,
   scheduleProblems,
@@ -21,6 +29,7 @@ import {
 } from '../../lib/recording.ts';
 import type { SourceKind } from '../../lib/recording.ts';
 import { useNotifyChoice } from '../auth/use-notify-choice.ts';
+import { useSession } from '../auth/session-context.ts';
 import { keepScreenAwake, startBackgroundClock } from './background-clock.ts';
 import { previewOf, RecorderContext, stopPreview } from './recorder-context.ts';
 import type {
@@ -65,11 +74,47 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
   });
   // A quién avisar por mail (D-104). Ref: una grabación programada arranca
   // desde un temporizador y tiene que leer la elección del momento.
-  const [notify, setNotifyState] = useNotifyChoice('recording', true);
+  // «A mí» viene sin tildar; se tilda solo al programar (D-109).
+  const { user } = useSession();
+  const [notify, setNotifyState] = useNotifyChoice('recording', false);
   const notifyRef = useRef(notify);
+  // «A mí» lo tildó la programación (no la persona): se saca si se desprograma.
+  const autoTickedRef = useRef(false);
   const setNotify = (ids: string[]) => {
     notifyRef.current = ids;
+    // Sumar o sacar a otro no convierte en elección propia el «A mí» automático:
+    // se sigue sin recordar (y se saca al desprogramar).
+    if (autoTickedRef.current && ids.includes(user.id)) {
+      setNotifyState(
+        ids,
+        true,
+        ids.filter((id) => id !== user.id),
+      );
+      return;
+    }
+    autoTickedRef.current = false;
     setNotifyState(ids);
+  };
+  const setNotifyAuto = (ids: string[]) => {
+    notifyRef.current = ids;
+    setNotifyState(ids, false);
+  };
+  // La programación registrada en el server (D-109). `id` se completa cuando
+  // responde (null si todavía no o si no se pudo); `ready` espera la respuesta.
+  const scheduleRef = useRef<{ id: string | null; ready: Promise<string | null> } | null>(null);
+  /** Cierra la programación registrada: cancelada, o no pudo empezar (avisa por mail). */
+  const settleSchedule = (outcome: { cancel: true } | { failed: string }) => {
+    const pending = scheduleRef.current;
+    scheduleRef.current = null;
+    if (!pending) return;
+    void pending.ready
+      .then((id) => {
+        if (id === null) return null;
+        return 'cancel' in outcome
+          ? cancelRecordingSchedule(id)
+          : failRecordingSchedule(id, outcome.failed);
+      })
+      .catch(() => null);
   };
   const [phase, setPhaseState] = useState<RecorderPhase>({ kind: 'idle' });
   const [upload, setUpload] = useState<UploaderState>(EMPTY_UPLOAD);
@@ -144,6 +189,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       stopPreview(ended);
       setPhase({ kind: 'idle' });
       setError('Se dejó de compartir la pantalla: se canceló la grabación programada.');
+      settleSchedule({ failed: 'Se dejó de compartir la pantalla antes de la hora de inicio.' });
     }
   };
 
@@ -237,8 +283,15 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     if (problems.length > 0) {
       setPhase({ kind: 'previewing', preview });
       setError(problems.join(' '));
+      if (current.kind === 'scheduled') settleSchedule({ failed: problems.join(' ') });
       return;
     }
+    // Empieza la programada (sola o a mano antes de hora): se cumple su registro.
+    // Sin await: el registro se resolvió al programar (si no, queda sin vincular
+    // y el server avisa que no empezó: mejor un aviso de más que uno de menos).
+    const programmedStart = current.kind === 'scheduled';
+    const scheduleId = programmedStart ? (scheduleRef.current?.id ?? null) : null;
+    if (programmedStart) scheduleRef.current = null;
     setError(null);
     setWarning(null);
     setNotice(null);
@@ -268,11 +321,16 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       const mimeType = pickMimeType((type) => MediaRecorder.isTypeSupported(type));
       if (mimeType === null) throw new Error('Este navegador no puede grabar en MP4 ni WebM.');
 
+      const plannedStopAt = plannedStop(schedule, Date.now());
       const { recordingId } = await createRecording({
         mimeType,
         fps,
         title: title.trim() || defaultRecordingTitle(new Date()),
         notify: notifyRef.current,
+        // Programada (D-109): avisa también al empezar.
+        programmed: programmedStart || schedule.stopMode !== 'manual',
+        stopAt: plannedStopAt === null ? null : new Date(plannedStopAt).toISOString(),
+        scheduleId,
       });
 
       const stream = new MediaStream(audio ? [preview.video, audio] : [preview.video]);
@@ -309,6 +367,10 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       void audioContext?.close();
       setPhase({ kind: 'previewing', preview });
       setError(errorMessage(e));
+      // Si la programada no llegó a crearse en el server, avisa que no empezó.
+      if (scheduleId !== null) {
+        failRecordingSchedule(scheduleId, errorMessage(e)).catch(() => null);
+      }
     }
   };
 
@@ -331,11 +393,31 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     setError(null);
     setNotice(null);
     setPhase({ kind: 'scheduled', preview: current.preview, startAt });
+    // Se registra en el server para avisar si a la hora no empezó (D-109). Si
+    // falla, la grabación programada sigue igual, sin ese aviso.
+    const stopAt = plannedStop(settings.schedule, startAt);
+    const registration: { id: string | null; ready: Promise<string | null> } = {
+      id: null,
+      ready: createRecordingSchedule({
+        startAt: new Date(startAt).toISOString(),
+        stopAt: stopAt === null ? null : new Date(stopAt).toISOString(),
+        title: settings.title.trim() || defaultRecordingTitle(new Date(startAt)),
+        notify: notifyRef.current,
+      })
+        .then(({ scheduleId }) => {
+          registration.id = scheduleId;
+          return scheduleId;
+        })
+        .catch(() => null),
+    };
+    scheduleRef.current = registration;
   };
 
   const cancelSchedule = () => {
     const current = phaseRef.current;
-    if (current.kind === 'scheduled') setPhase({ kind: 'previewing', preview: current.preview });
+    if (current.kind !== 'scheduled') return;
+    setPhase({ kind: 'previewing', preview: current.preview });
+    settleSchedule({ cancel: true });
   };
 
   // Reloj de lo programado: arranca a la hora o corta a la hora. Lee el estado
@@ -410,7 +492,19 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     },
     changeFps,
     setSchedule: (patch: Partial<RecordingSchedule>) => {
+      const before = settings.schedule;
+      const after = { ...before, ...patch };
       setSettings((current) => ({ ...current, schedule: { ...current.schedule, ...patch } }));
+      // Al programarla, «A mí» se tilda solo (D-109); al desprogramarla se
+      // saca, si lo había tildado la programación. No se recuerda.
+      const ids = notifyRef.current;
+      if (!isProgrammed(before) && isProgrammed(after) && !ids.includes(user.id)) {
+        autoTickedRef.current = true;
+        setNotifyAuto([user.id, ...ids]);
+      } else if (isProgrammed(before) && !isProgrammed(after) && autoTickedRef.current) {
+        autoTickedRef.current = false;
+        setNotifyAuto(ids.filter((id) => id !== user.id));
+      }
     },
     notify,
     setNotify,

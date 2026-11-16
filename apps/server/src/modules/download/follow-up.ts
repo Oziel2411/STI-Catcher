@@ -36,7 +36,12 @@ export function createFollowUps(deps: FollowUpDeps) {
     let job: Job;
     try {
       job = await deps.conversion.enqueue(
-        { sourceJobId: record.id, ...then, notify: record.notifyUserIds },
+        {
+          sourceJobId: record.id,
+          ...then,
+          notify: record.notifyUserIds,
+          batchId: record.noticeBatchId,
+        },
         requester,
       );
     } catch (error) {
@@ -60,6 +65,7 @@ export function createFollowUps(deps: FollowUpDeps) {
           parentJobId: record.id,
           userId: record.userId,
           notifyUserIds: record.notifyUserIds,
+          noticeBatchId: record.noticeBatchId,
           clientIp: record.clientIp,
         },
         error.message || UNEXPECTED_MESSAGE,

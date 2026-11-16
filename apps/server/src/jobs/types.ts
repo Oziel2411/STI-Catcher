@@ -33,11 +33,22 @@ export type JobRecord = {
   parentJobId: string | null;
   /** Conversión encadenada a esta descarga (D-093). */
   followUpJobId: string | null;
+  /** Pedido de varios trabajos que avisa con un solo mail (D-105). */
+  noticeBatchId: string | null;
 };
 
 export type NewJob = Pick<JobRecord, 'id' | 'type' | 'params' | 'createdAt'> &
   Partial<
-    Pick<JobRecord, 'sourceUrl' | 'title' | 'clientIp' | 'userId' | 'notifyUserIds' | 'parentJobId'>
+    Pick<
+      JobRecord,
+      | 'sourceUrl'
+      | 'title'
+      | 'clientIp'
+      | 'userId'
+      | 'notifyUserIds'
+      | 'parentJobId'
+      | 'noticeBatchId'
+    >
   >;
 
 export type FinalStatus = Extract<JobStatus, 'done' | 'failed' | 'cancelled'>;
@@ -123,6 +134,8 @@ export type JobsRepository = {
   setFollowUp(id: string, followUpJobId: string): boolean;
   /** Rutas relativas (`files/<id>.<ext>`) de los archivos de jobs `done`. */
   listLiveFilePaths(): string[];
+  /** Los trabajos de un pedido con aviso agrupado (D-105), del más viejo al más nuevo. */
+  listByNoticeBatch(batchId: string): JobRecord[];
 };
 
 /** Resultado de un runner exitoso. */

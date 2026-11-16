@@ -18,6 +18,7 @@ import type { JobQueue } from './jobs/queue.ts';
 import type { ConversionService } from './modules/conversion/conversion-service.ts';
 import type { UploadService } from './modules/conversion/upload-service.ts';
 import type { RecordingService } from './modules/recording/recording-service.ts';
+import type { ScheduleService } from './modules/recording/schedule-service.ts';
 import type { DownloadService } from './modules/download/download-service.ts';
 import type { HistoryService } from './modules/history/history-service.ts';
 import type { JobFiles } from './modules/files/job-files.ts';
@@ -32,6 +33,7 @@ import { registerRecordingRoutes } from './routes/recordings.ts';
 import { registerMediaRoutes } from './routes/media.ts';
 import { registerMailRoutes } from './routes/mail.ts';
 import type { MailService } from './modules/notifications/mail-service.ts';
+import type { NoticeBatchService } from './modules/notifications/notice-batches.ts';
 
 export type AppServices = {
   health: HealthService;
@@ -44,7 +46,9 @@ export type AppServices = {
   upload: UploadService;
   conversionOptions: ConversionOptionsResponse;
   recordings: RecordingService;
+  recordingSchedules: ScheduleService;
   mail: MailService;
+  noticeBatches: NoticeBatchService;
   auth: AuthService;
   users: UsersService;
   passwordReset: PasswordReset;
@@ -134,7 +138,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   registerHealthRoutes(app, options.services.health);
   registerJobRoutes(app, options.services.jobs);
-  registerMediaRoutes(app, options.services.download);
+  registerMediaRoutes(app, options.services.download, options.services.noticeBatches);
   registerFileRoutes(app, options.services.jobFiles);
   // Cuerpos binarios (subidas y fragmentos de grabación): no se parsean, se pasan
   // como stream al handler, que los escribe directo a disco (nunca enteros en memoria).
@@ -143,13 +147,14 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
 
   registerHistoryRoutes(app, options.services.history);
-  registerRecordingRoutes(app, options.services.recordings);
+  registerRecordingRoutes(app, options.services.recordings, options.services.recordingSchedules);
   registerConversionRoutes(app, {
     conversion: options.services.conversion,
     upload: options.services.upload,
     options: options.services.conversionOptions,
+    noticeBatches: options.services.noticeBatches,
   });
-  registerMailRoutes(app, options.services.mail, app.log);
+  registerMailRoutes(app, options.services.mail, options.services.noticeBatches, app.log);
   registerEventRoutes(app, {
     queue: options.services.jobs,
     bus: options.services.events,
