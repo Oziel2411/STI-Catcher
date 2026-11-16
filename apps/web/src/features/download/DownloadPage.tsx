@@ -6,7 +6,14 @@ import {
   WarningIcon,
   XIcon,
 } from '@phosphor-icons/react';
-import { CONVERSION_PRESETS, conversionOptionsResponseSchema } from '@sti-catcher/shared';
+import {
+  COMPRESSION_PRESET_IDS,
+  COMPRESSION_PRESETS,
+  compressionOptionsSchema,
+  CONVERSION_PRESETS,
+  conversionOptionsResponseSchema,
+  TARGET_SIZE_SHORTCUTS,
+} from '@sti-catcher/shared';
 import type {
   ConversionPresetId,
   GifLimits,
@@ -26,6 +33,7 @@ import {
   formatLabel,
   itemProblems,
   parseLinks,
+  splitLinkText,
   presetAvailable,
   presetShortName,
   resultJob,
@@ -36,6 +44,7 @@ import {
   startTargets,
 } from '../../lib/download-batch.ts';
 import type { DownloadItem, RowState } from '../../lib/download-batch.ts';
+import { compressesAfter } from '../../lib/download-batch.ts';
 import { codecNotices, codecsLabel, resolutionLabel } from '../../lib/download.ts';
 import type { CodecNotice } from '../../lib/download.ts';
 import { formatBytes, formatDuration } from '../../lib/format.ts';
@@ -122,7 +131,8 @@ export function DownloadPage() {
     <section className="page">
       <header className="page-header">
         <PageTitle icon={DownloadSimpleIcon} title="Descargar videos">
-          YouTube, Instagram, X y otros sitios. Pegá uno o varios links, uno por línea.
+          YouTube, Instagram, X y otros sitios. Pegá uno o varios links, como vengan: se separan
+          solos.
         </PageTitle>
       </header>
 
@@ -143,6 +153,19 @@ export function DownloadPage() {
             value={text}
             onChange={(e) => {
               setText(e.target.value);
+            }}
+            onPaste={(e) => {
+              // Al pegar, cada link queda en su renglón aunque vengan juntos.
+              const pasted = e.clipboardData.getData('text');
+              const split = splitLinkText(pasted);
+              if (split === pasted) return;
+              e.preventDefault();
+              const box = e.currentTarget;
+              const before = box.value.slice(0, box.selectionStart);
+              const after = box.value.slice(box.selectionEnd);
+              const glue = (left: string, right: string) =>
+                left === '' || right === '' || /\n$/.test(left) || /^\n/.test(right) ? '' : '\n';
+              setText(before + glue(before, split) + split + glue(split, after) + after);
             }}
             onKeyDown={(e) => {
               // Ctrl+Enter analiza (Enter solo agrega un renglón).
@@ -302,11 +325,12 @@ function LinkRow({ item, batch, limits }: RowProps) {
   const error = rowError(item);
   const problems = limits ? itemProblems(item, limits) : [];
   const notices =
-    editable && item.probe && item.preset === 'mp4'
+    editable && item.probe && item.preset === 'mp4' && item.compress === null
       ? codecNotices(item.probe, item.maxHeight, item.videoMode)
       : [];
   const showGif = editable && item.preset === 'gif' && item.gif !== null;
-  const subrow = showGif || notices.length > 0 || problems.length > 0;
+  const showCompress = editable && compressesAfter(item);
+  const subrow = showGif || showCompress || notices.length > 0 || problems.length > 0;
 
   return (
     <>
@@ -362,6 +386,7 @@ function LinkRow({ item, batch, limits }: RowProps) {
             {showGif && item.gif && limits && (
               <GifRange item={item} batch={batch} limits={limits} />
             )}
+            {showCompress && <CompressTarget item={item} batch={batch} />}
             {problems.map((problem) => (
               <p key={problem} className="small text-error">
                 {problem}
@@ -443,6 +468,8 @@ function qualityLabel(item: DownloadItem): string {
   if (!isVideoPreset(preset)) return '—';
   const height = item.maxHeight === null ? 'Mejor disponible' : `${String(item.maxHeight)}p`;
   if (preset !== 'mp4') return height;
+  if (item.compress)
+    return `${height} · comprimir: ${COMPRESSION_PRESETS[item.compress.preset].label}`;
   const codec = item.videoMode === 'quality' ? 'codec original' : 'H.264';
   return `${height} · ${codec}`;
 }
@@ -521,9 +548,49 @@ function QualityEditor({
   );
   if (preset !== 'mp4') return heights;
 
+  const compressSelect = (
+    <select
+      className="select-compact"
+      aria-label={`Comprimir «${rowName(item)}» al terminar`}
+      value={item.compress?.preset ?? ''}
+      onChange={(e) => {
+        const value = e.target.value;
+        batch.update(item.id, {
+          compress:
+            value === ''
+              ? null
+              : compressionOptionsSchema.parse({
+                  ...(item.compress ?? {}),
+                  preset: value,
+                  maxHeight: null,
+                }),
+        });
+      }}
+    >
+      <option value="">Sin comprimir</option>
+      <optgroup label="Comprimir al terminar">
+        {COMPRESSION_PRESET_IDS.map((id) => (
+          <option key={id} value={id}>
+            {COMPRESSION_PRESETS[id].label}
+          </option>
+        ))}
+      </optgroup>
+    </select>
+  );
+  if (item.compress) {
+    // Se baja en el códec original y se comprime: el códec de la descarga no importa.
+    return (
+      <div className="quality-pair">
+        {heights}
+        {compressSelect}
+      </div>
+    );
+  }
+
   return (
     <div className="quality-pair">
       {heights}
+      {compressSelect}
       <select
         className="select-compact"
         aria-label={`Codec de «${rowName(item)}»`}
@@ -595,6 +662,44 @@ function GifRange({
   );
 }
 
+/** Tamaño de la compresión al terminar (D-108): la calidad del preset o un máximo. */
+function CompressTarget({ item, batch }: { item: DownloadItem; batch: DownloadBatch }) {
+  const compress = item.compress;
+  if (!compress) return null;
+  const value = compress.target.mode === 'size' ? String(compress.target.megabytes) : '';
+  return (
+    <div className="gif-range">
+      <label className="gif-range-field">
+        <span>Comprimir al terminar · tamaño</span>
+        <select
+          className="select-compact"
+          value={value}
+          onChange={(e) => {
+            const megabytes = Number(e.target.value);
+            batch.update(item.id, {
+              compress: {
+                ...compress,
+                target: e.target.value === '' ? { mode: 'quality' } : { mode: 'size', megabytes },
+              },
+            });
+          }}
+        >
+          <option value="">Calidad del preset</option>
+          {TARGET_SIZE_SHORTCUTS.map((shortcut) => (
+            <option key={shortcut.id} value={shortcut.megabytes}>
+              {shortcut.label} (hasta {shortcut.megabytes} MB)
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="muted small">
+        Se baja en la mejor calidad y se comprime con «{COMPRESSION_PRESETS[compress.preset].label}
+        ». Un tamaño a medida, desde la sección Comprimir.
+      </span>
+    </div>
+  );
+}
+
 function StateCell({ item, state }: { item: DownloadItem; state: RowState }) {
   switch (state) {
     case 'analyzing':
@@ -626,12 +731,12 @@ function StateCell({ item, state }: { item: DownloadItem; state: RowState }) {
           : followUp?.status === 'queued'
             ? ' · en cola'
             : '';
+      const action =
+        followUp?.type === 'compression' || compressesAfter(item)
+          ? 'Comprimiendo'
+          : `Convirtiendo a ${target}`;
       return (
-        <Progress
-          name={rowName(item)}
-          job={followUp}
-          text={`Descargado · Convirtiendo a ${target}${details}`}
-        />
+        <Progress name={rowName(item)} job={followUp} text={`Descargado · ${action}${details}`} />
       );
     }
     case 'done': {

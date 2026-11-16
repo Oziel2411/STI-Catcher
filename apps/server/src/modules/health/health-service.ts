@@ -1,5 +1,11 @@
 import { TOOL_NAMES } from '@sti-catcher/shared';
-import type { HealthResponse, JobCounts, ToolName, ToolStatus } from '@sti-catcher/shared';
+import type {
+  HealthResponse,
+  JobCounts,
+  ResolvedEncoders,
+  ToolName,
+  ToolStatus,
+} from '@sti-catcher/shared';
 import type { DiskSpaceReader } from '../../adapters/disk.ts';
 import type { ToolVersionReader } from '../../adapters/tool-version.ts';
 
@@ -12,6 +18,8 @@ export type HealthServiceDeps = {
   readDiskSpace: DiskSpaceReader;
   /** Cantidad de jobs. Hasta la Fase 2 devuelve ceros. */
   getJobCounts: () => JobCounts;
+  /** Encoders de la compresión (D-108); null mientras se prueban. */
+  getEncoders?: () => ResolvedEncoders | null;
   /** Cuánto se reutilizan las versiones consultadas. */
   toolsCacheMs?: number;
   now?: () => Date;
@@ -82,6 +90,7 @@ export function createHealthService(deps: HealthServiceDeps): HealthService {
         tools: snapshot.tools,
         disk: { ...disk, minFreeBytes: deps.minFreeDiskBytes, isLow },
         jobs: deps.getJobCounts(),
+        encoders: deps.getEncoders?.() ?? null,
         toolsCheckedAt: snapshot.checkedAt.toISOString(),
       };
     },

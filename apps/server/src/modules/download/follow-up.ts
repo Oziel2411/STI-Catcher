@@ -3,6 +3,9 @@ import type { Job } from '@sti-catcher/shared';
 import { JobRejectedError, UNEXPECTED_MESSAGE } from '../../jobs/errors.ts';
 import type { JobQueue } from '../../jobs/queue.ts';
 import type { JobRecord, JobsRepository } from '../../jobs/types.ts';
+import { CompressionError } from '../compression/compression-service.ts';
+import type { CompressionService } from '../compression/compression-service.ts';
+import type { CompressionParams } from '../compression/compression-runner.ts';
 import { ConversionError } from '../conversion/conversion-service.ts';
 import type { ConversionService } from '../conversion/conversion-service.ts';
 import type { ConversionParams } from '../conversion/conversion-runner.ts';
@@ -10,6 +13,7 @@ import { downloadParamsSchema } from './download-runner.ts';
 
 export type FollowUpDeps = {
   conversion: Pick<ConversionService, 'enqueue'>;
+  compression: Pick<CompressionService, 'create'>;
   queue: Pick<JobQueue, 'recordFailed'>;
   repo: Pick<JobsRepository, 'setFollowUp'>;
   logger: { warn: (obj: object, msg: string) => void };
@@ -29,7 +33,12 @@ export function createFollowUps(deps: FollowUpDeps) {
   return async (record: JobRecord): Promise<void> => {
     if (record.type !== 'download' || record.followUpJobId !== null) return;
     const parsed = downloadParamsSchema.safeParse(record.params);
-    const then = parsed.success ? parsed.data.then : null;
+    if (!parsed.success) return;
+    if (parsed.data.compress) {
+      await compressAfter(record, parsed.data.compress);
+      return;
+    }
+    const then = parsed.data.then;
     if (!then) return;
 
     const requester = { userId: record.userId, ip: record.clientIp };
@@ -73,4 +82,45 @@ export function createFollowUps(deps: FollowUpDeps) {
     }
     deps.repo.setFollowUp(record.id, job.id);
   };
+
+  /**
+   * Compresión encadenada (D-108): mismo camino que `POST /api/jobs/compress`.
+   * Si no se puede (p. ej. el tamaño pedido no alcanza para lo que duró el
+   * video, que recién se sabe al bajarlo), queda una compresión fallida con
+   * el motivo, vinculada igual.
+   */
+  async function compressAfter(record: JobRecord, options: CompressionParams['options']) {
+    let job: Job;
+    try {
+      job = await deps.compression.create({
+        sourceJobId: record.id,
+        options,
+        requester: { userId: record.userId, ip: record.clientIp },
+        notifyUserIds: record.notifyUserIds,
+        noticeBatchId: record.noticeBatchId,
+      });
+    } catch (error) {
+      const known = error instanceof CompressionError || error instanceof JobRejectedError;
+      if (!known) throw error;
+      deps.logger.warn(
+        { jobId: record.id, code: error.code },
+        'No se pudo crear la compresión encadenada',
+      );
+      const params: CompressionParams = { sourceJobId: record.id, options };
+      job = deps.queue.recordFailed(
+        {
+          type: 'compression',
+          params,
+          title: `${record.title ?? 'Archivo'} (comprimido)`,
+          parentJobId: record.id,
+          userId: record.userId,
+          notifyUserIds: record.notifyUserIds,
+          noticeBatchId: record.noticeBatchId,
+          clientIp: record.clientIp,
+        },
+        error.message || UNEXPECTED_MESSAGE,
+      );
+    }
+    deps.repo.setFollowUp(record.id, job.id);
+  }
 }

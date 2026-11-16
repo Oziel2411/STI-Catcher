@@ -216,15 +216,18 @@ export type FfmpegRunOptions = {
   /** Para calcular el porcentaje. null si no se conoce. */
   totalDurationSeconds: number | null;
   onProgress?: (progress: FfmpegProgress) => void;
+  /** Prioridad baja del proceso (compresión, D-108). */
+  lowPriority?: boolean;
 };
 
 export type FfmpegRunner = (args: readonly string[], options: FfmpegRunOptions) => Promise<void>;
 
 export function createFfmpegRunner(run: StreamingRunner, ffmpegPath: string): FfmpegRunner {
-  return async (args, { signal, totalDurationSeconds, onProgress }) => {
+  return async (args, { signal, totalDurationSeconds, onProgress, lowPriority }) => {
     const tracker = createFfmpegProgressTracker(totalDurationSeconds);
     const result = await run(ffmpegPath, args, {
       signal,
+      ...(lowPriority ? { lowPriority } : {}),
       onStdoutLine: (line) => {
         const progress = tracker.push(line);
         if (progress) onProgress?.(progress);

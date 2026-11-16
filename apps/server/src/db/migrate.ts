@@ -10,6 +10,14 @@ export type Migration = {
    * transformaciones que SQLite no sabe hacer (p. ej. quitar tildes).
    */
   migrate?: (db: Db) => void;
+  /**
+   * Para reconstruir una tabla (SQLite no sabe cambiar un CHECK): apaga las
+   * claves foráneas mientras corre. Si no, borrar la tabla vieja dispararía
+   * los `ON DELETE SET NULL` de las que la referencian. `PRAGMA foreign_keys`
+   * no se puede cambiar dentro de una transacción, por eso lo hace migrate();
+   * al final se verifica con `foreign_key_check` antes de confirmar.
+   */
+  foreignKeysOff?: boolean;
 };
 
 /**
@@ -41,12 +49,27 @@ export function migrate(db: Db, migrations: readonly Migration[]): Migration[] {
 
   const pending = sorted.filter((migration) => migration.version > current);
   for (const migration of pending) {
-    db.transaction(() => {
-      db.exec(migration.sql);
-      migration.migrate?.(db);
-      // PRAGMA no acepta parámetros; version es un entero validado arriba.
-      db.pragma(`user_version = ${String(migration.version)}`);
-    })();
+    const restoreForeignKeys =
+      migration.foreignKeysOff === true && db.pragma('foreign_keys', { simple: true }) === 1;
+    if (restoreForeignKeys) db.pragma('foreign_keys = OFF');
+    try {
+      db.transaction(() => {
+        db.exec(migration.sql);
+        migration.migrate?.(db);
+        if (migration.foreignKeysOff) {
+          const broken = db.pragma('foreign_key_check') as unknown[];
+          if (broken.length > 0) {
+            throw new Error(
+              `La migración ${migration.name} dejó ${String(broken.length)} referencias rotas.`,
+            );
+          }
+        }
+        // PRAGMA no acepta parámetros; version es un entero validado arriba.
+        db.pragma(`user_version = ${String(migration.version)}`);
+      })();
+    } finally {
+      if (restoreForeignKeys) db.pragma('foreign_keys = ON');
+    }
   }
   return pending;
 }

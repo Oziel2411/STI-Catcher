@@ -106,6 +106,27 @@ describe('createJobQueue', () => {
     expect(calls.map((call) => call.context.job.id)).toEqual([a.id, b.id, c.id]);
   });
 
+  it('tope por tipo: los de ese tipo esperan, pero los demás pasan', async () => {
+    const { runner, calls } = controllableRunner();
+    const { queue } = setup({
+      runners: { selftest: runner, download: runner },
+      maxConcurrentByType: { selftest: 1 },
+    });
+    queue.start();
+    const a = await queue.enqueue(selftest);
+    const b = await queue.enqueue(selftest);
+    const c = await queue.enqueue({ type: 'download', params: {} });
+    await flush();
+
+    // b espera aunque sea anterior a c: el tope es solo para su tipo.
+    expect(calls.map((call) => call.context.job.id)).toEqual([a.id, c.id]);
+    expect(queue.get(b.id)?.status).toBe('queued');
+
+    calls[0]?.resolve({ output: null });
+    await flush();
+    expect(calls.map((call) => call.context.job.id)).toEqual([a.id, c.id, b.id]);
+  });
+
   it('no arranca nada hasta start() (los queued de antes de un reinicio esperan la recuperación)', async () => {
     const { queue, calls } = setup();
     await queue.enqueue(selftest);

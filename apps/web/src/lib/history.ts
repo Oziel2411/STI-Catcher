@@ -36,6 +36,8 @@ export type HistoryActions = {
   play: boolean;
   download: boolean;
   convert: boolean;
+  /** Achicar un video (D-108): no para audio ni GIF. */
+  compress: boolean;
   openOriginal: boolean;
   retry: boolean;
   cancel: boolean;
@@ -50,10 +52,11 @@ export function historyActions(item: HistoryItem): HistoryActions {
     play: hasFile,
     download: hasFile,
     convert: hasFile,
+    compress: hasFile && !isAudioOnly(item) && !isImage(item),
     openOriginal: item.sourceUrl !== null,
     retry:
       (item.status === 'failed' || item.status === 'cancelled') &&
-      (item.type === 'download' || item.type === 'conversion'),
+      (item.type === 'download' || item.type === 'conversion' || item.type === 'compression'),
     cancel: active && item.isMine,
     remove: !active && item.isMine,
   };

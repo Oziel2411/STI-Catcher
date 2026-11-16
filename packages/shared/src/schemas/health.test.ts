@@ -20,6 +20,8 @@ describe('healthResponseSchema', () => {
       tools: [{ name: 'deno', version: null, error: 'No encontrado' }],
       disk: { freeBytes: 1, totalBytes: 2, minFreeBytes: 0, isLow: false },
       jobs: { running: 0, queued: 0, maxConcurrent: 2 },
+      // Mientras se prueba la GPU al arrancar (D-108).
+      encoders: null,
       toolsCheckedAt: '2026-10-29T12:00:00.000Z',
     });
     expect(result.success).toBe(true);

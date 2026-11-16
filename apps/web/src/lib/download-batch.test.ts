@@ -1,3 +1,4 @@
+import { compressionOptionsSchema } from '@sti-catcher/shared';
 import type { GifLimits, Job, ProbeResponse } from '@sti-catcher/shared';
 import { describe, expect, it } from 'vitest';
 import {
@@ -9,11 +10,13 @@ import {
   isStartable,
   LIVE_MESSAGE,
   newLinkItem,
+  linkTokens,
   parseLinks,
   restoreLinks,
   resultJob,
   rowState,
   serializeLinks,
+  splitLinkText,
   startTargets,
   trackedJobIds,
   withProbe,
@@ -100,8 +103,42 @@ describe('parseLinks', () => {
       { line: 3, text: 'youtube' },
       { line: 3, text: 'video' },
       { line: 3, text: 'clase' },
-      { line: 5, text: 'www.' },
+      { line: 5, text: 'www' },
     ]);
+  });
+
+  it('separa los links pegados juntos, con comas o con signos alrededor', () => {
+    const text = [
+      'https://youtu.be/ahttps://youtu.be/b',
+      'https://youtu.be/c,https://youtu.be/d; https://youtu.be/e | https://youtu.be/f',
+      'Mirá esto: <https://youtu.be/g>, y (https://youtu.be/h).',
+      '«https://youtu.be/i»',
+    ].join('\n');
+    const parsed = parseLinks(text, []);
+    expect(parsed.urls).toEqual(
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((id) => `https://youtu.be/${id}`),
+    );
+    expect(parsed.invalid.map((entry) => entry.text)).toEqual(['Mirá', 'esto', 'y']);
+  });
+
+  it('no corta un link que va como parámetro de otro ni el «)» de Wikipedia', () => {
+    expect(linkTokens('https://x.com/r?u=https://youtu.be/a')).toEqual([
+      'https://x.com/r?u=https://youtu.be/a',
+    ]);
+    expect(linkTokens('(https://es.wikipedia.org/wiki/Gato_(desambiguación))')).toEqual([
+      'https://es.wikipedia.org/wiki/Gato_(desambiguación)',
+    ]);
+  });
+});
+
+describe('splitLinkText', () => {
+  it('deja un link por renglón y saca los renglones vacíos', () => {
+    expect(splitLinkText('https://youtu.be/a https://youtu.be/bhttps://youtu.be/c\n\n')).toBe(
+      'https://youtu.be/a\nhttps://youtu.be/b\nhttps://youtu.be/c',
+    );
+  });
+  it('un solo link queda igual', () => {
+    expect(splitLinkText('https://youtu.be/a')).toBe('https://youtu.be/a');
   });
 
   it('no repite los que ya están en la lista ni los pegados dos veces', () => {
@@ -313,4 +350,48 @@ it('formatLabel', () => {
   expect(formatLabel('mp4')).toBe('Video · MP4');
   expect(formatLabel('gif')).toBe('Animación · GIF');
   expect(formatLabel('wav')).toBe('Solo audio · WAV');
+});
+
+describe('comprimir al terminar (D-108)', () => {
+  const compress = (options: object) => compressionOptionsSchema.parse(options);
+
+  it('MP4 + comprimir: se manda `compress` con la altura elegida', () => {
+    const item = ready(video, { compress: compress({ preset: 'share-720p' }) });
+    expect(downloadRequest(item)).toEqual({
+      url: video.url,
+      title: 'Big Buck Bunny',
+      maxHeight: 1080,
+      compress: {
+        preset: 'share-720p',
+        target: { mode: 'quality' },
+        maxHeight: null,
+        audioKbps: null,
+      },
+    });
+  });
+
+  it('con otro formato, comprimir no cuenta', () => {
+    const item = ready(video, { preset: 'webm', compress: compress({ preset: 'share-720p' }) });
+    expect(downloadRequest(item)).not.toHaveProperty('compress');
+  });
+
+  it('un tamaño que no alcanza para lo que dura el video no deja empezar', () => {
+    // Big Buck Bunny dura 10:35: 24 MB no alcanzan a 720p.
+    const tight = ready(video, {
+      maxHeight: 720,
+      compress: compress({ preset: 'share-720p', target: { mode: 'size', megabytes: 24 } }),
+    });
+    expect(isStartable(tight, limits)).toBe(false);
+    const roomy = ready(video, {
+      maxHeight: 720,
+      compress: compress({ preset: 'share-720p', target: { mode: 'size', megabytes: 95 } }),
+    });
+    expect(isStartable(roomy, limits)).toBe(true);
+  });
+
+  it('una lista guardada antes de esta opción se restaura sin comprimir', () => {
+    const stored = JSON.parse(serializeLinks([ready()])) as Record<string, unknown>[];
+    for (const entry of stored) delete entry.compress;
+    expect(restoreLinks(JSON.stringify(stored))[0]?.compress).toBeNull();
+  });
 });

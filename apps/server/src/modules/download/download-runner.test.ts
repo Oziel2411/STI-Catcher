@@ -18,7 +18,7 @@ const h264Media: MediaInfo = {
   durationSeconds: 19.02,
   formatName: 'mov,mp4,m4a,3gp,3g2,mj2',
   sizeBytes: 742000,
-  video: { codec: 'h264', width: 320, height: 240, pixFmt: 'yuv420p' },
+  video: { codec: 'h264', width: 320, height: 240, pixFmt: 'yuv420p', frameRate: 30 },
   audio: { codec: 'aac', channels: 2 },
 };
 

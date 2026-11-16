@@ -7,7 +7,7 @@ import { subscribeToAllEvents } from '../api/events.ts';
 /** Espera tras un evento antes de volver a contar (varios cambios juntos = un pedido). */
 const REFRESH_DELAY_MS = 400;
 
-const EMPTY: ActiveJobsResponse = { download: 0, conversion: 0, recording: 0 };
+const EMPTY: ActiveJobsResponse = { download: 0, conversion: 0, compression: 0, recording: 0 };
 
 /**
  * Trabajos de esta cuenta en cola o en curso, para los contadores de la

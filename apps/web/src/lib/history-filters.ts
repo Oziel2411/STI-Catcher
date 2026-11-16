@@ -5,6 +5,7 @@ export const ORIGIN_OPTIONS: { value: JobType; label: string }[] = [
   { value: 'download', label: 'Descargas' },
   { value: 'upload', label: 'Archivos subidos' },
   { value: 'conversion', label: 'Conversiones' },
+  { value: 'compression', label: 'Compresiones' },
   { value: 'recording', label: 'Grabaciones' },
 ];
 

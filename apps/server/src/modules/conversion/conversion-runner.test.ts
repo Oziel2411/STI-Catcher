@@ -16,7 +16,7 @@ const hevcMov: MediaInfo = {
   durationSeconds: 12,
   formatName: 'mov,mp4,m4a,3gp,3g2,mj2',
   sizeBytes: 5_000_000,
-  video: { codec: 'hevc', width: 1920, height: 1080, pixFmt: 'yuv420p' },
+  video: { codec: 'hevc', width: 1920, height: 1080, pixFmt: 'yuv420p', frameRate: 30 },
   audio: { codec: 'aac', channels: 2 },
 };
 
@@ -26,7 +26,10 @@ function setup(params: object, overrides: Partial<ConversionRunnerDeps> = {}) {
     Promise.resolve(
       file.endsWith('.mov')
         ? hevcMov
-        : { ...hevcMov, video: { codec: 'h264', width: 1920, height: 1080, pixFmt: 'yuv420p' } },
+        : {
+            ...hevcMov,
+            video: { codec: 'h264', width: 1920, height: 1080, pixFmt: 'yuv420p', frameRate: 30 },
+          },
     ),
   );
   const runFfmpeg = vi.fn<FfmpegRunner>((_args, options) => {

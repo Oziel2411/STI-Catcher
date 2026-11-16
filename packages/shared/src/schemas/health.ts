@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { resolvedEncodersSchema } from '../presets/compression.ts';
 
 /** Herramientas externas que usa el sistema. El orden es el de la página Estado. */
 export const TOOL_NAMES = ['yt-dlp', 'ffmpeg', 'ffprobe', 'deno'] as const;
@@ -44,6 +45,8 @@ export const healthResponseSchema = z.object({
   tools: z.array(toolStatusSchema),
   disk: diskStatusSchema,
   jobs: jobCountsSchema,
+  /** Con qué comprime el server cada códec (D-108); null mientras se prueba al arrancar. */
+  encoders: resolvedEncodersSchema.nullable(),
   /** Momento en que se consultaron las versiones (ISO 8601). Se cachean unos segundos. */
   toolsCheckedAt: z.iso.datetime(),
 });

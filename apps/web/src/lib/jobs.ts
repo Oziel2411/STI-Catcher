@@ -37,6 +37,7 @@ export const PHASE_LABELS: Record<JobPhase, string> = {
   downloading: 'Descargando',
   merging: 'Uniendo audio y video',
   converting: 'Convirtiendo',
+  compressing: 'Comprimiendo',
   processing: 'Procesando',
 };
 
@@ -44,6 +45,7 @@ export const TYPE_LABELS: Record<JobType, string> = {
   download: 'Descarga',
   upload: 'Archivo subido',
   conversion: 'Conversión',
+  compression: 'Compresión',
   recording: 'Grabación',
   selftest: 'Prueba del sistema',
 };

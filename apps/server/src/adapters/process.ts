@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 
 /**
  * Ejecución de procesos externos.
@@ -129,6 +130,11 @@ export type StreamingOptions = {
   env?: NodeJS.ProcessEnv;
   /** Cuántas líneas finales de stderr se guardan para diagnosticar errores. */
   stderrTailLines?: number;
+  /**
+   * Prioridad «por debajo de lo normal» (D-108): para que una compresión larga
+   * ceda la CPU a la PC compartida y a los demás trabajos.
+   */
+  lowPriority?: boolean;
 };
 
 export type StreamingResult = {
@@ -164,6 +170,14 @@ export const runStreaming: StreamingRunner = (file, args, options) =>
       stdio: ['ignore', 'pipe', 'pipe'],
       env: options.env ?? process.env,
     });
+
+    if (options.lowPriority && child.pid !== undefined) {
+      try {
+        os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+      } catch {
+        // Si el proceso ya terminó o no hay permiso, corre con la prioridad normal.
+      }
+    }
 
     const tailSize = options.stderrTailLines ?? 30;
     const stderrTail: string[] = [];

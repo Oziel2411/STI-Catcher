@@ -63,6 +63,11 @@ const KINDS = {
     done: 'Conversión terminada',
     failed: 'Falló la conversión',
   },
+  compression: {
+    noun: 'La compresión',
+    done: 'Compresión terminada',
+    failed: 'Falló la compresión',
+  },
 } as const;
 
 type NoticeKind = keyof typeof KINDS;
@@ -70,15 +75,16 @@ const isNoticeKind = (type: string): type is NoticeKind => type in KINDS;
 
 /**
  * ¿Este fin de trabajo avisa? Solo terminado o fallido (cancelar lo hace uno
- * mismo). Una descarga que se convierte al terminar (`then`, D-093) no avisa
- * al bajar: avisa su conversión, que hereda la lista. Si la descarga falla, sí.
+ * mismo). Una descarga que se convierte o comprime al terminar (`then`, D-093;
+ * `compress`, D-108) no avisa al bajar: avisa el trabajo encadenado, que
+ * hereda la lista. Si la descarga falla, sí.
  */
 export function shouldNotify(record: JobRecord): boolean {
   if (!isNoticeKind(record.type) || record.notifyUserIds.length === 0) return false;
   if (record.status !== 'done' && record.status !== 'failed') return false;
   if (record.type === 'download' && record.status === 'done') {
     const params = downloadParamsSchema.safeParse(record.params);
-    if (params.success && params.data.then) return false;
+    if (params.success && (params.data.then || params.data.compress)) return false;
   }
   return true;
 }
@@ -152,6 +158,7 @@ export const batchFinished = (members: readonly JobRecord[]): boolean =>
 const PLURALS = {
   download: { many: 'descargas', title: 'Descargas' },
   conversion: { many: 'conversiones', title: 'Conversiones' },
+  compression: { many: 'compresiones', title: 'Compresiones' },
 } as const;
 
 /**
@@ -166,7 +173,14 @@ export function batchNoticeMessage(
 ): MailMessage {
   const items = batchItems(members);
   // Un pedido de Descargar incluye sus conversiones encadenadas: se nombra por la descarga.
-  const words = PLURALS[members.some((m) => m.type === 'download') ? 'download' : 'conversion'];
+  const words =
+    PLURALS[
+      members.some((m) => m.type === 'download')
+        ? 'download'
+        : members.some((m) => m.type === 'compression')
+          ? 'compression'
+          : 'conversion'
+    ];
   const done = items.filter((m) => m.status === 'done');
   const failed = items.filter((m) => m.status === 'failed');
   const cancelled = items.filter((m) => m.status === 'cancelled' || m.status === 'expired');

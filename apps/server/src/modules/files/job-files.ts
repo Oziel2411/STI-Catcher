@@ -3,6 +3,17 @@ import path from 'node:path';
 import type { JobRecord } from '../../jobs/types.ts';
 import { buildDownloadFileName } from './file-names.ts';
 
+/** Archivo de un job terminado, solo si queda dentro de STORAGE_DIR/files. */
+export function resolveJobFile(
+  record: JobRecord,
+  storageDir: string,
+  filesDir: string,
+): string | null {
+  if (record.filePath === null) return null;
+  const absolute = path.resolve(storageDir, record.filePath);
+  return absolute.startsWith(path.resolve(filesDir) + path.sep) ? absolute : null;
+}
+
 export type JobFileResult =
   | { kind: 'ok'; fileName: string; downloadName: string; sizeBytes: number }
   | { kind: 'not_found' }
