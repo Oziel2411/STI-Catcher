@@ -202,7 +202,7 @@ Probá desde una PC cliente: descargar un video, convertir un archivo y grabar l
 
 ## Migrar a otro servidor
 
-Para pasar STI-Catcher de un equipo (el «viejo») a otro (el «nuevo») conservando el historial. La base guarda las rutas de los archivos relativas a `STORAGE_DIR`, así que alcanza con copiar carpetas.
+Para pasar STI-Catcher de un equipo (el «viejo») a otro (el «nuevo») conservando el historial. El plan concreto para el servidor final está en [SERVIDOR-SYSCCUOMM.md](SERVIDOR-SYSCCUOMM.md). La base guarda las rutas de los archivos relativas a `STORAGE_DIR`, así que alcanza con copiar carpetas.
 
 **Antes del día:** si los compañeros entran por un alias DNS (por ejemplo `sti.empresa.local`), la migración no se nota: al final solo se cambia a qué equipo apunta. Si entran por el nombre del equipo viejo, avisales la dirección nueva.
 
