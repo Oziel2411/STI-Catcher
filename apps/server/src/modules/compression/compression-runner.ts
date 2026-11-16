@@ -87,13 +87,20 @@ export function createCompressionRunner(deps: CompressionRunnerDeps): JobRunner 
       };
 
       let attempt: Attempt = first;
+      let gpuFellBack = false;
       for (;;) {
         progress(0, null, null);
         const outcome = await runAttempt(attempt);
+        // La GPU queda descartada recién si la CPU pudo con el mismo archivo: si
+        // fallan las dos, el problema es el archivo (o el disco), no la GPU.
+        if (gpuFellBack && outcome.kind === 'encoded') {
+          deps.encoders.markGpuFailed(codec);
+          gpuFellBack = false;
+        }
         const decision = nextAttempt(source, options, attempt, outcome);
         if (decision.kind === 'done') break;
         if (decision.kind === 'fail') throw new JobError(decision.message);
-        if (decision.reason === 'gpu-failed') deps.encoders.markGpuFailed(codec);
+        if (decision.reason === 'gpu-failed') gpuFellBack = true;
         deps.logger.info(
           { jobId: job.id, reason: decision.reason, next: decision.attempt },
           'Se repite la compresión',

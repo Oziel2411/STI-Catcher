@@ -261,6 +261,38 @@ describe('aviso agrupado (D-105)', () => {
     expect(t.sentMails[0]?.text).toContain('- A → MP3');
   });
 
+  it('comprimir varios archivos: un solo mail, nombrado por las compresiones', async () => {
+    const t = await app();
+    await download(t, { title: 'A' });
+    await download(t, { title: 'B' });
+    await waitRuns(t, 1);
+    finishRun(t, 0);
+    await waitRuns(t, 2);
+    finishRun(t, 1);
+    await flush();
+    const sources = t.runs.map((run) => run.context.job.id);
+
+    const batchId = await openBatch(t, [t.ana.user.id]);
+    for (const sourceJobId of sources) {
+      const response = await t.app.inject({
+        method: 'POST',
+        url: '/api/jobs/compress',
+        payload: { sourceJobId, preset: 'share-720p', batchId },
+      });
+      expect(response.statusCode).toBe(202);
+    }
+    await close(t, batchId);
+    await waitRuns(t, 3);
+    finishRun(t, 2, '.mp4');
+    await waitRuns(t, 4);
+    finishRun(t, 3, '.mp4');
+    await vi.waitFor(() => {
+      expect(t.sentMails).toHaveLength(1);
+    });
+    expect(t.sentMails[0]?.subject).toBe('Compresiones terminadas: 2 de 2 listas');
+    expect(t.sentMails[0]?.text).toContain('- A (comprimido)');
+  });
+
   it('si se cancela todo, no avisa (como un trabajo cancelado solo)', async () => {
     const t = await app();
     const batchId = await openBatch(t, [t.ana.user.id]);

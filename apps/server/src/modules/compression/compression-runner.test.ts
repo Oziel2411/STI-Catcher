@@ -126,6 +126,12 @@ describe('createCompressionRunner', () => {
     await expect(registry.current()).resolves.toEqual({ h264: 'cpu', hevc: 'qsv' });
   });
 
+  it('si fallan la GPU y la CPU, el problema es el archivo: la GPU sigue disponible', async () => {
+    const { runner, context, registry } = setup(quality, { failWith: ['h264_qsv', 'libx264'] });
+    await expect(runner.run(context)).rejects.toThrow(JobError);
+    await expect(registry.current()).resolves.toEqual({ h264: 'qsv', hevc: 'qsv' });
+  });
+
   it('con tamaño objetivo se pasó: repite más bajo una vez', async () => {
     const { runner, context, runFfmpeg } = setup(toSize(5), { sizes: [5.6 * MB, 4.8 * MB] });
     await runner.run(context);

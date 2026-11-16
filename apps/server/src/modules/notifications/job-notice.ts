@@ -157,6 +157,7 @@ export const batchFinished = (members: readonly JobRecord[]): boolean =>
 const PLURALS = {
   download: { many: 'descargas', title: 'Descargas' },
   conversion: { many: 'conversiones', title: 'Conversiones' },
+  compression: { many: 'compresiones', title: 'Compresiones' },
 } as const;
 
 /**
@@ -171,7 +172,14 @@ export function batchNoticeMessage(
 ): MailMessage {
   const items = batchItems(members);
   // Un pedido de Descargar incluye sus conversiones encadenadas: se nombra por la descarga.
-  const words = PLURALS[members.some((m) => m.type === 'download') ? 'download' : 'conversion'];
+  const words =
+    PLURALS[
+      members.some((m) => m.type === 'download')
+        ? 'download'
+        : members.some((m) => m.type === 'compression')
+          ? 'compression'
+          : 'conversion'
+    ];
   const done = items.filter((m) => m.status === 'done');
   const failed = items.filter((m) => m.status === 'failed');
   const cancelled = items.filter((m) => m.status === 'cancelled' || m.status === 'expired');

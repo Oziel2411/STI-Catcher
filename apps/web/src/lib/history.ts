@@ -53,7 +53,7 @@ export function historyActions(item: HistoryItem): HistoryActions {
     openOriginal: item.sourceUrl !== null,
     retry:
       (item.status === 'failed' || item.status === 'cancelled') &&
-      (item.type === 'download' || item.type === 'conversion'),
+      (item.type === 'download' || item.type === 'conversion' || item.type === 'compression'),
     cancel: active && item.isMine,
     remove: !active && item.isMine,
   };

@@ -54,8 +54,10 @@ describe('detectVideoEncoders', () => {
 describe('createEncoderRegistry', () => {
   it('un códec cuya GPU falló pasa a CPU; el otro sigue igual', async () => {
     const registry = createEncoderRegistry(Promise.resolve({ h264: 'qsv', hevc: 'qsv' }));
+    expect(registry.peek()).toBeNull();
     registry.markGpuFailed('hevc');
     await expect(registry.current()).resolves.toEqual({ h264: 'qsv', hevc: 'cpu' });
+    expect(registry.peek()).toEqual({ h264: 'qsv', hevc: 'cpu' });
   });
 
   it('si la detección falla, todo por CPU', async () => {

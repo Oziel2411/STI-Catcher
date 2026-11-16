@@ -49,6 +49,7 @@ export const sampleHealth: HealthResponse = {
   tools: [{ name: 'yt-dlp', version: '2026.10.20', error: null }],
   disk: { freeBytes: 10, totalBytes: 20, minFreeBytes: 1, isLow: false },
   jobs: { running: 0, queued: 0, maxConcurrent: 2 },
+  encoders: { h264: 'qsv', hevc: 'qsv' },
   toolsCheckedAt: '2026-10-29T12:00:00.000Z',
 };
 

@@ -152,9 +152,18 @@ function StatusDetails({ health }: { health: HealthResponse }) {
           </tbody>
         </table>
         <p className="muted small">Versiones consultadas a las {checkedAt}.</p>
+        <p className="muted small">{encodersText(health.encoders)}</p>
       </div>
     </>
   );
+}
+
+const ENCODER_NAMES = { qsv: 'la GPU (Quick Sync)', cpu: 'el procesador' } as const;
+
+/** Con qué comprime el server cada códec (D-108). */
+function encodersText(encoders: HealthResponse['encoders']): string {
+  if (encoders === null) return 'Compresión: probando si la GPU puede codificar…';
+  return `Compresión: H.264 por ${ENCODER_NAMES[encoders.h264]}, H.265 por ${ENCODER_NAMES[encoders.hevc]}.`;
 }
 
 function StatCard({

@@ -77,14 +77,24 @@ export async function detectVideoEncoders(
  */
 export function createEncoderRegistry(detection: Promise<ResolvedEncoders>) {
   const fallen = new Set<CompressionCodec>();
-  const resolved = detection.catch((): ResolvedEncoders => ({ h264: 'cpu', hevc: 'cpu' }));
+  let known: ResolvedEncoders | null = null;
+  const resolved = detection
+    .catch((): ResolvedEncoders => ({ h264: 'cpu', hevc: 'cpu' }))
+    .then((encoders) => {
+      known = encoders;
+      return encoders;
+    });
+  const withFallbacks = (encoders: ResolvedEncoders): ResolvedEncoders => ({
+    h264: fallen.has('h264') ? 'cpu' : encoders.h264,
+    hevc: fallen.has('hevc') ? 'cpu' : encoders.hevc,
+  });
   return {
+    /** Lo resuelto hasta ahora, sin esperar (para la página Estado); null mientras se prueba. */
+    peek(): ResolvedEncoders | null {
+      return known === null ? null : withFallbacks(known);
+    },
     async current(): Promise<ResolvedEncoders> {
-      const encoders = await resolved;
-      return {
-        h264: fallen.has('h264') ? 'cpu' : encoders.h264,
-        hevc: fallen.has('hevc') ? 'cpu' : encoders.hevc,
-      };
+      return withFallbacks(await resolved);
     },
     markGpuFailed(codec: CompressionCodec): void {
       fallen.add(codec);

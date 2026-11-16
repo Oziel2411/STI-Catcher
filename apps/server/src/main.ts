@@ -236,6 +236,7 @@ async function main(): Promise<void> {
     readToolVersion: createToolVersionReader(runCommand),
     readDiskSpace,
     getJobCounts: () => queue.counts(),
+    getEncoders: () => encoders.peek(),
   });
 
   const download = createDownloadService({
