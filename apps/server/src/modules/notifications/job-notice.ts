@@ -75,15 +75,16 @@ const isNoticeKind = (type: string): type is NoticeKind => type in KINDS;
 
 /**
  * ¿Este fin de trabajo avisa? Solo terminado o fallido (cancelar lo hace uno
- * mismo). Una descarga que se convierte al terminar (`then`, D-093) no avisa
- * al bajar: avisa su conversión, que hereda la lista. Si la descarga falla, sí.
+ * mismo). Una descarga que se convierte o comprime al terminar (`then`, D-093;
+ * `compress`, D-108) no avisa al bajar: avisa el trabajo encadenado, que
+ * hereda la lista. Si la descarga falla, sí.
  */
 export function shouldNotify(record: JobRecord): boolean {
   if (!isNoticeKind(record.type) || record.notifyUserIds.length === 0) return false;
   if (record.status !== 'done' && record.status !== 'failed') return false;
   if (record.type === 'download' && record.status === 'done') {
     const params = downloadParamsSchema.safeParse(record.params);
-    if (params.success && params.data.then) return false;
+    if (params.success && (params.data.then || params.data.compress)) return false;
   }
   return true;
 }

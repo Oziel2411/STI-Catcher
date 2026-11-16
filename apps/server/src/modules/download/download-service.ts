@@ -1,5 +1,9 @@
 import type { DownloadRequest, Job, ProbeResponse } from '@sti-catcher/shared';
-import { downloadRequestSchema, followUpDownloadFormat } from '@sti-catcher/shared';
+import {
+  compressDownloadHeight,
+  downloadRequestSchema,
+  followUpDownloadFormat,
+} from '@sti-catcher/shared';
 import { UrlBlockedError, UrlResolveError } from '../../adapters/url-guard.ts';
 import type { UrlGuard } from '../../adapters/url-guard.ts';
 import { YtdlpError } from '../../adapters/ytdlp.ts';
@@ -84,14 +88,26 @@ export function createDownloadService(deps: DownloadServiceDeps): DownloadServic
       await assertUrlAllowed(parsed.url);
       // Con conversión encadenada se baja lo que mejor sirve de origen, en
       // modo compatible: la conversión hace el resto (D-093).
-      const format = parsed.then ? followUpDownloadFormat(parsed.then.preset) : parsed.format;
+      // Con compresión encadenada (D-108): MP4 en calidad (el códec original,
+      // sin recodificar dos veces), y no más alto de lo que va a quedar.
+      const compress = parsed.compress;
+      const format = parsed.then
+        ? followUpDownloadFormat(parsed.then.preset)
+        : compress
+          ? 'mp4'
+          : parsed.format;
       const isVideo = format === 'mp4';
       const params: DownloadParams = {
         url: parsed.url,
         format,
-        maxHeight: isVideo ? parsed.maxHeight : null,
-        videoMode: parsed.then ? 'compat' : parsed.videoMode,
+        maxHeight: !isVideo
+          ? null
+          : compress
+            ? compressDownloadHeight(compress, parsed.maxHeight)
+            : parsed.maxHeight,
+        videoMode: parsed.then ? 'compat' : compress ? 'quality' : parsed.videoMode,
         then: parsed.then,
+        compress,
       };
       return deps.enqueue({
         type: 'download',

@@ -1,3 +1,4 @@
+import { compressionOptionsSchema } from '@sti-catcher/shared';
 import type { GifLimits, Job, ProbeResponse } from '@sti-catcher/shared';
 import { describe, expect, it } from 'vitest';
 import {
@@ -349,4 +350,48 @@ it('formatLabel', () => {
   expect(formatLabel('mp4')).toBe('Video · MP4');
   expect(formatLabel('gif')).toBe('Animación · GIF');
   expect(formatLabel('wav')).toBe('Solo audio · WAV');
+});
+
+describe('comprimir al terminar (D-108)', () => {
+  const compress = (options: object) => compressionOptionsSchema.parse(options);
+
+  it('MP4 + comprimir: se manda `compress` con la altura elegida', () => {
+    const item = ready(video, { compress: compress({ preset: 'share-720p' }) });
+    expect(downloadRequest(item)).toEqual({
+      url: video.url,
+      title: 'Big Buck Bunny',
+      maxHeight: 1080,
+      compress: {
+        preset: 'share-720p',
+        target: { mode: 'quality' },
+        maxHeight: null,
+        audioKbps: null,
+      },
+    });
+  });
+
+  it('con otro formato, comprimir no cuenta', () => {
+    const item = ready(video, { preset: 'webm', compress: compress({ preset: 'share-720p' }) });
+    expect(downloadRequest(item)).not.toHaveProperty('compress');
+  });
+
+  it('un tamaño que no alcanza para lo que dura el video no deja empezar', () => {
+    // Big Buck Bunny dura 10:35: 24 MB no alcanzan a 720p.
+    const tight = ready(video, {
+      maxHeight: 720,
+      compress: compress({ preset: 'share-720p', target: { mode: 'size', megabytes: 24 } }),
+    });
+    expect(isStartable(tight, limits)).toBe(false);
+    const roomy = ready(video, {
+      maxHeight: 720,
+      compress: compress({ preset: 'share-720p', target: { mode: 'size', megabytes: 95 } }),
+    });
+    expect(isStartable(roomy, limits)).toBe(true);
+  });
+
+  it('una lista guardada antes de esta opción se restaura sin comprimir', () => {
+    const stored = JSON.parse(serializeLinks([ready()])) as Record<string, unknown>[];
+    for (const entry of stored) delete entry.compress;
+    expect(restoreLinks(JSON.stringify(stored))[0]?.compress).toBeNull();
+  });
 });

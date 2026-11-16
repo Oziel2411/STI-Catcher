@@ -281,7 +281,7 @@ async function main(): Promise<void> {
     encoders,
     queue,
   });
-  const followUps = createFollowUps({ conversion, queue, repo, logger });
+  const followUps = createFollowUps({ conversion, compression, queue, repo, logger });
   // Aviso por mail al terminar una grabación (D-099). Sin SMTP o sin MAIL_TO, nada.
   const sendMail = config.mail ? createSmtpMailer(config.mail) : null;
   // Recuperar la contraseña por mail (D-104): hace falta SMTP y PUBLIC_URL.

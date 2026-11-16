@@ -227,7 +227,13 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     encoders: { current: () => Promise.resolve(options.encoders ?? { h264: 'qsv', hevc: 'cpu' }) },
     queue,
   });
-  const followUps = createFollowUps({ conversion, queue, repo, logger: { warn: vi.fn() } });
+  const followUps = createFollowUps({
+    conversion,
+    compression,
+    queue,
+    repo,
+    logger: { warn: vi.fn() },
+  });
   const sentMails: MailMessage[] = [];
   const sendMail: SendMail =
     options.sendMail ??

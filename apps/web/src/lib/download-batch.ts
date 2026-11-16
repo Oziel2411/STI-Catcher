@@ -1,13 +1,18 @@
 import {
+  compressionOptionsSchema,
   CONVERSION_PRESETS,
   conversionPresetIdSchema,
   gifOptionsSchema,
   httpUrlSchema,
   isActiveStatus,
+  planTargetSize,
   probeResponseSchema,
+  TARGET_MARGIN,
+  targetSizeProblem,
   videoModeSchema,
 } from '@sti-catcher/shared';
 import type {
+  CompressionOptions,
   ConversionPresetId,
   DownloadRequest,
   GifLimits,
@@ -46,7 +51,9 @@ export type DownloadItem = {
   /** Solo MP4. */
   videoMode: VideoMode;
   gif: GifOptions | null;
-  /** La descarga y su último estado; la conversión encadenada, si hay. */
+  /** Comprimir al terminar (D-108), solo con MP4. null = no. */
+  compress: CompressionOptions | null;
+  /** La descarga y su último estado; la conversión o compresión encadenada, si hay. */
   jobId: string | null;
   job: Job | null;
   followUp: Job | null;
@@ -191,11 +198,40 @@ export function newLinkItem(id: string, url: string): DownloadItem {
     maxHeight: null,
     videoMode: 'compat',
     gif: null,
+    compress: null,
     jobId: null,
     job: null,
     followUp: null,
     error: null,
   };
+}
+
+/** Se comprime al terminar: solo cuenta con MP4 (los demás formatos ya se convierten). */
+export const compressesAfter = (item: Pick<DownloadItem, 'preset' | 'compress'>) =>
+  item.preset === 'mp4' && item.compress !== null;
+
+/**
+ * Si el tamaño pedido alcanza, con lo que se sabe antes de bajar: la duración
+ * y la altura elegida (el ancho se supone 16:9). Usa el margen de la GPU, el
+ * más exigente; el server vuelve a validar con el archivo real al terminar.
+ */
+function compressProblem(item: DownloadItem): string | null {
+  const { probe, compress } = item;
+  if (!probe || !compress || !compressesAfter(item) || compress.target.mode !== 'size') return null;
+  const height = item.maxHeight ?? probe.resolutions[0]?.height ?? null;
+  if (height === null) return null;
+  const plan = planTargetSize(
+    {
+      width: Math.round((height * 16) / 9),
+      height,
+      frameRate: null,
+      durationSeconds: probe.durationSeconds,
+      hasAudio: probe.hasAudio,
+    },
+    compress,
+    TARGET_MARGIN.gpu,
+  );
+  return plan.ok ? null : targetSizeProblem(plan, compress.target.megabytes);
 }
 
 /** Lo que se sabe del video, con la forma que usan las opciones del GIF. */
@@ -242,8 +278,10 @@ export function withProbe(
   };
 }
 
-/** Problemas que impiden empezar (por ahora, solo el GIF). */
+/** Problemas que impiden empezar: el GIF, o un tamaño de compresión que no alcanza. */
 export function itemProblems(item: DownloadItem, limits: GifLimits): string[] {
+  const compress = compressProblem(item);
+  if (compress !== null) return [compress];
   if (item.preset !== 'gif' || !item.probe || !item.gif) return [];
   return gifProblems(item.gif, probeMedia(item.probe), limits);
 }
@@ -259,6 +297,10 @@ export function downloadRequest(item: DownloadItem): DownloadRequest | null {
   const { probe, preset } = item;
   if (!probe || !preset) return null;
   const common = { url: probe.url, title: probe.title };
+  if (preset === 'mp4' && item.compress) {
+    // Se baja en calidad y se comprime al terminar (D-108).
+    return { ...common, maxHeight: item.maxHeight, compress: item.compress };
+  }
   if (isDirect(preset)) {
     return {
       ...common,
@@ -409,6 +451,7 @@ const storedItemSchema = z.object({
   maxHeight: z.number().nullable(),
   videoMode: videoModeSchema,
   gif: gifOptionsSchema.nullable(),
+  compress: compressionOptionsSchema.nullable().default(null),
   jobId: z.uuid().nullable(),
   error: z.string().nullable(),
 });
@@ -425,6 +468,7 @@ export function serializeLinks(items: readonly DownloadItem[]): string {
       maxHeight: item.maxHeight,
       videoMode: item.videoMode,
       gif: item.gif,
+      compress: item.compress,
       jobId: item.jobId,
       error: item.error,
     })),

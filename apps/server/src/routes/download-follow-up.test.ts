@@ -1,7 +1,7 @@
 import { rmSync } from 'node:fs';
 import { apiErrorSchema, createJobResponseSchema, jobResponseSchema } from '@sti-catcher/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { flush, makeTestApp } from '../../test/test-app.ts';
+import { flush, makeTestApp, sampleVideoMedia } from '../../test/test-app.ts';
 
 const storageDirs: string[] = [];
 afterEach(() => {
@@ -195,5 +195,82 @@ describe('POST /api/jobs/download con `then` (conversión encadenada)', () => {
     expect(response.statusCode).toBe(202);
     const { jobId } = createJobResponseSchema.parse(response.json());
     expect(testApp.repo.get(jobId)?.params).toMatchObject({ then: { preset: 'mov' } });
+  });
+});
+
+describe('POST /api/jobs/download con `compress` (compresión encadenada, D-108)', () => {
+  it('baja MP4 en calidad, no más alto que lo que va a quedar', async () => {
+    const testApp = await app();
+    await startDownload(testApp, {
+      format: 'mp3',
+      maxHeight: 1080,
+      compress: { preset: 'share-720p', target: { mode: 'size', megabytes: 24 } },
+    });
+    expect(testApp.runs[0]?.context.job.params).toMatchObject({
+      format: 'mp4',
+      videoMode: 'quality',
+      maxHeight: 720,
+      then: null,
+      compress: { preset: 'share-720p', target: { mode: 'size', megabytes: 24 } },
+    });
+  });
+
+  it('400 si pide convertir y comprimir a la vez', async () => {
+    const testApp = await app();
+    const response = await testApp.app.inject({
+      method: 'POST',
+      url: '/api/jobs/download',
+      payload: {
+        url: 'https://youtu.be/x',
+        then: { preset: 'webm' },
+        compress: { preset: 'share-720p' },
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(testApp.queue.list({ limit: 10 })).toHaveLength(0);
+  });
+
+  it('al terminar crea la compresión vinculada; avisa la compresión, no la descarga', async () => {
+    const testApp = await app();
+    const id = await startDownload(testApp, {
+      compress: { preset: 'screen' },
+      notify: [testApp.ana.user.id],
+    });
+    finishRun(testApp, 0, '.mp4');
+    await vi.waitFor(async () => {
+      expect((await getJob(testApp, id)).followUpJobId).not.toBeNull();
+    });
+    const download = await getJob(testApp, id);
+    const compression = testApp.repo.get(download.followUpJobId ?? '');
+    expect(compression).toMatchObject({
+      type: 'compression',
+      parentJobId: id,
+      title: 'Big Buck Bunny (comprimido)',
+      params: { sourceJobId: id, options: { preset: 'screen' } },
+      notifyUserIds: [testApp.ana.user.id],
+    });
+    await flush();
+    expect(testApp.sentMails).toHaveLength(0);
+  });
+
+  it('si el tamaño no alcanza para lo que se bajó, queda una compresión fallida con el motivo', async () => {
+    const testApp = await app({
+      ffprobe: () =>
+        Promise.resolve({
+          ...sampleVideoMedia,
+          durationSeconds: 3 * 3600,
+          sizeBytes: 2 * 1024 ** 3,
+        }),
+    });
+    const id = await startDownload(testApp, {
+      compress: { preset: 'share-720p', target: { mode: 'size', megabytes: 24 } },
+    });
+    finishRun(testApp, 0, '.mp4');
+    await vi.waitFor(async () => {
+      expect((await getJob(testApp, id)).followUpJobId).not.toBeNull();
+    });
+    const followUp = await getJob(testApp, (await getJob(testApp, id)).followUpJobId ?? '');
+    expect(followUp).toMatchObject({ type: 'compression', status: 'failed' });
+    expect(followUp.error).toMatch(/Es demasiado largo para que entre en 24 MB/);
   });
 });

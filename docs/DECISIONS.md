@@ -884,7 +884,7 @@ Hasta ahora «A mí» venía tildado en todas las grabaciones (D-104) y el aviso
 
 ## Compresión
 
-### D-108 — Comprimir video, al estilo de HandBrake · Etapas 1–3 de 5 · Vigente
+### D-108 — Comprimir video, al estilo de HandBrake · Etapas 1–5 · Vigente
 
 Sección propia «Comprimir», separada de Convertir: Convertir cambia el formato; Comprimir achica el archivo (para mandarlo por mail o WhatsApp, subirlo a una plataforma o archivarlo). Sale el resultado del cuestionario con el usuario (2026-11-12).
 
@@ -924,7 +924,15 @@ Calibración GPU contra CPU (60 s reales a 720p30, SSIM contra el original escal
 
 Verificado en el navegador con el server real y un clip de 60 s 1080p: estimación ≈ 2 a 8,2 MB (salió 2,8 MB); 5 MB a 720p mostró «bajá la resolución a 480p» y deshabilitó el botón; a 480p, «hasta 5 MB», comprimió en vivo a 10× y quedó en 4,2 MB (854×480). El menú del Historial llevó a Comprimir, Estado mostró «H.264 por la GPU (Quick Sync), H.265 por la GPU», y la vista de celular no se desborda.
 
-Pendiente (etapas siguientes): modo tamaño completo con estimación (4) — ya quedó casi todo en la etapa 3; queda revisar con el usuario si hace falta algo más (p. ej. recortar inicio y fin); comprimir al terminar una descarga (5). Encadenar a una grabación lo hace la sesión de avisos sobre `create`.
+**Etapa 5 — comprimir al terminar una descarga** (la 4, modo tamaño con estimación, quedó resuelta en la 3):
+
+- `POST /api/jobs/download` acepta `compress` (las mismas opciones de `compressionOptionsSchema`), excluyente con `then` (400 si vienen las dos). Se baja MP4 en **modo calidad** (el códec original, sin recodificar dos veces) y no más alto que lo que va a dejar la compresión (`compressDownloadHeight`).
+- Al terminar bien, el follow-up de la cola (D-093) llama a `compressionService.create`; si no se puede (p. ej. el tamaño no alcanza para lo que duró), queda una compresión fallida con el motivo, vinculada en `follow_up_job_id`. La descarga no avisa por mail: avisa la compresión. En los contadores cuenta como descarga.
+- En Descargar, con MP4, la columna Calidad tiene «Sin comprimir» o un preset de compresión; con uno elegido, el códec de la descarga se oculta y aparece «Comprimir al terminar · tamaño» (calidad del preset o los atajos Mail/WhatsApp/Teams-Drive; un tamaño a medida, desde Comprimir). El tamaño se valida antes de empezar con la duración del análisis y el margen de la GPU. El estado dice «Descargado · Comprimiendo».
+
+Verificado en el navegador con el server real: «Me at the zoo» con «Para compartir 720p» bajó en AV1 a 240p (534 KB) y se comprimió solo a H.264 (505 KB), vinculado a la descarga en el historial.
+
+Pendiente: encadenar a una grabación (la sesión de avisos, sobre `create`); verificar Quick Sync con el servicio instalado; sumar D-108 y las rutas a `CLAUDE.md` al mergear.
 
 ## Deuda técnica
 

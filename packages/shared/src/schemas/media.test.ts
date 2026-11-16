@@ -35,6 +35,7 @@ describe('downloadRequestSchema', () => {
       videoMode: 'compat',
       title: null,
       then: null,
+      compress: null,
       notify: [],
       batchId: null,
     });

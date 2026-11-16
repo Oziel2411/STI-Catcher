@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { COMPRESSION_PRESETS, compressionOptionsSchema } from '../presets/compression.ts';
+import type { CompressionOptions } from '../presets/compression.ts';
 import { conversionPresetIdSchema, CONVERSION_PRESETS } from '../presets/conversion.ts';
 import type { ConversionPresetId } from '../presets/conversion.ts';
 import { gifOptionsSchema } from './conversion.ts';
@@ -91,25 +93,52 @@ export function followUpDownloadFormat(preset: ConversionPresetId): DownloadForm
   return CONVERSION_PRESETS[preset].needs === 'audio' ? 'm4a' : 'mp4';
 }
 
-export const downloadRequestSchema = z.object({
-  url: httpUrlSchema,
-  format: downloadFormatSchema.default('mp4'),
-  /** Altura máxima en píxeles; null = la mejor disponible. Se ignora para audio. */
-  maxHeight: z.number().int().min(100).max(4320).nullable().default(null),
-  videoMode: videoModeSchema.default('compat'),
-  /**
-   * Título del análisis previo, para mostrar mientras se descarga. Al
-   * terminar se reemplaza por el que informa yt-dlp.
-   */
-  title: z.string().trim().max(500).nullable().default(null),
-  /**
-   * Convertir al terminar (D-093). Si se indica, `format` y `videoMode` se
-   * ignoran: se descarga lo que conviene para ese preset (`followUpDownloadFormat`).
-   */
-  then: downloadFollowUpSchema.nullable().default(null),
-  /** A quién avisar por mail al terminar o fallar (D-104). Con `then`, avisa la conversión. */
-  notify: notifyUserIdsSchema,
-  /** Pedido de varios links con un solo aviso (D-105). */
-  batchId: noticeBatchIdSchema,
-});
+/**
+ * Altura a bajar cuando se comprime al terminar (D-108): no hace falta más
+ * que lo que va a dejar la compresión. null = la mejor.
+ */
+export function compressDownloadHeight(
+  options: CompressionOptions,
+  chosen: number | null,
+): number | null {
+  const caps = [chosen, COMPRESSION_PRESETS[options.preset].maxHeight, options.maxHeight].filter(
+    (height): height is number => height !== null,
+  );
+  return caps.length > 0 ? Math.min(...caps) : null;
+}
+
+export const downloadRequestSchema = z
+  .object({
+    url: httpUrlSchema,
+    format: downloadFormatSchema.default('mp4'),
+    /** Altura máxima en píxeles; null = la mejor disponible. Se ignora para audio. */
+    maxHeight: z.number().int().min(100).max(4320).nullable().default(null),
+    videoMode: videoModeSchema.default('compat'),
+    /**
+     * Título del análisis previo, para mostrar mientras se descarga. Al
+     * terminar se reemplaza por el que informa yt-dlp.
+     */
+    title: z.string().trim().max(500).nullable().default(null),
+    /**
+     * Convertir al terminar (D-093). Si se indica, `format` y `videoMode` se
+     * ignoran: se descarga lo que conviene para ese preset (`followUpDownloadFormat`).
+     */
+    then: downloadFollowUpSchema.nullable().default(null),
+    /**
+     * Comprimir al terminar (D-108). Se baja un MP4 en la mejor calidad que
+     * sirva (la compresión recodifica igual); `format` y `videoMode` se ignoran.
+     */
+    compress: compressionOptionsSchema.nullable().default(null),
+    /**
+     * A quién avisar por mail al terminar o fallar (D-104). Con `then` o
+     * `compress`, avisa el trabajo encadenado.
+     */
+    notify: notifyUserIdsSchema,
+    /** Pedido de varios links con un solo aviso (D-105). */
+    batchId: noticeBatchIdSchema,
+  })
+  .refine((request) => request.then === null || request.compress === null, {
+    error: 'Se puede convertir o comprimir al terminar, no las dos cosas.',
+    path: ['compress'],
+  });
 export type DownloadRequest = z.input<typeof downloadRequestSchema>;
