@@ -434,6 +434,9 @@ export function HistoryPage() {
                         onConvert={() => {
                           void navigate(`/convertir?origen=${encodeURIComponent(item.id)}`);
                         }}
+                        onCompress={() => {
+                          void navigate(`/comprimir?origen=${encodeURIComponent(item.id)}`);
+                        }}
                         onDelete={() => {
                           remove(item);
                         }}
@@ -488,6 +491,7 @@ type RowProps = {
   playing: boolean;
   onTogglePlay: () => void;
   onConvert: () => void;
+  onCompress: () => void;
   onDelete: () => void;
   onRetry: () => void;
   onCancel: () => void;
@@ -508,6 +512,7 @@ function HistoryRow({
   playing,
   onTogglePlay,
   onConvert,
+  onCompress,
   onDelete,
   onRetry,
   onCancel,
@@ -530,6 +535,16 @@ function HistoryRow({
             label: 'Convertir a otro formato',
             icon: <ArrowsLeftRightIcon size={15} />,
             onSelect: onConvert,
+          },
+        ]
+      : []),
+    ...(actions.compress
+      ? [
+          {
+            key: 'compress',
+            label: 'Comprimir',
+            icon: <ArrowsInSimpleIcon size={15} />,
+            onSelect: onCompress,
           },
         ]
       : []),

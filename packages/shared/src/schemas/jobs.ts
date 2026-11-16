@@ -34,7 +34,13 @@ export function isActiveStatus(status: JobStatus): boolean {
   return (ACTIVE_JOB_STATUSES as readonly JobStatus[]).includes(status);
 }
 
-export const jobPhaseSchema = z.enum(['downloading', 'merging', 'converting', 'processing']);
+export const jobPhaseSchema = z.enum([
+  'downloading',
+  'merging',
+  'converting',
+  'compressing',
+  'processing',
+]);
 export type JobPhase = z.infer<typeof jobPhaseSchema>;
 
 /**

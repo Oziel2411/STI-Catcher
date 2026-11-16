@@ -181,8 +181,12 @@ export function targetSizeProblem(
  * en H.264: abajo, una grabación de pantalla casi quieta; arriba, video de
  * cámara con mucho movimiento. Depende tanto del contenido que solo sirve
  * para dar un orden de magnitud.
+ *
+ * Medido (D-108): una reunión real de 33 min con «Para compartir 720p» (RF 26)
+ * dio ~0,014, o sea ~0,022 a RF 22. El techo de 0,06 deja margen para video
+ * de cámara sin que todo parezca «puede no achicarse».
  */
-const QUALITY_BITS_PER_PIXEL = { low: 0.01, high: 0.12 } as const;
+const QUALITY_BITS_PER_PIXEL = { low: 0.01, high: 0.06 } as const;
 const REFERENCE_RF = 22;
 
 export type SizeEstimate = { minBytes: number; maxBytes: number };

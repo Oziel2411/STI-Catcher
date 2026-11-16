@@ -78,7 +78,7 @@ export function createCompressionRunner(deps: CompressionRunnerDeps): JobRunner 
 
       const progress = (percent: number | null, speedRatio: number | null, eta: number | null) => {
         reportProgress({
-          phase: 'converting',
+          phase: 'compressing',
           percent,
           speedBytesPerSecond: null,
           speedRatio,

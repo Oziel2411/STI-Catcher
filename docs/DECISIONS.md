@@ -884,7 +884,7 @@ Hasta ahora «A mí» venía tildado en todas las grabaciones (D-104) y el aviso
 
 ## Compresión
 
-### D-108 — Comprimir video, al estilo de HandBrake · Etapas 1–2 de 5 · Vigente
+### D-108 — Comprimir video, al estilo de HandBrake · Etapas 1–3 de 5 · Vigente
 
 Sección propia «Comprimir», separada de Convertir: Convertir cambia el formato; Comprimir achica el archivo (para mandarlo por mail o WhatsApp, subirlo a una plataforma o archivarlo). Sale el resultado del cuestionario con el usuario (2026-11-12).
 
@@ -914,7 +914,17 @@ Verificado: la migración 11 sobre una copia de la base real (60 trabajos) dejó
 
 Calibración GPU contra CPU (60 s reales a 720p30, SSIM contra el original escalado): al mismo número, `h264_qsv` da casi el mismo tamaño que x264 `medium` (3984 contra 4256 KB, SSIM 0,988 contra 0,990) y un 50 % más que x264 `veryfast` con igual calidad (0,988 contra 0,987). No se corrige el número: la diferencia es de la velocidad de x264, no de la GPU. Falta verificar Quick Sync con el servicio instalado (`NT SERVICE\sti-catcher`): si ahí no anda, la detección cae sola a CPU.
 
-Pendiente (etapas siguientes): la sección en la web (3); modo tamaño completo con estimación en la web (4); comprimir al terminar una descarga (5). Encadenar a una grabación lo hace la sesión de avisos sobre `create`.
+**Etapa 3 — la sección Comprimir:**
+
+- Sección propia en la barra (`/comprimir`, ícono de flechas hacia adentro, contador `compression`) y «Comprimir» en el menú «…» del Historial para videos terminados (no audio ni GIF) → `?origen=`.
+- Misma mecánica que Convertir (D-092): lista con detalle, subida de a una, análisis en el server, «Usar estas opciones en todos», lista en `sessionStorage` (`sti.compress.batch`), un solo aviso por pedido (D-105). La zona para soltar (`components/Dropzone.tsx`) y la cola de subidas (`api/upload-queue.ts`) pasaron a ser comunes a las dos secciones; la lógica de cada ítem quedó aparte (`lib/compress-batch.ts`), porque las opciones no se parecen.
+- Por ítem: preset (dos grupos: compartir en H.264 y archivar en H.265), tamaño (calidad del preset, atajos Mail/WhatsApp/Teams-Drive o un número de MB), resolución (solo por debajo de lo que deja el preset) y audio. Arranca con «Para compartir 720p»; una grabación de pantalla, con su preset.
+- **Estimación al instante** con las cuentas de shared: con tamaño, «hasta N MB»; con calidad, un rango «≈ A a B» que nunca supera al original, con aviso si puede no achicarse. Si el tamaño no alcanza se muestra el mismo motivo que daría el server y el botón no lo cuenta. El techo del rango bajó a 0,06 bits por píxel después de medir una reunión real (~0,022 a RF 22).
+- La fase del progreso es `compressing` («Comprimiendo»). En cola se explica que se comprime un video a la vez. Al terminar: cuánto achicó («de 12,6 MB a 4,2 MB (−67 %)»), y si no achicó, que el original ya estaba comprimido.
+
+Verificado en el navegador con el server real y un clip de 60 s 1080p: estimación ≈ 2 a 8,2 MB (salió 2,8 MB); 5 MB a 720p mostró «bajá la resolución a 480p» y deshabilitó el botón; a 480p, «hasta 5 MB», comprimió en vivo a 10× y quedó en 4,2 MB (854×480). El menú del Historial llevó a Comprimir, Estado mostró «H.264 por la GPU (Quick Sync), H.265 por la GPU», y la vista de celular no se desborda.
+
+Pendiente (etapas siguientes): modo tamaño completo con estimación (4) — ya quedó casi todo en la etapa 3; queda revisar con el usuario si hace falta algo más (p. ej. recortar inicio y fin); comprimir al terminar una descarga (5). Encadenar a una grabación lo hace la sesión de avisos sobre `create`.
 
 ## Deuda técnica
 

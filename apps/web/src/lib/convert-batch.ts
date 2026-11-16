@@ -177,8 +177,16 @@ export function itemMeta(item: ConvertItem): string {
     .join(' · ');
 }
 
+/** Lo mínimo de un ítem que sigue un job (Convertir y Comprimir). */
+type JobFollowingItem = {
+  jobId: string | null;
+  job: Job | null;
+  status: string;
+  error: string | null;
+};
+
 /** Aplica un evento SSE a los ítems que siguen ese job. Misma lista si no cambió nada. */
-export function applyEventToItems(items: ConvertItem[], event: JobEvent): ConvertItem[] {
+export function applyEventToItems<T extends JobFollowingItem>(items: T[], event: JobEvent): T[] {
   const next = items.map((item) => {
     if (item.jobId === null) return item;
     const jobId = event.type === 'job.updated' ? event.job.id : event.jobId;
@@ -188,7 +196,7 @@ export function applyEventToItems(items: ConvertItem[], event: JobEvent): Conver
         ...item,
         job: null,
         jobId: null,
-        status: 'failed' as const,
+        status: 'failed',
         error: 'El trabajo se borró.',
       };
     }

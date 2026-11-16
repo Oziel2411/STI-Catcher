@@ -5,11 +5,10 @@ import {
 } from '@sti-catcher/shared';
 import type { ConversionOptionsResponse } from '@sti-catcher/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ApiClientError, apiGet, apiPost } from '../../api/client.ts';
+import { apiGet, apiPost } from '../../api/client.ts';
 import { subscribeToJobsEvents } from '../../api/events.ts';
 import { withNoticeBatch } from '../../api/notice-batch.ts';
-import { uploadFile } from '../../api/upload.ts';
-import type { UploadHandle } from '../../api/upload.ts';
+import { createUploadQueue, newLocalId } from '../../api/upload-queue.ts';
 import {
   applyEventToItems,
   applyFormatToAll,
@@ -28,45 +27,6 @@ const STORAGE_KEY = 'sti.convert.batch';
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Error desconocido.';
-
-// crypto.randomUUID solo existe en contexto seguro, y Convertir también se usa por http://<IP>.
-let counter = 0;
-const newLocalId = () => `item-${Date.now().toString(36)}-${String(++counter)}`;
-
-type UploadQueue = {
-  files: { current: Map<string, File> };
-  queue: { current: string[] };
-  current: { current: { id: string; handle: UploadHandle } | null };
-  update: (id: string, patch: Partial<ConvertItem>) => void;
-};
-
-/** Sube el siguiente de la cola, de a uno; al terminar sigue con el próximo. */
-function pumpUploads(ctx: UploadQueue): void {
-  if (ctx.current.current) return;
-  let id = ctx.queue.current.shift();
-  while (id !== undefined && !ctx.files.current.has(id)) id = ctx.queue.current.shift();
-  const file = id === undefined ? undefined : ctx.files.current.get(id);
-  if (id === undefined || !file) return;
-  const itemId = id;
-  const handle = uploadFile(file, (progress) => {
-    ctx.update(itemId, { uploadedBytes: progress.loadedBytes });
-  });
-  ctx.current.current = { id: itemId, handle };
-  handle.promise
-    .then(({ jobId }) => {
-      ctx.update(itemId, { status: 'analyzing', sourceJobId: jobId, uploadedBytes: file.size });
-    })
-    .catch((error: unknown) => {
-      // Cancelada a propósito: el ítem ya se quitó de la lista.
-      if (error instanceof ApiClientError && error.code === 'ABORTED') return;
-      ctx.update(itemId, { status: 'failed', error: errorMessage(error) });
-    })
-    .finally(() => {
-      ctx.files.current.delete(itemId);
-      ctx.current.current = null;
-      pumpUploads(ctx);
-    });
-}
 
 function readStored(): ConvertItem[] {
   try {
@@ -87,14 +47,24 @@ export function useConvertBatch(options: ConversionOptionsResponse | null) {
   const [selectedId, setSelectedId] = useState<string | null>(() => items[0]?.id ?? null);
   const [notices, setNotices] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const files = useRef(new Map<string, File>());
-  const queue = useRef<string[]>([]);
-  const current = useRef<{ id: string; handle: UploadHandle } | null>(null);
   const analyzing = useRef(new Set<string>());
 
   const update = useCallback((id: string, patch: Partial<ConvertItem>) => {
     setItems((list) => list.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   }, []);
+  const [uploads] = useState(() =>
+    createUploadQueue({
+      onProgress: (id, loadedBytes) => {
+        update(id, { uploadedBytes: loadedBytes });
+      },
+      onUploaded: (id, jobId, sizeBytes) => {
+        update(id, { status: 'analyzing', sourceJobId: jobId, uploadedBytes: sizeBytes });
+      },
+      onFailed: (id, message) => {
+        update(id, { status: 'failed', error: message });
+      },
+    }),
+  );
 
   // Guardar la lista (sin los File).
   useEffect(() => {
@@ -151,24 +121,19 @@ export function useConvertBatch(options: ConversionOptionsResponse | null) {
     });
   }, [activeJobIds]);
 
-  const pump = useCallback(() => {
-    pumpUploads({ files, queue, current, update });
-  }, [update]);
-
   // Al salir de la página se cancela lo que se estaba subiendo (no queda en la lista guardada).
   useEffect(
     () => () => {
-      queue.current = [];
-      current.current?.handle.abort();
+      uploads.abortAll();
     },
-    [],
+    [uploads],
   );
 
   const addFiles = useCallback(
     (list: FileList | File[]) => {
       if (!options) return;
       const skipped: string[] = [];
-      const added: ConvertItem[] = [];
+      const added: { item: ConvertItem; file: File }[] = [];
       for (const file of Array.from(list)) {
         if (file.size > options.maxUploadBytes) {
           skipped.push(
@@ -176,18 +141,15 @@ export function useConvertBatch(options: ConversionOptionsResponse | null) {
           );
           continue;
         }
-        const item = newUploadItem(newLocalId(), file);
-        files.current.set(item.id, file);
-        queue.current.push(item.id);
-        added.push(item);
+        added.push({ item: newUploadItem(newLocalId(), file), file });
       }
       setNotices(skipped);
       if (added.length === 0) return;
-      setItems((current) => [...current, ...added]);
-      setSelectedId((selected) => selected ?? added[0]?.id ?? null);
-      pump();
+      setItems((current) => [...current, ...added.map((entry) => entry.item)]);
+      setSelectedId((selected) => selected ?? added[0]?.item.id ?? null);
+      for (const { item, file } of added) uploads.add(item.id, file);
     },
-    [options, pump],
+    [options, uploads],
   );
 
   /** Archivos del historial (`?origen=`): los que ya están en la lista no se repiten. */
@@ -203,9 +165,7 @@ export function useConvertBatch(options: ConversionOptionsResponse | null) {
   };
 
   const remove = (id: string) => {
-    if (current.current?.id === id) current.current.handle.abort();
-    queue.current = queue.current.filter((queued) => queued !== id);
-    files.current.delete(id);
+    uploads.remove(id);
     const index = items.findIndex((item) => item.id === id);
     const next = items.filter((item) => item.id !== id);
     setItems((list) => list.filter((item) => item.id !== id));

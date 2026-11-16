@@ -1,4 +1,5 @@
 import {
+  ArrowsInSimpleIcon,
   ArrowsLeftRightIcon,
   ClockCounterClockwiseIcon,
   DownloadSimpleIcon,
@@ -27,6 +28,7 @@ const NAV_ITEMS: readonly {
   { to: '/descargar', label: 'Descargar', icon: DownloadSimpleIcon, count: 'download' },
   { to: '/grabar', label: 'Grabar pantalla', shortLabel: 'Grabar', icon: RecordIcon },
   { to: '/convertir', label: 'Convertir', icon: ArrowsLeftRightIcon, count: 'conversion' },
+  { to: '/comprimir', label: 'Comprimir', icon: ArrowsInSimpleIcon, count: 'compression' },
   { to: '/historial', label: 'Historial', icon: ClockCounterClockwiseIcon },
   { to: '/estado', label: 'Estado', icon: PulseIcon },
 ];

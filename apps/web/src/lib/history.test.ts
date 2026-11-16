@@ -61,11 +61,18 @@ describe('historyActions', () => {
       play: true,
       download: true,
       convert: true,
+      compress: true,
       openOriginal: true,
       retry: false,
       cancel: false,
       remove: true,
     });
+  });
+
+  it('comprimir: solo videos terminados (no audio ni GIF)', () => {
+    expect(historyActions({ ...item, format: 'mp3', resolution: null }).compress).toBe(false);
+    expect(historyActions({ ...item, format: 'gif' }).compress).toBe(false);
+    expect(historyActions({ ...item, status: 'running' }).compress).toBe(false);
   });
 
   it('en curso: solo quien lo pidió lo cancela, y no se borra', () => {

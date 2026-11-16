@@ -3,6 +3,7 @@ import { Layout } from './components/Layout.tsx';
 import { AccountPage } from './features/auth/AccountPage.tsx';
 import { AuthGate } from './features/auth/AuthGate.tsx';
 import { ConvertPage } from './features/convert/ConvertPage.tsx';
+import { CompressPage } from './features/compress/CompressPage.tsx';
 import { DownloadPage } from './features/download/DownloadPage.tsx';
 import { HistoryPage } from './features/history/HistoryPage.tsx';
 import { RecordingPage } from './features/recording/RecordingPage.tsx';
@@ -20,6 +21,7 @@ export function App() {
             <Route path="descargar" element={<DownloadPage />} />
             <Route path="grabar" element={<RecordingPage />} />
             <Route path="convertir" element={<ConvertPage />} />
+            <Route path="comprimir" element={<CompressPage />} />
             <Route path="historial" element={<HistoryPage />} />
             <Route path="estado" element={<StatusPage />} />
             <Route path="cuenta" element={<AccountPage />} />
