@@ -48,7 +48,7 @@ npm run check        # typecheck + lint + format:check + test (correr antes de c
   - `http/` — helpers HTTP (errores, `parseInput`). `test/` — helpers de tests (`makeTestApp`) y fixtures.
 - `apps/web` — React + Vite. `features/<sección>/`, `components/`, `api/` (cliente HTTP + SSE tipado, con reconexión), `lib/` (formato y lógica pura).
 - `packages/shared` — esquemas Zod del contrato de API y presets de conversión (`presets/conversion.ts`, lista cerrada). Se consume como código TS, sin build.
-- `scripts/` — PowerShell: `setup.ps1`, `update-ytdlp.ps1`, `new-certificate.ps1`, `install-service.ps1`, `uninstall-service.ps1` y `common.ps1` (funciones compartidas). Instalación en el servidor: `docs/DEPLOY.md`. `service/` (WinSW + XML generado) va en `.gitignore`. `bin/`, `storage/`, `data/`, `logs/` están en `.gitignore`.
+- `scripts/` — PowerShell: `setup.ps1`, `update-ytdlp.ps1`, `new-certificate.ps1`, `install-service.ps1`, `uninstall-service.ps1`, `survey-server.ps1` (relevamiento de un equipo, solo lee) y `common.ps1` (funciones compartidas). Instalación en el servidor: `docs/DEPLOY.md`. `service/` (WinSW + XML generado) va en `.gitignore`. `bin/`, `storage/`, `data/`, `logs/` están en `.gitignore`.
 
 ## Convenciones
 

@@ -2,7 +2,20 @@
 
 Guía paso a paso para instalar STI-Catcher en una PC con Windows 10 que hace de servidor en la red interna. Los compañeros entran desde el navegador, sin instalar nada más que el certificado de la red (paso 8).
 
-> **Solo red interna.** Windows 10 no tiene soporte de Microsoft desde octubre de 2025 (las actualizaciones extendidas para particulares terminaron en octubre de 2026). Este equipo **nunca** debe quedar expuesto a internet: nada de redirigir puertos en el router ni publicarlo por VPN a terceros. La app no tiene login.
+> **Solo red interna.** Windows 10 no tiene soporte de Microsoft desde octubre de 2025 (las actualizaciones extendidas para particulares terminaron en octubre de 2026). Este equipo **nunca** debe quedar expuesto a internet: nada de redirigir puertos en el router ni publicarlo por VPN a terceros. El login de la app (D-104) es para la red interna, no para internet.
+
+## Antes de instalar: relevamiento del equipo
+
+`scripts\survey-server.ps1` junta en un archivo de texto lo que hace falta saber del equipo: Windows (y si es Server), CPU, RAM, discos, GPU (para Compresión), IP fija o DHCP, dominio, perfil de red, puertos ocupados, Node, .NET, antivirus, AppLocker, GPOs, proxy, salida a GitHub/gyan.dev/npm/YouTube, el SMTP de Ferozo y si llega al servidor viejo. **Solo lee**: no instala ni cambia nada, y no pide contraseñas.
+
+Es independiente del proyecto: se puede llevar solo ese archivo en un pendrive. En el equipo, en PowerShell (mejor como administrador, así ve GPOs y AppLocker):
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\survey-server.ps1
+```
+
+Deja `sti-relevamiento-<EQUIPO>-<fecha>.txt` en el Escritorio, con una lista de **avisos** al final (lo que hay que resolver antes de instalar) y unas preguntas para completar a mano. Opciones: `-OutFile <ruta>`, `-OldServer <ip>` (por defecto 192.168.3.115), `-SkipNetworkTests`.
 
 ## Qué hace falta
 
