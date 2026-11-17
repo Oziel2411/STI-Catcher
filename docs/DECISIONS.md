@@ -481,6 +481,25 @@ El soporte terminó en octubre de 2025 y las actualizaciones extendidas para usu
 
 ---
 
+### D-110 — El certificado de la red se instala desde la app · Vigente
+
+Sin dominio de Windows (sin GPO) ni consola de ESET PROTECT, instalar la CA en cada PC era manual: buscar el archivo en el servidor y pasar por el asistente de certificados.
+
+**Decidido con el usuario:** se baja desde la misma dirección de la app, sin ingresar.
+
+- **Página pública `/certificado`**, con un link desde la pantalla de ingreso («¿El navegador avisa que la conexión no es privada?»). La primera vez el navegador avisa: se entra por «Avanzado → Continuar», se baja el instalador y el aviso no vuelve.
+- **Instalador de un clic** (`instalar-certificado-sti.cmd`), con la CA adentro: pide permiso de administrador, la agrega a «Entidades de certificación raíz de confianza» del equipo (Chrome y Edge usan ese almacén) y, si hay Firefox, activa la política `ImportEnterpriseRoots`. Es un `.cmd` que se puede leer, no un `.exe`.
+- También se puede bajar el `.crt` solo, para instalarlo a mano.
+
+**Detalles técnicos:**
+
+- Rutas públicas (sin sesión, también con contraseña provisoria): `GET /api/ca` → `{ available }`, `GET /api/ca/sti-catcher-ca.crt` y `GET /api/ca/instalar-certificado-sti.cmd` (404 `NO_NETWORK_CA` si el servidor no la tiene).
+- La CA sale de `DATA_DIR\certs\sti-catcher-ca.crt` (la deja `new-certificate.ps1`) y se lee en cada pedido: si se regenera, no hay que reiniciar.
+- El `.cmd` es solo ASCII y CRLF, y cada línea del PEM se valida antes de ponerla en un `echo`: un carácter como `&` o `)` rompería el script.
+- La CA es pública: no es la clave (`rootCA-key.pem`), que nunca sale del perfil del administrador.
+
+**Verificado:** con tests de las rutas y del script, y corriendo el `.cmd` en modo prueba (sin `certutil -addstore`): el certificado que escribe es idéntico al original. Falta probar la instalación real en una PC cliente.
+
 ## Interfaz
 
 ### D-090 — Rediseño Nocturne por etapas · Etapa 1 · Vigente

@@ -64,6 +64,22 @@
   margin: 0;
 }
 
+/* Certificado de la red (D-110). */
+.login-link {
+  font-size: 0.8667rem;
+  color: var(--accent);
+  text-align: center;
+}
+
+.cert-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 0.9333rem;
+}
+
 /*
  * Cuenta arriba a la derecha (D-106): iniciales, nombre y los enlaces, apenas
  * más grandes que en la barra lateral de antes. En angosto, un menú.

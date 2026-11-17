@@ -34,6 +34,7 @@ import { registerJobRoutes } from './routes/jobs.ts';
 import { registerRecordingRoutes } from './routes/recordings.ts';
 import { registerMediaRoutes } from './routes/media.ts';
 import { registerMailRoutes } from './routes/mail.ts';
+import { registerNetworkCaRoutes } from './routes/network-ca.ts';
 import type { MailService } from './modules/notifications/mail-service.ts';
 import type { NoticeBatchService } from './modules/notifications/notice-batches.ts';
 
@@ -57,6 +58,8 @@ export type AppServices = {
   passwordReset: PasswordReset;
   /** Cuenta por id (para devolver la sesión actualizada en «Mi cuenta»). */
   getUser: (id: string) => UserRecord | null;
+  /** CA de la red en PEM (D-110), o null si el servidor no la tiene. */
+  networkCa: () => string | null;
 };
 
 export type BuildAppOptions = {
@@ -140,6 +143,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   registerUserRoutes(app, options.services.users, options.services.getUser);
 
   registerHealthRoutes(app, options.services.health);
+  registerNetworkCaRoutes(app, options.services.networkCa);
   registerJobRoutes(app, options.services.jobs);
   registerMediaRoutes(app, options.services.download, options.services.noticeBatches);
   registerFileRoutes(app, options.services.jobFiles);

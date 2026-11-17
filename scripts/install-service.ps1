@@ -12,7 +12,9 @@
      (retrasado) y reinicio si se cae.
   4. Permisos de esa cuenta: lectura en la app, BIN_DIR y Node; modificación
      solo en STORAGE_DIR, DATA_DIR y LOG_DIR; la clave del certificado la leen
-     solo esa cuenta, SYSTEM y Administradores.
+     solo esa cuenta, SYSTEM y Administradores. En las carpetas de arriba (p. ej.
+     D:\Aplicaciones) solo «leer y ejecutar» de esa carpeta, sin herencia: Node
+     revisa cada carpeta de la ruta al arrancar.
   5. Regla de entrada en el Firewall de Windows para el puerto (perfiles
      Dominio y Privado; con -RemoteAddress, solo desde esas direcciones).
   6. Inicia el servicio y prueba https://localhost:<PORT>/api/health.
@@ -87,6 +89,18 @@ function Invoke-Native([string]$File, [string[]]$Arguments) {
 function Grant-Access([string]$Path, [string]$Rights) {
   Invoke-Action "$ServiceAccount — $Rights en $Path" {
     Invoke-Native 'icacls.exe' @($Path, '/grant', "${ServiceAccount}:(OI)(CI)$Rights", '/Q') | Out-Null
+  }
+}
+
+# Node recorre cada carpeta de la ruta al arrancar (realpath): si la cuenta no puede
+# abrir una carpeta de arriba, falla con EPERM. «Leer y ejecutar» solo de esa carpeta,
+# sin herencia: ve los nombres de lo que hay al lado, no su contenido.
+function Get-Ancestors([string]$Path) {
+  # Sin la raíz del disco (D:\): ahí ya pueden listar todos.
+  $parent = Split-Path -Parent $Path
+  while ($parent -and (Split-Path -Parent $parent)) {
+    $parent
+    $parent = Split-Path -Parent $parent
   }
 }
 
@@ -245,6 +259,16 @@ Grant-Access $appDir 'RX'
 if (-not (Test-Inside $config.BinDir $appDir)) { Grant-Access $config.BinDir 'RX' }
 Grant-Access (Split-Path -Parent $nodePath) 'RX'
 foreach ($dir in @($config.StorageDir, $config.DataDir, $config.LogDir)) { Grant-Access $dir 'M' }
+$programFiles = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }
+$ownDirs = @($appDir, $config.BinDir, $config.StorageDir, $config.DataDir, $config.LogDir) |
+  Where-Object { $dir = $_; -not @($programFiles | Where-Object { Test-Inside $dir $_ }).Count } |
+  Sort-Object -Unique
+$ancestors = $ownDirs | ForEach-Object { Get-Ancestors $_ } | Sort-Object -Unique | Where-Object { $ownDirs -notcontains $_ }
+foreach ($dir in $ancestors) {
+  Invoke-Action "$ServiceAccount — RX solo en $dir (sin herencia)" {
+    Invoke-Native 'icacls.exe' @($dir, '/grant', "${ServiceAccount}:RX", '/Q') | Out-Null
+  }
+}
 if (-not (Test-Inside $config.EnvFile $appDir)) {
   Invoke-Action "$ServiceAccount — lectura de $($config.EnvFile)" {
     Invoke-Native 'icacls.exe' @($config.EnvFile, '/grant', "${ServiceAccount}:R", '/Q') | Out-Null

@@ -393,6 +393,14 @@ async function main(): Promise<void> {
       users: usersService,
       passwordReset,
       getUser: (id) => users.get(id),
+      // La deja new-certificate.ps1. Se lee en cada pedido: si se regenera, no hay que reiniciar.
+      networkCa: () => {
+        try {
+          return readFileSync(path.join(config.paths.data, 'certs', 'sti-catcher-ca.crt'), 'utf8');
+        } catch {
+          return null;
+        }
+      },
     },
     // En desarrollo la web la sirve Vite (otro puerto) y los POST llegan con su Origin.
     ...(config.nodeEnv === 'development'

@@ -81,6 +81,8 @@ export type TestAppOptions = {
   authNow?: () => Date;
   /** Dirección pública para el link de recuperación (null = desactivada). */
   publicUrl?: string | null;
+  /** CA de la red en PEM (por defecto el servidor no la tiene). */
+  networkCaPem?: string | null;
 };
 
 /** Contraseña de las cuentas que crea `loginAs`. */
@@ -342,6 +344,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       users: usersService,
       passwordReset,
       getUser: (id) => users.get(id),
+      networkCa: () => options.networkCaPem ?? null,
     },
     filesDir,
     webDistDir: options.webDistDir ?? null,

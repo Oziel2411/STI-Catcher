@@ -163,6 +163,7 @@ Cada PC que use STI-Catcher tiene que confiar en la CA del paso 5; si no, el nav
 
 El archivo a instalar es `C:\STI-Catcher\data\certs\sti-catcher-ca.crt`. Es el certificado **público** de la CA y se puede compartir: dejalo en una carpeta compartida.
 
+**Opción 0 — desde la app (sin dominio, la más simple).** En cada PC, abrí `https://<servidor>:<puerto>/certificado` (también hay un link en la pantalla de ingreso). Si el navegador avisa que la conexión no es privada, entrá por «Avanzado → Continuar». Bajá **el instalador**, abrilo y aceptá el permiso de administrador. Después cerrá el navegador y volvé a abrirlo (D-110).
 **Opción A — por GPO (dominio, recomendado).** En «Administración de directivas de grupo», editá una GPO que aplique a los equipos:
 
 1. Configuración del equipo → Directivas → Configuración de Windows → Configuración de seguridad → Directivas de clave pública → **Entidades de certificación raíz de confianza**.

@@ -213,6 +213,9 @@ export function LoginPage({ onLogin, notice }: Props) {
       {resetAvailable && (
         <p className="muted small login-help">¿No tenés cuenta? Pedísela a un administrador.</p>
       )}
+      <a className="login-link" href="/certificado">
+        ¿El navegador avisa que la conexión no es privada? Instalá el certificado
+      </a>
     </AuthCard>
   );
 }

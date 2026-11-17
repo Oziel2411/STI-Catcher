@@ -41,8 +41,8 @@ Respuestas del responsable de la app:
 | Puerto       | `PORT=3000`                                                                                       | 443 es de Apache; 3000 está libre y es el mismo de hoy.                                              |
 | Dirección    | **`https://192.168.3.78:3000`** (y `https://srv-sysccuomm:3000` si el nombre resuelve en las PCs) | Sin DNS interno, la IP es lo único seguro. **A confirmar.**                                          |
 | `PUBLIC_URL` | `https://192.168.3.78:3000`                                                                       | El link para recuperar la contraseña tiene que abrir en cualquier PC.                                |
-| Código       | `D:\STI-Catcher\app`                                                                              | Criterio de Juan Pablo: C: sistema y programas; D: apps propias, cada una en su carpeta; E: backups. |
-| Datos        | `D:\STI-Catcher\storage`, `D:\STI-Catcher\data`, `D:\STI-Catcher\logs`                            | Todo lo de la app junto en `D:\STI-Catcher`. Node.js queda en C: (es un programa).                   |
+| Código       | `D:\Aplicaciones\Catcher\app`                                                                     | Criterio de Juan Pablo: C: sistema y programas; D: apps propias, cada una en su carpeta; E: backups. |
+| Datos        | `D:\Aplicaciones\Catcher\storage`, `D:\Aplicaciones\Catcher\data`, `D:\Aplicaciones\Catcher\logs` | Todo lo de la app junto en `D:\Aplicaciones\Catcher`. Node.js queda en C: (es un programa).          |
 | Backups      | `E:\STI-Catcher` (lo administra Juan Pablo)                                                       | E: es el disco de backups.                                                                           |
 | Certificado  | CA nueva con mkcert; incluye `srv-sysccuomm`, 192.168.3.78, 192.168.5.191 y localhost             | `new-certificate.ps1` toma el nombre y todas las IPs solo.                                           |
 | Suspensión   | No hace falta `-DisableSleep`                                                                     | Ya está en «nunca».                                                                                  |
@@ -52,7 +52,7 @@ Respuestas del responsable de la app:
 
 ### A. Con Juan Pablo (o quien administre ESET)
 
-1. **Excepción en ESET** para `D:\STI-Catcher\app\bin\` (yt-dlp, ffmpeg, ffprobe, deno, mkcert) y `D:\STI-Catcher\app\service\` (WinSW). Son ejecutables descargados de internet y un antivirus puede ponerlos en cuarentena.
+1. **Excepción en ESET** para `D:\Aplicaciones\Catcher\app\bin\` (yt-dlp, ffmpeg, ffprobe, deno, mkcert) y `D:\Aplicaciones\Catcher\app\service\` (WinSW). Son ejecutables descargados de internet y un antivirus puede ponerlos en cuarentena.
 2. **Firewall de ESET:** permitir TCP **3000** de entrada desde **192.168.3.0/24**. La regla de Windows la crea `install-service.ps1`, pero si ESET filtra la entrada (como pasa con el 443 de Apache), no alcanza.
 3. **Windows Update:** que no reinicie solo (horas activas o pausar), porque el equipo no se puede reiniciar. El driver de video de 2020 también conviene actualizarlo, pero solo en una ventana con reinicio acordada con Carli: no es requisito.
 
@@ -66,27 +66,27 @@ El servidor no tiene git y la versión a instalar está solo en SISTEMAS2-PC (`m
    git archive --format=zip -o C:\temp\sti-catcher.zip main
    ```
 
-2. Copiá `sti-catcher.zip` a SRV-SYSCCUOMM (pendrive o carpeta compartida) y descomprimilo en `D:\STI-Catcher\app`. Tienen que quedar `D:\STI-Catcher\app\package.json`, `scripts\`, `apps\`, etc. (no una subcarpeta más).
+2. Copiá `sti-catcher.zip` a SRV-SYSCCUOMM (pendrive o carpeta compartida) y descomprimilo en `D:\Aplicaciones\Catcher\app`. Tienen que quedar `D:\Aplicaciones\Catcher\app\package.json`, `scripts\`, `apps\`, etc. (no una subcarpeta más).
 3. En SRV-SYSCCUOMM, PowerShell como administrador:
 
    ```powershell
-   Get-ChildItem -Recurse D:\STI-Catcher\app | Unblock-File
+   Get-ChildItem -Recurse D:\Aplicaciones\Catcher\app | Unblock-File
    ```
 
 ### C. Instalar (pasos 2 a 6 de DEPLOY.md)
 
-Todo en PowerShell **como administrador**, en `D:\STI-Catcher\app`, después de `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
+Todo en PowerShell **como administrador**, en `D:\Aplicaciones\Catcher\app`, después de `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
 
 1. `.\scripts\setup.ps1`: crea el `.env` y descarga los binarios. Node 26.13 ya está.
-2. Editá `D:\STI-Catcher\app\.env` con el Bloc de notas:
+2. Editá `D:\Aplicaciones\Catcher\app\.env` con el Bloc de notas:
 
    ```ini
    NODE_ENV=production
    HOST=0.0.0.0
    PORT=3000
-   STORAGE_DIR=D:\STI-Catcher\storage
-   DATA_DIR=D:\STI-Catcher\data
-   LOG_DIR=D:\STI-Catcher\logs
+   STORAGE_DIR=D:\Aplicaciones\Catcher\storage
+   DATA_DIR=D:\Aplicaciones\Catcher\data
+   LOG_DIR=D:\Aplicaciones\Catcher\logs
    PUBLIC_URL=https://192.168.3.78:3000
    ```
 
@@ -119,8 +119,8 @@ Hasta el día del corte, la base de SRV-SYSCCUOMM está vacía: para probar, cre
    Tiene que dar `TcpTestSucceeded : True`. Si da `False`, falta el permiso en el firewall de ESET (paso A.2).
 
 3. En esa PC, `ping srv-sysccuomm`: si responde, también se puede entrar por nombre.
-4. Instalá la CA nueva en esa PC (`D:\STI-Catcher\data\certs\sti-catcher-ca.crt`, opción B o C del paso 8 de DEPLOY.md: no hay dominio, así que no hay GPO) y probá descargar, convertir, comprimir y grabar.
-5. **Compresión:** revisá en el log de la app (`D:\STI-Catcher\logs\app.*.log`) qué encoder eligió al arrancar. En SISTEMAS2-PC, Quick Sync anda desde el escritorio pero no estaba probado bajo el servicio.
+4. Instalá la CA nueva en esa PC desde `https://192.168.3.78:3000/certificado` (instalador de un clic, D-110; no hay dominio ni consola de ESET PROTECT) y probá descargar, convertir, comprimir y grabar.
+5. **Compresión:** revisá en el log de la app (`D:\Aplicaciones\Catcher\logs\app.*.log`) qué encoder eligió al arrancar. En SISTEMAS2-PC, Quick Sync anda desde el escritorio pero no estaba probado bajo el servicio.
 
 ## El día del corte
 
@@ -128,15 +128,23 @@ Corte de unos minutos. Avisá antes a los compañeros.
 
 1. **En SRV-SYSCCUOMM:** `Stop-Service sti-catcher`.
 2. **En SISTEMAS2-PC:** `Stop-Service sti-catcher`. Desde acá nadie usa la app hasta el paso 6.
-3. Copiá de SISTEMAS2-PC a `D:\STI-Catcher\data\` de SRV-SYSCCUOMM: `sti-catcher.db` (y `sti-catcher.db-wal` / `sti-catcher.db-shm` si están). **No** copies `certs\`, `sti-catcher.pid` ni `storage\`.
-4. **Dejar solo las cuentas:** en `D:\STI-Catcher\app`, `npm run db:keep-accounts`. Muestra cuántas cuentas quedan y cuántos trabajos, grabaciones, avisos y sesiones se borran; escribí `BORRAR` para seguir. Con el servicio andando no hace nada. La base original sigue en SISTEMAS2-PC.
+3. Copiá de SISTEMAS2-PC a `D:\Aplicaciones\Catcher\data\` de SRV-SYSCCUOMM: `sti-catcher.db` (y `sti-catcher.db-wal` / `sti-catcher.db-shm` si están). **No** copies `certs\`, `sti-catcher.pid` ni `storage\`.
+4. **Dejar solo las cuentas:** en `D:\Aplicaciones\Catcher\app`, `npm run db:keep-accounts`. Muestra cuántas cuentas quedan y cuántos trabajos, grabaciones, avisos y sesiones se borran; escribí `BORRAR` para seguir. Con el servicio andando no hace nada. La base original sigue en SISTEMAS2-PC.
 5. **En SRV-SYSCCUOMM:** `Start-Service sti-catcher`. Entrá con tu cuenta de siempre y revisá **Usuarios**. **Estado → Mandar mail de prueba.**
-6. Avisá la dirección nueva: `https://192.168.3.78:3000`. Cada PC tiene que instalar la CA nueva antes de entrar (si no, ve «La conexión no es privada» y no puede grabar).
+6. Avisá la dirección nueva: `https://192.168.3.78:3000`. Cada PC instala la CA nueva desde `https://192.168.3.78:3000/certificado` (la primera vez, «Avanzado → Continuar»); sin ella ve «La conexión no es privada» y no puede grabar.
 7. **SISTEMAS2-PC:** dejalo detenido unos días por si hay que volver atrás (`Start-Service sti-catcher` ahí). Cuando esté todo bien: `.\scripts\uninstall-service.ps1`.
+
+## Cómo quedó (17/11/2026)
+
+- Instalado en `D:\Aplicaciones\Catcher` (`app`, `data`, `storage`, `logs`), la carpeta que usa Juan Pablo para las apps propias. ESET: exclusión de `D:\Aplicaciones\Catcher\*` y regla «STI-Catcher - Puerto 3000» (TCP, entrante).
+- `D:\Aplicaciones` se comparte en la red (`\\SRV-SYSCCUOMM\Aplicaciones`, la cuenta local «Aplicaciones» con control total). A `Catcher` se le cortó la herencia y se le quitó esa cuenta: quedan SYSTEM, Administradores y Soporte (el `.env` tiene la contraseña del mail).
+- El servicio no arrancaba: Node recorre las carpetas de la ruta y `NT SERVICE\sti-catcher` no podía abrir `D:\Aplicaciones` (EPERM). Se le dio «leer y ejecutar» solo en esa carpeta, sin herencia. `install-service.ps1` ya lo hace solo.
+- La CA quedó en el perfil de **Soporte** (`C:\Users\Soporte\AppData\Local\mkcert`).
+- Migradas las cuentas (sin historial). El servicio de SISTEMAS2-PC quedó detenido.
 
 ## Después
 
-- **Backups** (Juan Pablo): `D:\STI-Catcher\data` (base y certificados) y `D:\STI-Catcher\app\.env`, a `E:\STI-Catcher`. Copiar la base con el servicio andando puede dejar una copia inconsistente: detenerlo un momento, o esperar la propuesta de backup automático.
+- **Backups** (Juan Pablo): `D:\Aplicaciones\Catcher\data` (base y certificados) y `D:\Aplicaciones\Catcher\app\.env`, a `E:\STI-Catcher`. Copiar la base con el servicio andando puede dejar una copia inconsistente: detenerlo un momento, o esperar la propuesta de backup automático.
 - **Actualizar la app:** nuevo ZIP como en el paso B, descomprimido encima **sin pisar `.env`**, `npm ci`, `npm run build`, `Restart-Service sti-catcher`.
 - **Cambio de IP:** `new-certificate.ps1 -Force` e `install-service.ps1` (DEPLOY.md, Mantenimiento).
 

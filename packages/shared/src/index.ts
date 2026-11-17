@@ -8,6 +8,7 @@ export * from './schemas/error.ts';
 export * from './schemas/health.ts';
 export * from './schemas/history.ts';
 export * from './schemas/jobs.ts';
+export * from './schemas/network-ca.ts';
 export * from './schemas/mail.ts';
 export * from './schemas/media.ts';
 export * from './schemas/recording.ts';

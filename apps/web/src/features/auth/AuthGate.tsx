@@ -5,6 +5,7 @@ import { useLocation } from 'react-router';
 import { fetchCurrentUser, logout as logoutRequest } from '../../api/auth.ts';
 import { SESSION_EXPIRED_EVENT } from '../../api/client.ts';
 import { startBackgroundClock } from '../recording/background-clock.ts';
+import { CertificatePage } from './CertificatePage.tsx';
 import { ForcedPasswordChange } from './ForcedPasswordChange.tsx';
 import { LoginPage } from './LoginPage.tsx';
 import { ResetPasswordPage } from './ResetPasswordPage.tsx';
@@ -111,6 +112,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   // El link del mail para elegir una contraseña nueva: sirve con o sin sesión.
   if (pathname === '/restablecer') return <ResetPasswordPage />;
+  // Certificado de la red (D-110): se baja antes de poder ingresar sin el aviso del navegador.
+  if (pathname === '/certificado') return <CertificatePage />;
   if (state.status === 'loading') return null;
   if (state.status === 'error') {
     return (

@@ -1,3 +1,4 @@
+import { NETWORK_CA_CERT_PATH, NETWORK_CA_INSTALLER_PATH } from '@sti-catcher/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { UserRecord } from '../db/users-repository.ts';
 import type { AuthService } from '../modules/auth/auth-service.ts';
@@ -22,6 +23,10 @@ const PUBLIC_API = new Set([
   '/api/auth/forgot',
   '/api/auth/reset',
   '/api/health',
+  // Certificado de la red (D-110): hace falta antes de ingresar.
+  '/api/ca',
+  NETWORK_CA_CERT_PATH,
+  NETWORK_CA_INSTALLER_PATH,
 ]);
 /**
  * Con una contraseña provisoria solo se puede cambiarla (D-104): el resto de
@@ -36,6 +41,10 @@ const ALLOWED_WITH_PROVISIONAL_PASSWORD = new Set([
   '/api/auth/forgot',
   '/api/auth/reset',
   '/api/health',
+  // Certificado de la red (D-110): hace falta antes de ingresar.
+  '/api/ca',
+  NETWORK_CA_CERT_PATH,
+  NETWORK_CA_INSTALLER_PATH,
 ]);
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
