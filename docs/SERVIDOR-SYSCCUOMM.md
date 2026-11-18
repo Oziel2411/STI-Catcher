@@ -145,7 +145,21 @@ Corte de unos minutos. Avisá antes a los compañeros.
 ## Después
 
 - **Backups** (Juan Pablo): `D:\Aplicaciones\Catcher\data` (base y certificados) y `D:\Aplicaciones\Catcher\app\.env`, a `E:\STI-Catcher`. Copiar la base con el servicio andando puede dejar una copia inconsistente: detenerlo un momento, o esperar la propuesta de backup automático.
-- **Actualizar la app:** nuevo ZIP como en el paso B, descomprimido encima **sin pisar `.env`**, `npm ci`, `npm run build`, `Restart-Service sti-catcher`.
+- **Actualizar la app** (PowerShell como administrador):
+
+  ```powershell
+  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+  Stop-Service sti-catcher
+  Expand-Archive -Path C:\temp\sti-catcher.zip -DestinationPath D:\Aplicaciones\Catcher\app -Force
+  cd D:\Aplicaciones\Catcher\app
+  Get-ChildItem -Recurse . | Unblock-File
+  npm ci
+  npm run build
+  Start-Service sti-catcher
+  ```
+
+  El ZIP no trae `.env`, `bin`, `service` ni `node_modules`: no se pisan. **Detener antes de `npm ci`**: con el servicio andando, `npm ci` falla con EPERM y deja las librerías a medias (pasó el 18/11).
+
 - **Cambio de IP:** `new-certificate.ps1 -Force` e `install-service.ps1` (DEPLOY.md, Mantenimiento).
 
 ## Riesgos y pendientes
