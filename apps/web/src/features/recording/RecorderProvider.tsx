@@ -22,8 +22,9 @@ import {
 } from '../../lib/recording-schedule.ts';
 import type { RecordingSchedule } from '../../lib/recording-schedule.ts';
 import {
-  defaultRecordingTitle,
   displayMediaOptions,
+  hasRecordingTitle,
+  MISSING_TITLE_MESSAGE,
   pickMimeType,
   sourceKindFromSurface,
 } from '../../lib/recording.ts';
@@ -280,6 +281,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     const { fps, systemAudio, microphone, title, schedule } = settings;
     // Al empezar a mano solo importa el corte (el inicio programado ya pasó o no hay).
     const problems = scheduleProblems({ ...schedule, startMode: 'now' }, new Date());
+    if (!hasRecordingTitle(title)) problems.unshift(MISSING_TITLE_MESSAGE);
     if (problems.length > 0) {
       setPhase({ kind: 'previewing', preview });
       setError(problems.join(' '));
@@ -325,7 +327,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       const { recordingId } = await createRecording({
         mimeType,
         fps,
-        title: title.trim() || defaultRecordingTitle(new Date()),
+        title: title.trim(),
         notify: notifyRef.current,
         // Programada (D-109): avisa también al empezar.
         programmed: programmedStart || schedule.stopMode !== 'manual',
@@ -385,6 +387,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     if (current.kind !== 'previewing') return;
     const now = new Date();
     const problems = scheduleProblems(settings.schedule, now);
+    if (!hasRecordingTitle(settings.title)) problems.unshift(MISSING_TITLE_MESSAGE);
     const startAt = plannedStart(settings.schedule, now);
     if (problems.length > 0 || startAt === null) {
       setError(problems.join(' ') || 'Indicá a qué hora empieza.');
@@ -401,7 +404,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       ready: createRecordingSchedule({
         startAt: new Date(startAt).toISOString(),
         stopAt: stopAt === null ? null : new Date(stopAt).toISOString(),
-        title: settings.title.trim() || defaultRecordingTitle(new Date(startAt)),
+        title: settings.title.trim(),
         notify: notifyRef.current,
       })
         .then(({ scheduleId }) => {

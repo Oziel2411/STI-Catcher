@@ -18,8 +18,8 @@ import { PageTitle } from '../../components/PageTitle.tsx';
 import { useTrackedJob } from '../../hooks/useTrackedJob.ts';
 import { formatBytes, formatDuration } from '../../lib/format.ts';
 import {
-  defaultRecordingTitle,
   describeSource,
+  hasRecordingTitle,
   recordingSupport,
   SOURCE_KINDS,
 } from '../../lib/recording.ts';
@@ -113,6 +113,7 @@ function Recorder() {
   useEffect(() => attachPage(), [attachPage]);
 
   const preview = previewOf(phase);
+  const missingTitle = !hasRecordingTitle(title);
   const trackedId = phase.kind === 'tracking' ? phase.jobId : null;
   const { job, connected } = useTrackedJob(trackedId);
   const recording = phase.kind === 'recording';
@@ -265,11 +266,13 @@ function Recorder() {
 
         <div className="card recorder-options">
           <label className="field">
-            <span>Título (opcional)</span>
+            <span>Título</span>
             <input
               type="text"
               maxLength={200}
-              placeholder={defaultRecordingTitle(new Date())}
+              required
+              aria-invalid={missingTitle && !locked}
+              placeholder="Ej.: Reunión de equipo del lunes"
               value={title}
               disabled={locked}
               onChange={(e) => {
@@ -355,6 +358,12 @@ function Recorder() {
               {schedule.startMode === 'at' ? 'programar' : 'empezar'} la grabación.
             </div>
           )}
+          {missingTitle && !locked && (
+            <div className="alert alert-warn" role="status">
+              Falta el título: escribí un nombre para{' '}
+              {schedule.startMode === 'at' ? 'programar' : 'empezar'} la grabación.
+            </div>
+          )}
 
           {recording ? (
             <button
@@ -388,7 +397,7 @@ function Recorder() {
             <button
               type="button"
               className="button button-block"
-              disabled={phase.kind !== 'previewing' || micMissing}
+              disabled={phase.kind !== 'previewing' || micMissing || missingTitle}
               onClick={recorder.scheduleStart}
             >
               <TimerIcon size={14} aria-hidden="true" />
@@ -398,7 +407,7 @@ function Recorder() {
             <button
               type="button"
               className="button button-block"
-              disabled={phase.kind !== 'previewing' || micMissing}
+              disabled={phase.kind !== 'previewing' || micMissing || missingTitle}
               onClick={() => void recorder.startRecording()}
             >
               <span className="rec-dot" aria-hidden="true" />
