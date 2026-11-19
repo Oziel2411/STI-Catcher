@@ -41,7 +41,12 @@ export type HistoryActions = {
   openOriginal: boolean;
   retry: boolean;
   cancel: boolean;
+  /** Borrar el trabajo y el archivo; también decide si la fila se puede elegir (D-111). */
   remove: boolean;
+  /** Borrar solo el archivo: la fila queda como «archivo borrado» (D-111). */
+  removeFile: boolean;
+  /** Cambiar el título (D-111). */
+  rename: boolean;
 };
 
 /** Qué se puede hacer con un trabajo del historial. */
@@ -59,7 +64,45 @@ export function historyActions(item: HistoryItem): HistoryActions {
       (item.type === 'download' || item.type === 'conversion' || item.type === 'compression'),
     cancel: active && item.isMine,
     remove: !active && item.isMine,
+    removeFile: hasFile && item.isMine,
+    rename: !active && item.isMine,
   };
+}
+
+/** Lo elegido para borrar de a varios: cuántos, cuántos tienen archivo y cuánto ocupan. */
+export type SelectionSummary = {
+  ids: string[];
+  withFile: string[];
+  bytes: number;
+};
+
+export function selectionSummary(
+  items: readonly HistoryItem[],
+  selected: ReadonlySet<string>,
+): SelectionSummary {
+  const chosen = items.filter((item) => selected.has(item.id) && historyActions(item).remove);
+  const withFile = chosen.filter((item) => historyActions(item).removeFile);
+  return {
+    ids: chosen.map((item) => item.id),
+    withFile: withFile.map((item) => item.id),
+    bytes: withFile.reduce((total, item) => total + (item.sizeBytes ?? 0), 0),
+  };
+}
+
+/**
+ * Deja en la selección solo las filas que siguen en la lista y se pueden
+ * borrar (al cambiar de página, al borrarse, al empezar de nuevo). Devuelve el
+ * mismo Set si no cambió nada, para no volver a dibujar.
+ */
+export function pruneSelection(
+  selected: ReadonlySet<string>,
+  items: readonly HistoryItem[],
+): ReadonlySet<string> {
+  if (selected.size === 0) return selected;
+  const valid = new Set(
+    items.filter((item) => selected.has(item.id) && historyActions(item).remove).map((i) => i.id),
+  );
+  return valid.size === selected.size ? selected : valid;
 }
 
 /**

@@ -93,6 +93,42 @@ export const historyRequestersResponseSchema = z.object({
 });
 export type HistoryRequestersResponse = z.infer<typeof historyRequestersResponseSchema>;
 
+/** Cambiar el título de un trabajo propio (D-111). */
+export const renameJobBodySchema = z.object({
+  title: z
+    .string({ error: 'Poné un título.' })
+    .trim()
+    .min(1, { error: 'Poné un título.' })
+    .max(200, { error: 'El título es demasiado largo (hasta 200 caracteres).' }),
+});
+export type RenameJobBody = z.infer<typeof renameJobBodySchema>;
+
+/** Tope de trabajos por pedido de borrado: una página del historial. */
+export const HISTORY_BULK_MAX = 100;
+
+/**
+ * Borrar varios trabajos propios de una vez (D-111). `file` borra solo el
+ * archivo (la fila queda como «archivo borrado»); `job`, la fila y el archivo.
+ */
+export const historyBulkDeleteBodySchema = z.object({
+  ids: z
+    .array(z.uuid({ error: 'Id de trabajo inválido.' }))
+    .min(1, { error: 'No elegiste ningún trabajo.' })
+    .max(HISTORY_BULK_MAX, {
+      error: `Se pueden borrar hasta ${String(HISTORY_BULK_MAX)} a la vez.`,
+    }),
+  what: z.enum(['file', 'job']),
+});
+export type HistoryBulkDeleteBody = z.infer<typeof historyBulkDeleteBodySchema>;
+
+export const historyBulkDeleteResponseSchema = z.object({
+  /** Los que se borraron. */
+  done: z.array(z.string()),
+  /** Los que no, con el motivo para el usuario. */
+  failed: z.array(z.object({ id: z.string(), message: z.string() })),
+});
+export type HistoryBulkDeleteResponse = z.infer<typeof historyBulkDeleteResponseSchema>;
+
 export const fileQuerySchema = z.object({
   /** `inline=1`: para reproducir en el navegador; sin él, se descarga como archivo. */
   inline: z
