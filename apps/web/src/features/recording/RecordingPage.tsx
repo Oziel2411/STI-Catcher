@@ -191,6 +191,15 @@ function Recorder() {
             onChoose={() => void recorder.chooseSource()}
           />
 
+          {preview && sourceKind === 'window' && (
+            <div className="alert alert-info" role="note">
+              No minimices la ventana que se graba: Windows deja de dibujarla y la grabación sale en
+              negro mientras esté minimizada. Para seguir usando la PC, dejala abierta detrás de
+              otras ventanas: tapada se graba igual. Si es una página web, elegí «Pestaña»: esa se
+              graba aunque el navegador esté minimizado.
+            </div>
+          )}
+
           {phase.kind === 'recording' && (
             <div className="recording-status" aria-live="polite">
               <span className="recording-dot" aria-hidden="true" />
