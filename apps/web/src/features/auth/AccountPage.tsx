@@ -67,7 +67,7 @@ export function AccountPage() {
               />
             </label>
             <button
-              className="button"
+              className="button button-secondary"
               type="submit"
               disabled={savingName || name.trim() === '' || name.trim() === user.name}
             >

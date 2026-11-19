@@ -108,7 +108,7 @@ export function SelfTestCard({ onJobUpdated }: { onJobUpdated: () => void }) {
             Cancelar
           </button>
         ) : (
-          <button type="button" className="button" onClick={start} disabled={busy}>
+          <button type="button" className="button button-secondary" onClick={start} disabled={busy}>
             Iniciar prueba
           </button>
         )}

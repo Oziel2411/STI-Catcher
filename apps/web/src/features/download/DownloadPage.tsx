@@ -176,7 +176,12 @@ export function DownloadPage() {
             }}
           />
         </label>
-        <button type="submit" className="button" disabled={pending === 0}>
+        {/* Con links listos, el principal pasa a ser «Descargar N listos» (D-112). */}
+        <button
+          type="submit"
+          className={targets > 0 ? 'button button-secondary' : 'button'}
+          disabled={pending === 0}
+        >
           <MagnifyingGlassIcon size={14} aria-hidden="true" />
           {pending === 0
             ? 'Analizar'
