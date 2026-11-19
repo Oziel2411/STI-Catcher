@@ -93,7 +93,7 @@ export const historyRequestersResponseSchema = z.object({
 });
 export type HistoryRequestersResponse = z.infer<typeof historyRequestersResponseSchema>;
 
-/** Cambiar el título de un trabajo propio (D-111). */
+/** Cambiar el título de un trabajo propio (D-113). */
 export const renameJobBodySchema = z.object({
   title: z
     .string({ error: 'Poné un título.' })
@@ -107,7 +107,7 @@ export type RenameJobBody = z.infer<typeof renameJobBodySchema>;
 export const HISTORY_BULK_MAX = 100;
 
 /**
- * Borrar varios trabajos propios de una vez (D-111). `file` borra solo el
+ * Borrar varios trabajos propios de una vez (D-113). `file` borra solo el
  * archivo (la fila queda como «archivo borrado»); `job`, la fila y el archivo.
  */
 export const historyBulkDeleteBodySchema = z.object({

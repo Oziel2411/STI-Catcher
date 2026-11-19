@@ -112,7 +112,7 @@ describe('historyActions', () => {
   });
 });
 
-describe('selección para borrar de a varios (D-111)', () => {
+describe('selección para borrar de a varios (D-113)', () => {
   const expired = {
     ...item,
     id: '00000000-0000-4000-8000-0000000000e1',

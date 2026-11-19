@@ -40,7 +40,7 @@ export function registerHistoryRoutes(app: FastifyInstance, history: HistoryServ
     return reply.status(204).send();
   });
 
-  // Solo el archivo, para liberar disco: el trabajo queda como expirado (D-111).
+  // Solo el archivo, para liberar disco: el trabajo queda como expirado (D-113).
   app.delete('/api/jobs/:id/file', async (request) => {
     const { id } = parseInput(jobIdParamsSchema, request.params);
     try {
@@ -50,7 +50,7 @@ export function registerHistoryRoutes(app: FastifyInstance, history: HistoryServ
     }
   });
 
-  // Varios a la vez (selección múltiple del historial, D-111).
+  // Varios a la vez (selección múltiple del historial, D-113).
   app.post('/api/history/delete', async (request) => {
     const { ids, what } = parseInput(historyBulkDeleteBodySchema, request.body);
     return history.removeMany(ids, what, requesterOf(request));

@@ -291,7 +291,7 @@ La migración 2 completa los registros que ya existían. Para eso, las migracion
 
 Al listar el historial (una página: hasta 20 `stat`) y al pedir un archivo, si un job `done` ya no tiene su archivo, pasa a `expired` y se publica por SSE. Así un borrado manual o la retención (Fase 7, que también lo marca directamente) nunca dejan un link roto. Es la única transición desde un estado final.
 
-### D-062 — Borrar: solo lo propio, registro y archivo · Fase 4 · Vigente (con D-100: propio = de la misma cuenta; con D-111: solo el archivo, de a varios)
+### D-062 — Borrar: solo lo propio, registro y archivo · Fase 4 · Vigente (con D-100: propio = de la misma cuenta; con D-113: solo el archivo, de a varios)
 
 - Solo el navegador que lo creó (cookie), si no **403**. No es seguridad, es prevención de accidentes (SPEC §8).
 - Un trabajo en curso no se borra (**409**): primero hay que cancelarlo.
@@ -309,7 +309,7 @@ Un trabajo `failed` o `cancelled` se reintenta con los mismos parámetros, como 
 - Filtro, búsqueda y página viven en la URL (`?scope=all&q=…&page=2`).
 - El selftest no aparece en el historial (D-030).
 
-### D-111 — Borrar solo el archivo, de a varios, y cambiar el título · Vigente
+### D-113 — Borrar solo el archivo, de a varios, y cambiar el título · Vigente
 
 Borrar un trabajo (D-062) ya liberaba el disco, pero también se llevaba la fila: no quedaba registro de qué se había descargado o grabado. Además había que borrar los trabajos de a uno.
 

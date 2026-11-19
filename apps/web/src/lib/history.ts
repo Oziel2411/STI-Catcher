@@ -41,11 +41,11 @@ export type HistoryActions = {
   openOriginal: boolean;
   retry: boolean;
   cancel: boolean;
-  /** Borrar el trabajo y el archivo; también decide si la fila se puede elegir (D-111). */
+  /** Borrar el trabajo y el archivo; también decide si la fila se puede elegir (D-113). */
   remove: boolean;
-  /** Borrar solo el archivo: la fila queda como «archivo borrado» (D-111). */
+  /** Borrar solo el archivo: la fila queda como «archivo borrado» (D-113). */
   removeFile: boolean;
-  /** Cambiar el título (D-111). */
+  /** Cambiar el título (D-113). */
   rename: boolean;
 };
 

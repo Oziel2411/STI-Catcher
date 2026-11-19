@@ -85,15 +85,15 @@ export type HistoryService = {
   requesters: () => HistoryRequestersResponse;
   /** Borra el trabajo y su archivo. */
   remove: (id: string, requester: Requester) => Promise<void>;
-  /** Borra solo el archivo: el trabajo queda como `expired` (D-111). */
+  /** Borra solo el archivo: el trabajo queda como `expired` (D-113). */
   removeFile: (id: string, requester: Requester) => Promise<Job>;
-  /** Varios de una vez; los que no se pueden quedan en `failed` con el motivo (D-111). */
+  /** Varios de una vez; los que no se pueden quedan en `failed` con el motivo (D-113). */
   removeMany: (
     ids: readonly string[],
     what: 'file' | 'job',
     requester: Requester,
   ) => Promise<HistoryBulkDeleteResponse>;
-  /** Cambia el título de un trabajo propio que no está en curso (D-111). */
+  /** Cambia el título de un trabajo propio que no está en curso (D-113). */
   rename: (id: string, title: string, requester: Requester) => Job;
   retry: (id: string, requester: Requester) => Promise<Job>;
   /** Contadores de la barra lateral: lo que este navegador tiene en cola o en curso. */

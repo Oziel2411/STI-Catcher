@@ -89,7 +89,7 @@ export function HistoryPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
-  // Selección para borrar de a varios y fila con el título en edición (D-111).
+  // Selección para borrar de a varios y fila con el título en edición (D-113).
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -937,7 +937,7 @@ function HistoryRow({
   );
 }
 
-/** Título editable en la fila: Enter guarda, Escape cancela (D-111). */
+/** Título editable en la fila: Enter guarda, Escape cancela (D-113). */
 function TitleEditor({
   initial,
   onSave,
