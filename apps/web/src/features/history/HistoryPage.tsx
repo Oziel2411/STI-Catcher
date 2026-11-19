@@ -264,8 +264,25 @@ export function HistoryPage() {
     setActionError(null);
     setBulkBusy(true);
     apiPost('/api/history/delete', historyBulkDeleteResponseSchema, { ids, what })
-      .then(({ failed }) => {
-        // Los borrados llegan por SSE; lo que no se pudo queda elegido, con el motivo.
+      .then(({ done, failed }) => {
+        // Las filas borradas se sacan acá: cada borrado cambia la lista y vuelve a
+        // abrir el stream de eventos, y un `job.deleted` que llega en ese momento
+        // se pierde (al reconectar, el server no tiene nada que mandar de esa fila).
+        // Los archivos borrados sí llegan bien: al reconectar se manda el estado actual.
+        if (what === 'job') {
+          const gone = new Set(done);
+          setState((current) => {
+            if (current.kind !== 'ready') return current;
+            const nextItems = current.data.items.filter((item) => !gone.has(item.id));
+            const removed = current.data.items.length - nextItems.length;
+            if (removed === 0) return current;
+            return {
+              kind: 'ready',
+              data: { ...current.data, items: nextItems, total: current.data.total - removed },
+            };
+          });
+        }
+        // Lo que no se pudo queda elegido, con el motivo.
         setSelected(new Set(failed.map((entry) => entry.id)));
         if (failed.length > 0) {
           const reasons = [...new Set(failed.map((entry) => entry.message))].join(' ');
@@ -933,6 +950,8 @@ function TitleEditor({
   const [value, setValue] = useState(initial);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    // El menú «…» devuelve el foco a su botón al elegir: el editor lo toma después.
+    inputRef.current?.focus();
     inputRef.current?.select();
   }, []);
   const trimmed = value.trim();

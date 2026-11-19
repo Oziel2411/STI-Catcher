@@ -263,6 +263,33 @@ describe('borrar un archivo que usa otro trabajo (D-111)', () => {
     expect(existsSync(path.join(testApp.filesDir, `${jobId}.mp4`))).toBe(true);
     expect(testApp.repo.get(jobId)?.status).toBe('done');
   });
+
+  it('con la conversión encadenada ya terminada: se borra el origen y la conversión queda intacta', async () => {
+    const testApp = await app();
+    const download = createJob(testApp, 'Descarga', testApp.ana.user.id);
+    forceDone(testApp, download);
+    const conversion = createChild(testApp, download);
+    forceDone(testApp, conversion);
+    expect(testApp.repo.setFollowUp(download, conversion)).toBe(true);
+    const { existsSync } = await import('node:fs');
+
+    const fileOnly = await testApp.app.inject({
+      method: 'DELETE',
+      url: `/api/jobs/${download}/file`,
+      headers: testApp.ana.headers,
+    });
+    expect(fileOnly.statusCode).toBe(200);
+    expect(testApp.repo.get(download)?.followUpJobId).toBe(conversion);
+
+    const row = await testApp.app.inject({
+      method: 'DELETE',
+      url: `/api/jobs/${download}`,
+      headers: testApp.ana.headers,
+    });
+    expect(row.statusCode).toBe(204);
+    expect(testApp.repo.get(conversion)).toMatchObject({ status: 'done', parentJobId: null });
+    expect(existsSync(path.join(testApp.filesDir, `${conversion}.mp4`))).toBe(true);
+  });
 });
 
 describe('DELETE /api/jobs/:id/file', () => {
