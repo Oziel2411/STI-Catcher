@@ -500,6 +500,30 @@ Sin dominio de Windows (sin GPO) ni consola de ESET PROTECT, instalar la CA en c
 
 **Verificado:** con tests de las rutas y del script, y corriendo el `.cmd` en modo prueba (sin `certutil -addstore`): el certificado que escribe es idéntico al original. Falta probar la instalación real en una PC cliente.
 
+### D-112 — Recortar y dividir videos · Vigente
+
+Lo que más se hace con una grabación es sacar el principio y el final, sacar un tramo del medio o partirla en varias. Nada de edición compleja (sin transiciones, textos ni varias pistas).
+
+**Decidido con el usuario:**
+
+- **Cortes sobre una línea de tiempo.** Debajo del `<video>` se marcan cortes; cada corte separa tramos y cada tramo **queda o se saca**. Con eso salen los tres casos: dos cortes y se sacan las puntas; dos cortes y se saca el del medio; cortes y «un video por tramo».
+- **Teclas:** espacio reproduce, ← → 1 s (Shift: 10 s), `,` `.` un cuadro (con los cuadros por segundo de ffprobe; 30 si no se saben), `C` corta, `I` / `O` marcan inicio y fin (sacan lo de antes o lo de después), `Supr` saca el corte más cercano. Los cortes se arrastran.
+- **Resultado:** «Un solo video» (los tramos que quedan, unidos) o «Un video por tramo». Siempre trabajos nuevos de tipo `edit`, vinculados al original por `parent_job_id`: el original no se toca.
+- **Dividir = un trabajo por tramo** («Título (parte 2 de 3)»): `JobResult` deja un solo archivo, y así cada parte se baja, se convierte o se borra como cualquier otro trabajo. Con aviso por mail, el server abre su propio pedido (D-105) y llega **un solo mail** cuando terminan todas.
+- **Dónde:** en la grabación terminada («Recortar o dividir» abre el editor en el mismo lugar) y para cualquier video del historial (menú «…» → `/editar?origen=<id>`, una página fuera de la barra de secciones).
+- **Precisión: exacta por defecto.** Con `-c copy` el corte solo puede caer en un cuadro clave, y las grabaciones se codifican con el GOP por defecto de libx264 (un cuadro clave cada 250, ~8 s a 30 cuadros): el corte se correría varios segundos. La exacta recodifica (libx264 `veryfast` CRF 18, AAC 160k, siempre MP4) y corta en el cuadro marcado. La **rápida** copia, con la aclaración de que cada tramo arranca en el cuadro clave anterior; sirve para videos largos donde unos segundos de más no importan.
+
+**Detalles técnicos:**
+
+- `buildEditArgs` (pura): exacta con un tramo, `-ss`/`-t` antes de `-i`; con varios, el archivo abierto una vez por tramo (cada uno con su `-ss`/`-t`, así no se decodifica lo que se saca) y el filtro `concat`. Rápida con varios, demuxer concat con `inpoint`/`outpoint` (la lista va a `tmp\<jobId>-list.txt`). Ancho y alto pares y audio opcional, como la grabación.
+- Esquemas en `shared/schemas/edit.ts`: hasta 20 tramos, en orden y sin pisarse, de al menos medio segundo. El server los valida contra la duración real (ffprobe): un fin que se pasa por redondeo queda en el final; uno que empieza después del final es 422.
+- Migración 12: `edit` entra en el `CHECK` de `jobs.type` (`rebuildJobsTypeCheck`, como la 11). Un `edit` a la vez (`maxConcurrentByType`) y ffmpeg con prioridad baja, como la compresión. Se puede reintentar desde el historial.
+- La lógica de la línea de tiempo (cortes → tramos, teclas) es pura, en `web/src/lib/edit.ts`, con tests.
+
+**Verificado:** con ffmpeg real sobre un video de prueba con un cuadro clave cada 10 s: la exacta da la duración pedida al milisegundo (un tramo, dos tramos con audio, dos sin audio); la rápida arranca en el cuadro clave anterior, como se avisa. Falta probarlo en el navegador con una grabación real.
+
+**Para más adelante:** un cuadro clave cada 2 s en `buildRecordingArgs` (`-g`) haría que la rápida sirva casi siempre con las grabaciones.
+
 ## Interfaz
 
 ### D-090 — Rediseño Nocturne por etapas · Etapa 1 · Vigente

@@ -38,6 +38,8 @@ export type HistoryActions = {
   convert: boolean;
   /** Achicar un video (D-108): no para audio ni GIF. */
   compress: boolean;
+  /** Recortar o dividir (D-112): los mismos que se pueden comprimir. */
+  edit: boolean;
   openOriginal: boolean;
   retry: boolean;
   cancel: boolean;
@@ -53,10 +55,14 @@ export function historyActions(item: HistoryItem): HistoryActions {
     download: hasFile,
     convert: hasFile,
     compress: hasFile && !isAudioOnly(item) && !isImage(item),
+    edit: hasFile && !isAudioOnly(item) && !isImage(item),
     openOriginal: item.sourceUrl !== null,
     retry:
       (item.status === 'failed' || item.status === 'cancelled') &&
-      (item.type === 'download' || item.type === 'conversion' || item.type === 'compression'),
+      (item.type === 'download' ||
+        item.type === 'conversion' ||
+        item.type === 'compression' ||
+        item.type === 'edit'),
     cancel: active && item.isMine,
     remove: !active && item.isMine,
   };

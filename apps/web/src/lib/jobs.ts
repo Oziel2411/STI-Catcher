@@ -46,6 +46,7 @@ export const TYPE_LABELS: Record<JobType, string> = {
   upload: 'Archivo subido',
   conversion: 'Conversión',
   compression: 'Compresión',
+  edit: 'Recorte',
   recording: 'Grabación',
   selftest: 'Prueba del sistema',
 };

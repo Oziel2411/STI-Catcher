@@ -4,6 +4,7 @@ export * from './presets/conversion.ts';
 export * from './schemas/auth.ts';
 export * from './schemas/compression.ts';
 export * from './schemas/conversion.ts';
+export * from './schemas/edit.ts';
 export * from './schemas/error.ts';
 export * from './schemas/health.ts';
 export * from './schemas/history.ts';

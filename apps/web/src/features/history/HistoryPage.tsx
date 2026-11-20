@@ -10,6 +10,7 @@ import {
   MusicNotesIcon,
   PlayIcon,
   RecordIcon,
+  ScissorsIcon,
   TrashIcon,
   TrayIcon,
   UploadSimpleIcon,
@@ -437,6 +438,9 @@ export function HistoryPage() {
                         onCompress={() => {
                           void navigate(`/comprimir?origen=${encodeURIComponent(item.id)}`);
                         }}
+                        onEdit={() => {
+                          void navigate(`/editar?origen=${encodeURIComponent(item.id)}`);
+                        }}
                         onDelete={() => {
                           remove(item);
                         }}
@@ -492,6 +496,7 @@ type RowProps = {
   onTogglePlay: () => void;
   onConvert: () => void;
   onCompress: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   onRetry: () => void;
   onCancel: () => void;
@@ -502,6 +507,7 @@ const TYPE_ICONS = {
   upload: UploadSimpleIcon,
   conversion: ArrowsLeftRightIcon,
   compression: ArrowsInSimpleIcon,
+  edit: ScissorsIcon,
   recording: RecordIcon,
   selftest: ArrowsClockwiseIcon,
 } as const;
@@ -513,6 +519,7 @@ function HistoryRow({
   onTogglePlay,
   onConvert,
   onCompress,
+  onEdit,
   onDelete,
   onRetry,
   onCancel,
@@ -545,6 +552,16 @@ function HistoryRow({
             label: 'Comprimir',
             icon: <ArrowsInSimpleIcon size={15} />,
             onSelect: onCompress,
+          },
+        ]
+      : []),
+    ...(actions.edit
+      ? [
+          {
+            key: 'edit',
+            label: 'Recortar o dividir',
+            icon: <ScissorsIcon size={15} />,
+            onSelect: onEdit,
           },
         ]
       : []),

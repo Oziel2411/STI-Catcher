@@ -22,10 +22,10 @@ describe('migrate', () => {
   it('aplica las pendientes una sola vez', () => {
     const db = openDatabase(':memory:');
     expect(migrate(db, migrations).map((m) => m.version)).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
     ]);
     expect(migrate(db, migrations)).toEqual([]);
-    expect(db.pragma('user_version', { simple: true })).toBe(11);
+    expect(db.pragma('user_version', { simple: true })).toBe(12);
   });
 
   it('revierte una migración que falla y no avanza la versión', () => {

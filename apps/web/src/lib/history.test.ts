@@ -62,6 +62,7 @@ describe('historyActions', () => {
       download: true,
       convert: true,
       compress: true,
+      edit: true,
       openOriginal: true,
       retry: false,
       cancel: false,

@@ -17,6 +17,7 @@ import type { JobEventBus } from './jobs/event-bus.ts';
 import type { JobQueue } from './jobs/queue.ts';
 import type { CompressionService } from './modules/compression/compression-service.ts';
 import type { ConversionService } from './modules/conversion/conversion-service.ts';
+import type { EditService } from './modules/edit/edit-service.ts';
 import type { UploadService } from './modules/conversion/upload-service.ts';
 import type { RecordingService } from './modules/recording/recording-service.ts';
 import type { ScheduleService } from './modules/recording/schedule-service.ts';
@@ -26,6 +27,7 @@ import type { JobFiles } from './modules/files/job-files.ts';
 import type { HealthService } from './modules/health/health-service.ts';
 import { registerCompressionRoutes } from './routes/compression.ts';
 import { registerConversionRoutes } from './routes/conversion.ts';
+import { registerEditRoutes } from './routes/edit.ts';
 import { registerEventRoutes } from './routes/events.ts';
 import { registerFileRoutes } from './routes/files.ts';
 import { registerHistoryRoutes } from './routes/history.ts';
@@ -47,6 +49,7 @@ export type AppServices = {
   history: HistoryService;
   conversion: ConversionService;
   compression: CompressionService;
+  edit: EditService;
   upload: UploadService;
   conversionOptions: ConversionOptionsResponse;
   recordings: RecordingService;
@@ -163,6 +166,10 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
   registerCompressionRoutes(app, {
     compression: options.services.compression,
+    noticeBatches: options.services.noticeBatches,
+  });
+  registerEditRoutes(app, {
+    edit: options.services.edit,
     noticeBatches: options.services.noticeBatches,
   });
   registerMailRoutes(app, options.services.mail, options.services.noticeBatches, app.log);

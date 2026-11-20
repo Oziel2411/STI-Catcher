@@ -26,6 +26,7 @@ import { createJobEventBus } from '../src/jobs/event-bus.ts';
 import { createJobQueue } from '../src/jobs/queue.ts';
 import type { JobContext, JobResult, JobRunner } from '../src/jobs/types.ts';
 import { createCompressionService } from '../src/modules/compression/compression-service.ts';
+import { createEditService } from '../src/modules/edit/edit-service.ts';
 import { createConversionService } from '../src/modules/conversion/conversion-service.ts';
 import { createUploadService } from '../src/modules/conversion/upload-service.ts';
 import { createRecordingService } from '../src/modules/recording/recording-service.ts';
@@ -165,6 +166,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       download: runner,
       conversion: runner,
       compression: runner,
+      edit: runner,
       recording: runner,
     },
     files: {
@@ -273,6 +275,14 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     },
     now: () => clock.now,
   });
+  const edit = createEditService({
+    getJob: (id) => repo.get(id),
+    storageDir: storageDir,
+    filesDir,
+    ffprobe,
+    queue,
+    noticeBatches,
+  });
   const mail = createMailService({
     send: options.mailConfigured === true ? sendMail : null,
     from: options.mailConfigured === true ? 'avisos@capitanes.ar' : null,
@@ -334,6 +344,7 @@ export async function makeTestApp(options: TestAppOptions = {}) {
       history,
       conversion,
       compression,
+      edit,
       upload,
       conversionOptions,
       recordings,

@@ -6,6 +6,7 @@ export const JOB_TYPES = [
   'upload',
   'conversion',
   'compression',
+  'edit',
   'recording',
   'selftest',
 ] as const;

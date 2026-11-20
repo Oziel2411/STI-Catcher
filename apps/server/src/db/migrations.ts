@@ -247,6 +247,24 @@ export const migrations: readonly Migration[] = [
     },
     foreignKeysOff: true,
   },
+  {
+    version: 12,
+    name: 'add-edit-job-type',
+    // Recortar y dividir (D-112): otro tipo de job, mismo procedimiento que la 11.
+    sql: '',
+    migrate: (db) => {
+      rebuildJobsTypeCheck(db, [
+        'download',
+        'upload',
+        'conversion',
+        'compression',
+        'edit',
+        'recording',
+        'selftest',
+      ]);
+    },
+    foreignKeysOff: true,
+  },
 ];
 
 /**

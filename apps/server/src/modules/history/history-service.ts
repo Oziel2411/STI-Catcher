@@ -21,7 +21,13 @@ export const HISTORY_TYPES: readonly JobType[] = HISTORY_JOB_TYPES;
 const USER_PREFIX = 'user:';
 
 /** Tipos que se pueden reintentar con los mismos parámetros. */
-const RETRYABLE_TYPES: readonly JobType[] = ['download', 'conversion', 'compression', 'recording'];
+const RETRYABLE_TYPES: readonly JobType[] = [
+  'download',
+  'conversion',
+  'compression',
+  'edit',
+  'recording',
+];
 
 /** Error con mensaje para el usuario; las rutas lo traducen al código HTTP. */
 export class HistoryError extends Error {

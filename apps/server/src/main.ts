@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readDiskSpace } from './adapters/disk.ts';
@@ -32,6 +33,8 @@ import { createPasswordReset } from './modules/auth/password-reset.ts';
 import { createPasswordResetsRepository } from './db/password-resets-repository.ts';
 import { createCompressionRunner } from './modules/compression/compression-runner.ts';
 import { createCompressionService } from './modules/compression/compression-service.ts';
+import { createEditRunner } from './modules/edit/edit-runner.ts';
+import { createEditService } from './modules/edit/edit-service.ts';
 import { createConversionRunner } from './modules/conversion/conversion-runner.ts';
 import { createConversionService } from './modules/conversion/conversion-service.ts';
 import { createUploadService } from './modules/conversion/upload-service.ts';
@@ -197,6 +200,14 @@ async function main(): Promise<void> {
         fileSize: fileOps.fileSize,
         logger,
       }),
+      edit: createEditRunner({
+        getJob: (id) => repo.get(id),
+        storageDir: config.paths.storage,
+        filesDir: storage.filesDir,
+        ffprobe,
+        runFfmpeg,
+        writeTextFile: (filePath, content) => writeFile(filePath, content, 'utf8'),
+      }),
       recording: createRecordingRunner({
         recordingsDir: storage.recordingsDir,
         ffprobe,
@@ -208,7 +219,8 @@ async function main(): Promise<void> {
     paths: storage,
     maxConcurrent: config.limits.maxConcurrentJobs,
     // Una compresión a la vez (D-108): es lo que más CPU usa, y la PC es compartida.
-    maxConcurrentByType: { compression: 1 },
+    // Recortar recodifica igual: también de a uno (D-112).
+    maxConcurrentByType: { compression: 1, edit: 1 },
     minFreeDiskBytes: config.limits.minFreeDiskBytes,
     readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,
     // La conversión encadenada necesita el servicio de conversión, que necesita la cola.
@@ -317,6 +329,14 @@ async function main(): Promise<void> {
     repo: noticeBatchesRepo,
     onClosed: (id) => notifyJob?.evaluateBatch(id),
   });
+  const edit = createEditService({
+    getJob: (id) => repo.get(id),
+    storageDir: config.paths.storage,
+    filesDir: storage.filesDir,
+    ffprobe,
+    queue,
+    noticeBatches,
+  });
   if (config.mail) {
     logger.info(
       { host: config.mail.host, port: config.mail.port },
@@ -383,6 +403,7 @@ async function main(): Promise<void> {
       history,
       conversion,
       compression,
+      edit,
       upload,
       conversionOptions,
       recordings,

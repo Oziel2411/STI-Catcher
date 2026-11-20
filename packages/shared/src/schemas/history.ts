@@ -13,6 +13,7 @@ export const HISTORY_JOB_TYPES = [
   'upload',
   'conversion',
   'compression',
+  'edit',
   'recording',
 ] as const satisfies readonly JobType[];
 

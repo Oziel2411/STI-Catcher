@@ -68,6 +68,7 @@ const KINDS = {
     done: 'Compresión terminada',
     failed: 'Falló la compresión',
   },
+  edit: { noun: 'El recorte', done: 'Recorte terminado', failed: 'Falló el recorte' },
 } as const;
 
 type NoticeKind = keyof typeof KINDS;
@@ -159,6 +160,7 @@ const PLURALS = {
   download: { many: 'descargas', title: 'Descargas' },
   conversion: { many: 'conversiones', title: 'Conversiones' },
   compression: { many: 'compresiones', title: 'Compresiones' },
+  edit: { many: 'partes', title: 'Partes' },
 } as const;
 
 /**
@@ -179,7 +181,9 @@ export function batchNoticeMessage(
         ? 'download'
         : members.some((m) => m.type === 'compression')
           ? 'compression'
-          : 'conversion'
+          : members.some((m) => m.type === 'edit')
+            ? 'edit'
+            : 'conversion'
     ];
   const done = items.filter((m) => m.status === 'done');
   const failed = items.filter((m) => m.status === 'failed');

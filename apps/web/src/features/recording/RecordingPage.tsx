@@ -33,6 +33,7 @@ import {
 } from '../../lib/recording-schedule.ts';
 import type { RecordingSchedule, StartMode, StopMode } from '../../lib/recording-schedule.ts';
 import { NotifyPicker } from '../auth/NotifyPicker.tsx';
+import { VideoEditor } from '../edit/VideoEditor.tsx';
 import { previewOf, useClock, useElapsedSeconds, useRecorder } from './recorder-context.ts';
 import type { Fps, Preview } from './recorder-context.ts';
 
@@ -587,6 +588,18 @@ function SourcePreview({
 }
 
 function RecordingDone({ job }: { job: Job }) {
+  // Recortar y dividir sobre la misma grabación (D-112).
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <VideoEditor
+        sourceJobId={job.id}
+        onClose={() => {
+          setEditing(false);
+        }}
+      />
+    );
+  }
   const fileUrl = `/api/jobs/${job.id}/file`;
   const details = [
     formatDuration(job.durationSeconds),
@@ -605,6 +618,15 @@ function RecordingDone({ job }: { job: Job }) {
         <Link className="button button-secondary" to={`/convertir?origen=${job.id}`}>
           Convertir
         </Link>
+        <button
+          type="button"
+          className="button button-secondary"
+          onClick={() => {
+            setEditing(true);
+          }}
+        >
+          Recortar o dividir
+        </button>
         <Link className="button button-secondary" to="/historial">
           Ver en el historial
         </Link>

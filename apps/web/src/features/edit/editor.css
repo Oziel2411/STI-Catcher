@@ -1,0 +1,146 @@
+/* Recortar y dividir (D-112). Aparte de styles.css para no mezclarse con los estilos base. */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.editor-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: var(--radius);
+  outline: none;
+}
+
+.editor-stage:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.editor-stage video {
+  cursor: pointer;
+}
+
+.editor-transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-time {
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.editor-spacer {
+  flex: 1;
+}
+
+.editor-track {
+  position: relative;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.editor-piece {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.editor-piece-removed {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--text) 14%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+.editor-cut {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 14px;
+  margin-left: -7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.editor-cut::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--text);
+}
+
+.editor-cut:focus-visible::after {
+  background: var(--accent);
+}
+
+.editor-playhead {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--rec);
+  pointer-events: none;
+}
+
+.editor-options {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.editor-pieces {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.editor-pieces th,
+.editor-pieces td {
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.editor-pieces td:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.editor-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+kbd {
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--text) 25%, transparent);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 0.9em;
+}
+
+/* Que la línea de tiempo entre en la pantalla junto con el video. */
+.editor .player video {
+  max-height: 55vh;
+}
