@@ -3,11 +3,20 @@ import {
   describeSource,
   displayMediaOptions,
   friendlyTrackLabel,
+  hasRecordingTitle,
   pickMimeType,
   recordingSupport,
   rmsLevel,
   sourceKindFromSurface,
 } from './recording.ts';
+
+describe('hasRecordingTitle', () => {
+  it('el título es obligatorio: vacío o solo espacios no sirve', () => {
+    expect(hasRecordingTitle('')).toBe(false);
+    expect(hasRecordingTitle('   ')).toBe(false);
+    expect(hasRecordingTitle('Reunión del lunes')).toBe(true);
+  });
+});
 
 describe('pickMimeType', () => {
   it('prefiere MP4 H.264 + AAC, después WebM VP9/Opus, después WebM', () => {

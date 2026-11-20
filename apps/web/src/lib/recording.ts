@@ -26,11 +26,10 @@ export function recordingSupport(env: {
   return { ok: true };
 }
 
-const titleFormat = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+/** El título es obligatorio, grabe ya o programada: sin él no se empieza ni se programa. */
+export const MISSING_TITLE_MESSAGE = 'Poné un nombre a la grabación.';
 
-/** "Grabación de pantalla 29/10/26, 15:40" (hora de la PC de quien graba). */
-export const defaultRecordingTitle = (date: Date) =>
-  `Grabación de pantalla ${titleFormat.format(date)}`;
+export const hasRecordingTitle = (title: string) => title.trim() !== '';
 
 /** Qué se comparte: los valores de `displaySurface` de getDisplayMedia. */
 export type SourceKind = 'monitor' | 'window' | 'browser';

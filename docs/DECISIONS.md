@@ -494,6 +494,17 @@ El soporte terminó en octubre de 2025 y las actualizaciones extendidas para usu
 
 ---
 
+### D-111 — Título obligatorio en la grabación de pantalla · Vigente
+
+Las grabaciones sin nombre quedaban todas como «Grabación de pantalla <fecha>» y en el historial no se distinguían.
+
+**Decidido con el usuario:** para grabar hay que poner un título, sea en el momento o programada.
+
+- La web no deja empezar ni programar sin título: el botón queda deshabilitado, con un aviso que dice qué falta, y `startRecording`/`scheduleStart` lo vuelven a controlar. Ya no hay título automático con la fecha.
+- La API no cambia: `POST /api/recordings` y `POST /api/recording-schedules` ya exigían un `title` de 1 a 200 caracteres.
+
+---
+
 ### D-110 — El certificado de la red se instala desde la app · Vigente
 
 Sin dominio de Windows (sin GPO) ni consola de ESET PROTECT, instalar la CA en cada PC era manual: buscar el archivo en el servidor y pasar por el asistente de certificados.
