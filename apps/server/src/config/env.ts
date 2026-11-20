@@ -56,6 +56,8 @@ const rawEnvSchema = z
     MAX_CONCURRENT_JOBS: intInRange(1, 8, 2),
     MAX_UPLOAD_MB: intInRange(1, 50_000, 2048),
     RETENTION_DAYS: intInRange(0, 3650, 14),
+    // Papelera del historial (D-115): días antes de borrar para siempre.
+    TRASH_DAYS: intInRange(1, 365, 7),
     MIN_FREE_DISK_GB: z.coerce
       .number({ error: 'Tiene que ser un número.' })
       .min(0, { error: 'No puede ser negativo.' })
@@ -165,6 +167,7 @@ export type Config = {
     maxConcurrentJobs: number;
     maxUploadBytes: number;
     retentionDays: number;
+    trashDays: number;
     minFreeDiskBytes: number;
   };
   download: {
@@ -250,6 +253,7 @@ export function parseConfig(raw: Record<string, string | undefined>, baseDir: st
       maxConcurrentJobs: env.MAX_CONCURRENT_JOBS,
       maxUploadBytes: env.MAX_UPLOAD_MB * MB,
       retentionDays: env.RETENTION_DAYS,
+      trashDays: env.TRASH_DAYS,
       minFreeDiskBytes: Math.round(env.MIN_FREE_DISK_GB * GB),
     },
     download: {

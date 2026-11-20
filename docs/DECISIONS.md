@@ -322,6 +322,24 @@ Borrar un trabajo (D-062) ya liberaba el disco, pero también se llevaba la fila
 
 Verificado con el server real (build de producción, tres subidas): «Borrar archivos» con dos elegidos (la barra decía «2 elegidos · 63,6 KB»), y las filas pasaron a «Archivo borrado» sin recargar y sin sus archivos en disco. «Cambiar el título» desde el menú: el campo abre con el foco y el texto elegido, y Enter guarda. Con «elegir todos» y «Borrar del historial», la tabla quedó vacía.
 
+Con D-115 los dos borrados ya no borran nada en el momento: mandan a la papelera.
+
+### D-115 — Papelera del historial · Vigente
+
+Antes de instalar D-113 en el servidor apareció el pedido: un borrado por error no tenía vuelta. Ahora «Borrar solo el archivo», «Borrar del historial» y el borrado de a varios mandan a una papelera, y lo de la papelera se borra solo a los `TRASH_DAYS` días (7 por defecto, de 1 a 365, en el `.env`).
+
+- **Qué se guarda:** el archivo pasa de `files/` a `STORAGE_DIR\trash` (mismo nombre, `<jobId>.<ext>`; `fileOps.moveFile`, que en el mismo disco es un rename). No puede quedar en `files/`: la retención borra ahí lo que no es de un job `done`. Si se movió un archivo, el trabajo queda `expired` hasta que se restaure.
+- **Migración 13:** `trashed_at`, `trash_kind` (`file`: solo el archivo, la fila se sigue viendo; `job`: el trabajo entero, la fila no se ve), `trash_path` y `restored_at`. Un `file` que después se borra del historial pasa a `job` y conserva el archivo que ya estaba guardado.
+- **Lo que está en la papelera como `job` no existe para el historial:** no sale en la lista ni en el filtro Usuario, y borrarlo, renombrarlo o reintentarlo da 404. Al mandarlo se publica `job.deleted`; las otras pestañas lo sacan como antes. Con `file` se publica `job.updated` y el `Job` trae `inTrash: true` (solo cuando es true), así la fila dice «Archivo en la papelera: se puede restaurar».
+- **Quién:** cada cuenta, solo su papelera (403 con lo ajeno). El admin no: solo administra cuentas (D-104).
+- **API:** `GET /api/trash` (lo propio, con `purgeAt`, `trashBytes`, el total y `trashDays`), `POST /api/trash/restore { ids }`, `POST /api/trash/purge { ids }` (borrar para siempre) y `POST /api/trash/empty`. Restaurar y borrar para siempre responden como el borrado de a varios (`done`, `failed` con el motivo). Logs: «Trabajo movido a la papelera», «Archivo movido a la papelera», «Restaurado de la papelera», «Borrado para siempre desde la papelera», «Papelera vaciada».
+- **Restaurar:** el archivo vuelve a `files/` y el trabajo a `done`; si el archivo ya no estaba en la papelera, el trabajo vuelve sin archivo (`expired`). La retención cuenta desde `restored_at` (`COALESCE(restored_at, finished_at)`), porque si no un archivo viejo restaurado se borraría en la pasada siguiente.
+- **Borrar para siempre:** se borra el archivo guardado; con `job` también la fila (los encadenados pierden el origen por `ON DELETE SET NULL`, como antes), y con `file` la fila queda `expired` y sale de la papelera.
+- **Retención:** la pasada de cada hora borra para siempre lo que lleva más de `TRASH_DAYS` en la papelera (`purgeExpiredTrash`), y también los archivos sueltos de `trash/` más viejos que eso que ningún trabajo guarda. Corre aunque `RETENTION_DAYS=0`: lo borrado no se queda para siempre. La retención normal no toca nada que esté en la papelera.
+- **Disco:** mientras está en la papelera el archivo sigue en el disco, así que cuenta como ocupado para `MIN_FREE_DISK_GB`. La pestaña muestra cuánto ocupa la papelera y «Vaciar la papelera» lo libera en el momento.
+- **Encadenados:** no cambia la regla de D-113. Si una conversión, compresión o recorte en curso lee el archivo, no se manda a la papelera (409 `SOURCE_IN_USE`). Cada trabajo va solo: mandar una descarga a la papelera no se lleva su conversión terminada. Un trabajo en la papelera no sirve como origen (está `expired`): primero hay que restaurarlo.
+- **Web:** tercera pestaña del Historial, «Papelera» (`?scope=papelera`), sin búsqueda ni filtros. Muestra cuánto ocupa todo y cuántos días se guarda, y cada fila con qué se borró, cuándo y cuándo se borra sola, con «Restaurar» y el ícono de borrar para siempre. Las casillas permiten restaurar o borrar varios a la vez, y «Vaciar la papelera» borra todo. No va en vivo: se vuelve a pedir después de cada acción. Los mensajes de confirmación del Historial dicen que va a la papelera, y después de borrar aparece un aviso con «Ver la papelera».
+
 ## Conversión
 
 ### D-070 — Presets cerrados en `shared` · Fase 5 · Vigente

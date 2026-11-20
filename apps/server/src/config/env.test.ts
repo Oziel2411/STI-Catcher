@@ -29,6 +29,7 @@ describe('parseConfig', () => {
       maxConcurrentJobs: 2,
       maxUploadBytes: 2048 * 1024 ** 2,
       retentionDays: 14,
+      trashDays: 7,
       minFreeDiskBytes: 5 * 1024 ** 3,
     });
     expect(config.nodeEnv).toBe('development');

@@ -31,6 +31,10 @@ const record = (patch: Partial<JobRecord> = {}): JobRecord => ({
   parentJobId: null,
   followUpJobId: null,
   noticeBatchId: null,
+  trashedAt: null,
+  trashKind: null,
+  trashPath: null,
+  restoredAt: null,
   ...patch,
 });
 

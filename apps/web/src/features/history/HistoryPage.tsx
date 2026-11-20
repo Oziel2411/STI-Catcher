@@ -38,6 +38,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '../../api/client.ts';
 import { subscribeToAllEvents, subscribeToJobsEvents } from '../../api/events.ts';
 import { RowMenu } from '../../components/RowMenu.tsx';
 import { PageTitle } from '../../components/PageTitle.tsx';
+import { TrashView } from './TrashView.tsx';
 import type { RowMenuItem } from '../../components/RowMenu.tsx';
 import { formatBytes, formatDateTime } from '../../lib/format.ts';
 import { dayRange, invalidRange, ORIGIN_OPTIONS } from '../../lib/history-filters.ts';
@@ -76,6 +77,8 @@ export function HistoryPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const scope: HistoryScope = params.get('scope') === 'all' ? 'all' : 'mine';
+  // Papelera (D-115): ?scope=papelera, con su propia vista.
+  const trashView = params.get('scope') === 'papelera';
   const q = params.get('q') ?? '';
   const page = Math.max(1, Number(params.get('page')) || 1);
   const from = params.get('desde');
@@ -94,6 +97,8 @@ export function HistoryPage() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Aviso después de mandar algo a la papelera, con el acceso para restaurarlo.
+  const [trashNotice, setTrashNotice] = useState<string | null>(null);
 
   const updateParams = useCallback(
     (changes: Record<string, string | null>) => {
@@ -124,6 +129,7 @@ export function HistoryPage() {
   }, [searchInput, q, updateParams]);
 
   useEffect(() => {
+    if (trashView) return;
     const controller = new AbortController();
     const query = new URLSearchParams({ scope, page: String(page), pageSize: String(PAGE_SIZE) });
     if (q) query.set('q', q);
@@ -143,7 +149,7 @@ export function HistoryPage() {
     return () => {
       controller.abort();
     };
-  }, [scope, q, page, reloadKey, from, to, origin, user]);
+  }, [trashView, scope, q, page, reloadKey, from, to, origin, user]);
 
   // Valores del filtro "Usuario": cuentas, y las PCs de los trabajos de antes del login.
   useEffect(() => {
@@ -233,11 +239,16 @@ export function HistoryPage() {
   const remove = (item: HistoryItem) => {
     const name = item.title ?? 'este trabajo';
     if (
-      !window.confirm(`¿Borrar «${name}» del historial? También se borra el archivo del servidor.`)
+      !window.confirm(
+        `¿Mandar «${name}» a la papelera, con su archivo? Lo podés restaurar desde la pestaña Papelera.`,
+      )
     )
       return;
     // La lista se actualiza sola con el evento job.deleted.
-    runAction(apiDelete(`/api/jobs/${item.id}`));
+    setTrashNotice(null);
+    runAction(apiDelete(`/api/jobs/${item.id}`), () => {
+      setTrashNotice(`«${name}» está en la papelera.`);
+    });
   };
 
   const removeFile = (item: HistoryItem) => {
@@ -245,12 +256,15 @@ export function HistoryPage() {
     const size = item.sizeBytes !== null ? ` (${formatBytes(item.sizeBytes)})` : '';
     if (
       !window.confirm(
-        `¿Borrar el archivo de «${name}»${size}? El trabajo queda en el historial, sin archivo.`,
+        `¿Mandar el archivo de «${name}»${size} a la papelera? El trabajo queda en el historial, sin archivo, y lo podés restaurar desde la pestaña Papelera.`,
       )
     )
       return;
-    // La fila pasa a «archivo borrado» con el evento job.updated.
-    runAction(apiDelete(`/api/jobs/${item.id}/file`));
+    // La fila pasa a «archivo en la papelera» con el evento job.updated.
+    setTrashNotice(null);
+    runAction(apiDelete(`/api/jobs/${item.id}/file`), () => {
+      setTrashNotice(`El archivo de «${name}» está en la papelera.`);
+    });
   };
 
   const removeSelected = (what: 'file' | 'job') => {
@@ -259,10 +273,11 @@ export function HistoryPage() {
     const count = ids.length === 1 ? '1 trabajo' : `${String(ids.length)} trabajos`;
     const question =
       what === 'file'
-        ? `¿Borrar los archivos de ${count} (${formatBytes(selection.bytes)})? Los trabajos quedan en el historial, sin archivo.`
-        : `¿Borrar ${count} del historial? También se borran sus archivos del servidor.`;
-    if (!window.confirm(question)) return;
+        ? `¿Mandar los archivos de ${count} (${formatBytes(selection.bytes)}) a la papelera? Los trabajos quedan en el historial, sin archivo.`
+        : `¿Mandar ${count} a la papelera, con sus archivos?`;
+    if (!window.confirm(`${question} Los podés restaurar desde la pestaña Papelera.`)) return;
     setActionError(null);
+    setTrashNotice(null);
     setBulkBusy(true);
     apiPost('/api/history/delete', historyBulkDeleteResponseSchema, { ids, what })
       .then(({ done, failed }) => {
@@ -282,6 +297,13 @@ export function HistoryPage() {
               data: { ...current.data, items: nextItems, total: current.data.total - removed },
             };
           });
+        }
+        if (done.length > 0) {
+          setTrashNotice(
+            done.length === 1
+              ? 'Uno está en la papelera.'
+              : `${String(done.length)} están en la papelera.`,
+          );
         }
         // Lo que no se pudo queda elegido, con el motivo.
         setSelected(new Set(failed.map((entry) => entry.id)));
@@ -349,6 +371,48 @@ export function HistoryPage() {
   const showRequester = scope === 'all';
   const total = state.kind === 'ready' ? state.data.total : null;
 
+  const tabs = (
+    <div className="tabs" role="tablist" aria-label="Qué trabajos mostrar">
+      {(['mine', 'all', 'trash'] as const).map((value) => {
+        const active = value === 'trash' ? trashView : !trashView && scope === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={`tab ${active ? 'tab-active' : ''}`}
+            onClick={() => {
+              setTrashNotice(null);
+              updateParams({
+                scope: value === 'all' ? 'all' : value === 'trash' ? 'papelera' : null,
+                page: null,
+              });
+            }}
+          >
+            {value === 'mine' ? 'Mis trabajos' : value === 'all' ? 'Todos' : 'Papelera'}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  if (trashView) {
+    return (
+      <section className="page">
+        <header className="page-header">
+          <PageTitle icon={ClockCounterClockwiseIcon} title="Historial">
+            Todo lo descargado, convertido y grabado. Se actualiza solo.
+          </PageTitle>
+        </header>
+        <div className="card history-toolbar">
+          <div className="history-toolbar-row">{tabs}</div>
+        </div>
+        <TrashView />
+      </section>
+    );
+  }
+
   return (
     <section className="page">
       <header className="page-header">
@@ -359,22 +423,7 @@ export function HistoryPage() {
 
       <div className="card history-toolbar">
         <div className="history-toolbar-row">
-          <div className="tabs" role="tablist" aria-label="Qué trabajos mostrar">
-            {(['mine', 'all'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={scope === value}
-                className={`tab ${scope === value ? 'tab-active' : ''}`}
-                onClick={() => {
-                  updateParams({ scope: value === 'all' ? 'all' : null, page: null });
-                }}
-              >
-                {value === 'mine' ? 'Mis trabajos' : 'Todos'}
-              </button>
-            ))}
-          </div>
+          {tabs}
           <label className="search-field">
             <MagnifyingGlassIcon size={15} aria-hidden="true" className="search-icon" />
             <span className="visually-hidden">Buscar por título</span>
@@ -473,6 +522,22 @@ export function HistoryPage() {
           </p>
         )}
       </div>
+
+      {trashNotice && (
+        <div className="alert alert-info trash-notice" role="status">
+          <span>{trashNotice}</span>
+          <button
+            type="button"
+            className="button button-ghost"
+            onClick={() => {
+              setTrashNotice(null);
+              updateParams({ scope: 'papelera', page: null });
+            }}
+          >
+            Ver la papelera
+          </button>
+        </div>
+      )}
 
       {actionError && (
         <div className="alert alert-error" role="alert">
@@ -848,7 +913,11 @@ function HistoryRow({
               </span>
               {failed && item.error && <span className="video-error">{item.error}</span>}
               {item.status === 'expired' && (
-                <span className="video-meta">Archivo borrado: ya no está en el servidor.</span>
+                <span className="video-meta">
+                  {item.inTrash
+                    ? 'Archivo en la papelera: se puede restaurar.'
+                    : 'Archivo borrado: ya no está en el servidor.'}
+                </span>
               )}
             </div>
           </div>
@@ -887,7 +956,9 @@ function HistoryRow({
               </span>
             </div>
           ) : (
-            <span className={`badge ${statusClass}`}>{STATUS_LABELS[item.status]}</span>
+            <span className={`badge ${statusClass}`}>
+              {item.inTrash ? 'En la papelera' : STATUS_LABELS[item.status]}
+            </span>
           )}
         </td>
         <td className="col-actions">

@@ -130,6 +130,42 @@ export const historyBulkDeleteResponseSchema = z.object({
 });
 export type HistoryBulkDeleteResponse = z.infer<typeof historyBulkDeleteResponseSchema>;
 
+/** Qué se mandó a la papelera (D-115): solo el archivo, o el trabajo entero. */
+export const trashKindSchema = z.enum(['file', 'job']);
+export type TrashKind = z.infer<typeof trashKindSchema>;
+
+/** Un trabajo en la papelera: lo mismo que en el historial, más cuándo se borra solo. */
+export const trashItemSchema = historyItemSchema.extend({
+  trashKind: trashKindSchema,
+  trashedAt: z.iso.datetime(),
+  /** Cuándo se borra para siempre si nadie lo restaura. */
+  purgeAt: z.iso.datetime(),
+  /** Lo que ocupa el archivo guardado; null si no había archivo. */
+  trashBytes: z.number().int().nonnegative().nullable(),
+});
+export type TrashItem = z.infer<typeof trashItemSchema>;
+
+export const trashResponseSchema = z.object({
+  items: z.array(trashItemSchema),
+  /** Lo que ocupa toda la papelera de la cuenta. */
+  totalBytes: z.number().int().nonnegative(),
+  /** Días que se guarda lo borrado (TRASH_DAYS). */
+  trashDays: z.number().int().positive(),
+});
+export type TrashResponse = z.infer<typeof trashResponseSchema>;
+
+/** Restaurar o borrar para siempre varios de la papelera. Responde como el borrado de a varios. */
+export const trashIdsBodySchema = z.object({
+  ids: historyBulkDeleteBodySchema.shape.ids,
+});
+export type TrashIdsBody = z.infer<typeof trashIdsBodySchema>;
+
+export const trashEmptyResponseSchema = z.object({
+  purged: z.number().int().nonnegative(),
+  freedBytes: z.number().int().nonnegative(),
+});
+export type TrashEmptyResponse = z.infer<typeof trashEmptyResponseSchema>;
+
 export const fileQuerySchema = z.object({
   /** `inline=1`: para reproducir en el navegador; sin él, se descarga como archivo. */
   inline: z

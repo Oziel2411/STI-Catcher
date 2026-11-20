@@ -2042,6 +2042,29 @@ input[type='radio'] {
   padding: 0.6rem 0.9rem;
 }
 
+/* Papelera del historial (D-115). */
+.trash-notice,
+.trash-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.trash-summary {
+  padding: 0.7rem 0.9rem;
+}
+
+.trash-summary p {
+  flex: 1 1 22rem;
+  margin: 0;
+}
+
+.trash-table {
+  min-width: 52rem;
+}
+
 .bulk-count {
   margin-right: auto;
   font-variant-numeric: tabular-nums;

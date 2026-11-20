@@ -86,6 +86,8 @@ export const jobSchema = z.object({
   followUpJobId: z.uuid().nullable(),
   /** Solo mientras el job está `running`. */
   progress: jobProgressSchema.nullable(),
+  /** En la papelera del historial (D-115). Solo viene cuando es true. */
+  inTrash: z.literal(true).optional(),
 });
 export type Job = z.infer<typeof jobSchema>;
 

@@ -143,3 +143,49 @@ describe('createRetentionService', () => {
     expect(existsSync(raw)).toBe(true);
   });
 });
+
+describe('papelera en la retención (D-115)', () => {
+  it('corre aunque RETENTION_DAYS=0: lo vencido y los archivos sueltos viejos de trash/', async () => {
+    const { repo, filesDir, recordingsDir, file, doneJob, logger } = setup(0);
+    const storageDir = path.dirname(filesDir);
+    const trashDir = path.join(storageDir, 'trash');
+    mkdirSync(trashDir);
+    // Un job en la papelera con su archivo guardado (viejo, pero lo guarda un job).
+    doneJob(1, 30);
+    const kept = file(trashDir, `${id(1)}.mp4`, 30);
+    repo.moveToTrash(id(1), {
+      kind: 'job',
+      at: daysAgo(1).toISOString(),
+      trashPath: path.join('trash', `${id(1)}.mp4`),
+    });
+    const looseOld = file(trashDir, 'suelto-viejo.mp4', 8);
+    const looseNew = file(trashDir, 'suelto-nuevo.mp4', 1);
+    const purgeExpired = vi.fn(() => Promise.resolve(2));
+    const service = createRetentionService({
+      retentionDays: 0,
+      repo,
+      expire: (jobId) => repo.markExpired(jobId),
+      storageDir,
+      filesDir,
+      recordingsDir,
+      trash: { days: 7, dir: trashDir, purgeExpired },
+      now: () => NOW,
+      logger,
+    });
+    expect(await service.run()).toEqual({ expired: 0, orphans: 0, recordings: 0, trash: 2 });
+    expect(purgeExpired).toHaveBeenCalledOnce();
+    expect(existsSync(kept)).toBe(true);
+    expect(existsSync(looseOld)).toBe(false);
+    expect(existsSync(looseNew)).toBe(true);
+  });
+
+  it('la retención no toca lo que está en la papelera', async () => {
+    const { service, repo, doneJob } = setup(14);
+    const old = doneJob(1, 30);
+    repo.moveToTrash(id(1), { kind: 'file', at: NOW.toISOString(), trashPath: null });
+    expect(await service.run()).toEqual({ expired: 0, orphans: 0, recordings: 0 });
+    expect(repo.get(id(1))?.status).toBe('done');
+    // El archivo de files/ sigue siendo de un job done: no es huérfano.
+    expect(existsSync(old)).toBe(true);
+  });
+});

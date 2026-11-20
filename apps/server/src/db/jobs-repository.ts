@@ -37,7 +37,14 @@ type JobRow = {
   parent_job_id: string | null;
   follow_up_job_id: string | null;
   notice_batch_id: string | null;
+  trashed_at: string | null;
+  trash_kind: string | null;
+  trash_path: string | null;
+  restored_at: string | null;
 };
+
+/** Lo borrado del historial con todo (D-115) no se ve ni cuenta en los filtros. */
+const NOT_TRASHED_JOB_SQL = "(trash_kind IS NULL OR trash_kind <> 'job')";
 
 /**
  * Quién pidió un trabajo, para el filtro del historial (D-098, D-104): `user:<id>`
@@ -93,6 +100,10 @@ function toRecord(row: JobRow): JobRecord {
     parentJobId: row.parent_job_id,
     followUpJobId: row.follow_up_job_id,
     noticeBatchId: row.notice_batch_id,
+    trashedAt: row.trashed_at,
+    trashKind: row.trash_kind === 'file' || row.trash_kind === 'job' ? row.trash_kind : null,
+    trashPath: row.trash_path,
+    restoredAt: row.restored_at,
   };
 }
 
@@ -189,10 +200,40 @@ export function createJobsRepository(db: Db): JobsRepository {
   const activeChildStmt = db.prepare<[string], { found: number }>(
     "SELECT 1 AS found FROM jobs WHERE parent_job_id = ? AND status IN ('queued', 'running') LIMIT 1",
   );
+  // Papelera (D-115). Con archivo guardado, done → expired; un 'file' que pasa a
+  // 'job' conserva el archivo que ya estaba en la papelera.
+  const moveToTrashStmt = db.prepare<
+    [{ id: string; kind: string; at: string; trashPath: string | null }]
+  >(`
+    UPDATE jobs
+       SET trashed_at = @at, trash_kind = @kind,
+           trash_path = COALESCE(@trashPath, trash_path),
+           status = CASE WHEN @trashPath IS NOT NULL THEN 'expired' ELSE status END
+     WHERE id = @id AND status NOT IN ('queued', 'running')
+  `);
+  const restoreStmt = db.prepare<[{ id: string; at: string; fileBack: number }]>(`
+    UPDATE jobs
+       SET status = CASE WHEN @fileBack = 1 THEN 'done' ELSE status END,
+           trashed_at = NULL, trash_kind = NULL, trash_path = NULL, restored_at = @at
+     WHERE id = @id AND trashed_at IS NOT NULL
+  `);
+  const clearTrashStmt = db.prepare<[string]>(
+    'UPDATE jobs SET trashed_at = NULL, trash_kind = NULL, trash_path = NULL WHERE id = ? AND trashed_at IS NOT NULL',
+  );
+  const listTrashStmt = db.prepare<[string], JobRow>(
+    'SELECT * FROM jobs WHERE user_id = ? AND trashed_at IS NOT NULL ORDER BY trashed_at DESC, rowid DESC',
+  );
+  const trashedBeforeStmt = db.prepare<[string], JobRow>(
+    'SELECT * FROM jobs WHERE trashed_at IS NOT NULL AND trashed_at < ? ORDER BY trashed_at',
+  );
+  const trashPathsStmt = db.prepare<[], { trash_path: string }>(
+    'SELECT trash_path FROM jobs WHERE trash_path IS NOT NULL',
+  );
   // Retención: no se borra el origen de una conversión que todavía lo va a leer.
   const expirableStmt = db.prepare<[string], { id: string; file_path: string }>(`
     SELECT j.id, j.file_path FROM jobs j
-     WHERE j.status = 'done' AND j.file_path IS NOT NULL AND j.finished_at < ?
+     WHERE j.status = 'done' AND j.file_path IS NOT NULL AND j.trashed_at IS NULL
+       AND COALESCE(j.restored_at, j.finished_at) < ?
        AND NOT EXISTS (SELECT 1 FROM jobs c
                         WHERE c.parent_job_id = j.id AND c.status IN ('queued', 'running'))
      ORDER BY j.finished_at
@@ -220,7 +261,7 @@ export function createJobsRepository(db: Db): JobsRepository {
 
   /** WHERE del historial; los valores van como parámetros (nunca concatenados). */
   const historyWhere = (filter: HistoryFilter) => {
-    const where = [`type IN (${filter.types.map(() => '?').join(', ')})`];
+    const where = [`type IN (${filter.types.map(() => '?').join(', ')})`, NOT_TRASHED_JOB_SQL];
     const args: string[] = [...filter.types];
     if (filter.userId !== null) {
       where.push('user_id = ?');
@@ -352,6 +393,30 @@ export function createJobsRepository(db: Db): JobsRepository {
       return renameStmt.run(title, normalizeSearchText(title), id).changes === 1;
     },
 
+    moveToTrash(id, { kind, at, trashPath }) {
+      return moveToTrashStmt.run({ id, kind, at, trashPath }).changes === 1;
+    },
+
+    restoreFromTrash(id, { at, fileBack }) {
+      return restoreStmt.run({ id, at, fileBack: fileBack ? 1 : 0 }).changes === 1;
+    },
+
+    clearTrash(id) {
+      return clearTrashStmt.run(id).changes === 1;
+    },
+
+    listTrash(userId) {
+      return listTrashStmt.all(userId).map(toRecord);
+    },
+
+    listTrashedBefore(beforeIso) {
+      return trashedBeforeStmt.all(beforeIso).map(toRecord);
+    },
+
+    listTrashPaths() {
+      return trashPathsStmt.all().map((row) => row.trash_path);
+    },
+
     hasActiveChildren(id) {
       return activeChildStmt.get(id) !== undefined;
     },
@@ -394,6 +459,7 @@ export function createJobsRepository(db: Db): JobsRepository {
              FROM jobs
             WHERE type IN (${types.map(() => '?').join(', ')})
               AND ${REQUESTER_SQL} IS NOT NULL
+              AND ${NOT_TRASHED_JOB_SQL}
             GROUP BY value
             ORDER BY MAX(created_at) DESC
             LIMIT 200`,

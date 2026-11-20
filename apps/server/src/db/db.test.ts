@@ -22,10 +22,10 @@ describe('migrate', () => {
   it('aplica las pendientes una sola vez', () => {
     const db = openDatabase(':memory:');
     expect(migrate(db, migrations).map((m) => m.version)).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
     ]);
     expect(migrate(db, migrations)).toEqual([]);
-    expect(db.pragma('user_version', { simple: true })).toBe(12);
+    expect(db.pragma('user_version', { simple: true })).toBe(13);
   });
 
   it('revierte una migración que falla y no avanza la versión', () => {
@@ -65,7 +65,11 @@ describe('migrate', () => {
       "INSERT INTO recordings (id, status, mime_type, extension, fps, title, created_at, job_id) VALUES ('r', 'finalized', 'video/webm', 'webm', 30, 'Grabación', 't', ?)",
     ).run(ids.a);
 
-    migrate(db, migrations);
+    // Hasta la 12 (las que rehacen la tabla); la 13 suma columnas (D-115).
+    migrate(
+      db,
+      migrations.filter((m) => m.version <= 12),
+    );
 
     expect(columns()).toEqual(before.columns);
     expect(indexes()).toEqual(before.indexes);

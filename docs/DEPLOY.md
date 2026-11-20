@@ -76,6 +76,7 @@ LOG_DIR=C:\STI-Catcher\logs
 - **PORT=443** permite entrar sin escribir el puerto (`https://servidor`). Si el 443 ya lo usa otro programa (por ejemplo IIS), elegí otro, como 8443. Para ver si está ocupado: `Get-NetTCPConnection -LocalPort 443 -State Listen`.
 - Las demás variables están explicadas en el mismo archivo (tamaño máximo de subida, días de retención, trabajos simultáneos, etc.).
 - `RETENTION_DAYS` (14 por defecto) borra los archivos más viejos y deja la entrada del historial como «expirado». `0` = no se borra nada.
+- `TRASH_DAYS` (7 por defecto, de 1 a 365): lo que se borra desde el Historial va a la papelera (`STORAGE_DIR\trash`) y se borra solo pasados esos días (D-115). Mientras tanto ocupa disco: si falta espacio, cada uno puede vaciar su papelera.
 
 Volvé a correr `.\scripts\setup.ps1` para que cree las carpetas nuevas.
 
@@ -233,4 +234,4 @@ Para pasar STI-Catcher de un equipo (el «viejo») a otro (el «nuevo») conserv
   - La red del servidor tiene que ser Privada o Dominio: el instalador avisa si es Pública.
   - Probá la regla de firewall desde la PC cliente: `Test-NetConnection servidor -Port 443`.
 - **El servicio se detiene solo:** mirá `logs\service\sti-catcher.err.log`. Windows lo reinicia a los 10 s, a los 30 s y después cada 2 minutos.
-- **«No hay espacio suficiente»:** se alcanzó `MIN_FREE_DISK_GB`. Bajá `RETENTION_DAYS` o liberá espacio en el disco de `STORAGE_DIR`.
+- **«No hay espacio suficiente»:** se alcanzó `MIN_FREE_DISK_GB`. Bajá `RETENTION_DAYS` o `TRASH_DAYS`, pedí que vacíen la papelera del Historial o liberá espacio en el disco de `STORAGE_DIR`.

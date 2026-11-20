@@ -17,6 +17,7 @@ import type {
   JobRunner,
   JobsRepository,
   ListJobsFilter,
+  TrashKind,
 } from './types.ts';
 
 /** Subconjunto de pino que usa la cola (así los tests pasan un logger falso). */
@@ -98,6 +99,19 @@ export type JobQueue = {
   toApi(record: JobRecord): Job;
   /** done → expired y lo publica. false si el job no estaba en done. */
   expire(id: string): boolean;
+  /**
+   * Pasa un job terminado a la papelera (D-115) y lo publica: con kind 'job'
+   * como `job.deleted` (deja de verse en el historial), con 'file' como cambio.
+   * false si no existe o está activo.
+   */
+  trash(id: string, change: { kind: TrashKind; at: string; trashPath: string | null }): boolean;
+  /** Lo saca de la papelera y lo publica. false si no estaba en la papelera. */
+  restore(id: string, change: { at: string; fileBack: boolean }): boolean;
+  /**
+   * Borra para siempre lo que estaba en la papelera (el archivo ya se borró):
+   * kind 'job' borra la fila; 'file' la deja como `expired` y lo publica.
+   */
+  purge(id: string): boolean;
   /** Cambia el título de un job terminado y lo publica. null si no existe o está activo. */
   rename(id: string, title: string): Job | null;
   /** Borra un job terminado y publica `job.deleted`. false si no existe o está activo. */
@@ -175,6 +189,7 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
     parentJobId: record.parentJobId,
     followUpJobId: record.followUpJobId,
     progress: record.status === 'running' ? (progress.get(record.id) ?? null) : null,
+    ...(record.trashKind !== null ? { inTrash: true as const } : {}),
   });
 
   /** Anota el nombre de la PC del pedido, sin esperar (puede tardar segundos si no responde). */
@@ -464,6 +479,28 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
       if (!repo.markExpired(id)) return false;
       publishUpdated(id);
       logger.info({ jobId: id }, 'Archivo de un trabajo ya no disponible: marcado como expirado');
+      return true;
+    },
+
+    trash(id, change) {
+      if (!repo.moveToTrash(id, change)) return false;
+      if (change.kind === 'job') bus.publish({ type: 'job.deleted', jobId: id });
+      else publishUpdated(id);
+      return true;
+    },
+
+    restore(id, change) {
+      if (!repo.restoreFromTrash(id, change)) return false;
+      publishUpdated(id);
+      return true;
+    },
+
+    purge(id) {
+      const record = repo.get(id);
+      if (!record || record.trashKind === null) return false;
+      if (record.trashKind === 'job') return repo.delete(id);
+      if (!repo.clearTrash(id)) return false;
+      publishUpdated(id);
       return true;
     },
 

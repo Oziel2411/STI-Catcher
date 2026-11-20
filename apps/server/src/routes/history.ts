@@ -3,6 +3,7 @@ import {
   historyQuerySchema,
   jobIdParamsSchema,
   renameJobBodySchema,
+  trashIdsBodySchema,
 } from '@sti-catcher/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { HttpError, parseInput } from '../http/validation.ts';
@@ -29,7 +30,7 @@ export function registerHistoryRoutes(app: FastifyInstance, history: HistoryServ
 
   app.get('/api/active-jobs', (request) => history.activeCounts(requesterOf(request)));
 
-  // Solo los trabajos propios (D-104). Borra el registro y el archivo.
+  // Solo los trabajos propios (D-104). El trabajo y su archivo van a la papelera (D-115).
   app.delete('/api/jobs/:id', async (request, reply) => {
     const { id } = parseInput(jobIdParamsSchema, request.params);
     try {
@@ -40,7 +41,7 @@ export function registerHistoryRoutes(app: FastifyInstance, history: HistoryServ
     return reply.status(204).send();
   });
 
-  // Solo el archivo, para liberar disco: el trabajo queda como expirado (D-113).
+  // Solo el archivo, a la papelera: el trabajo queda como expirado (D-113, D-115).
   app.delete('/api/jobs/:id/file', async (request) => {
     const { id } = parseInput(jobIdParamsSchema, request.params);
     try {
@@ -55,6 +56,21 @@ export function registerHistoryRoutes(app: FastifyInstance, history: HistoryServ
     const { ids, what } = parseInput(historyBulkDeleteBodySchema, request.body);
     return history.removeMany(ids, what, requesterOf(request));
   });
+
+  // Papelera (D-115): solo la propia.
+  app.get('/api/trash', (request) => history.trash(requesterOf(request)));
+
+  app.post('/api/trash/restore', async (request) => {
+    const { ids } = parseInput(trashIdsBodySchema, request.body);
+    return history.restoreMany(ids, requesterOf(request));
+  });
+
+  app.post('/api/trash/purge', async (request) => {
+    const { ids } = parseInput(trashIdsBodySchema, request.body);
+    return history.purgeMany(ids, requesterOf(request));
+  });
+
+  app.post('/api/trash/empty', async (request) => history.emptyTrash(requesterOf(request)));
 
   app.patch('/api/jobs/:id', (request) => {
     const { id } = parseInput(jobIdParamsSchema, request.params);

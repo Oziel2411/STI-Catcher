@@ -10,10 +10,15 @@ import type {
   HistoryScope,
   Job,
   JobType,
+  TrashEmptyResponse,
+  TrashItem,
+  TrashResponse,
 } from '@sti-catcher/shared';
 import { normalizeIp } from '../../adapters/host-resolver.ts';
 import type { EnqueueInput, JobQueue } from '../../jobs/queue.ts';
-import type { JobRecord, JobsRepository } from '../../jobs/types.ts';
+import type { JobRecord, JobsRepository, TrashKind } from '../../jobs/types.ts';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Tipos que aparecen en el historial. El selftest no: es una prueba del sistema (D-030). */
 export const HISTORY_TYPES: readonly JobType[] = HISTORY_JOB_TYPES;
@@ -35,7 +40,13 @@ export class HistoryError extends Error {
   override name = 'HistoryError';
   constructor(
     readonly code:
-      'JOB_NOT_FOUND' | 'NOT_OWNER' | 'JOB_ACTIVE' | 'NOT_RETRYABLE' | 'NO_FILE' | 'SOURCE_IN_USE',
+      | 'JOB_NOT_FOUND'
+      | 'NOT_OWNER'
+      | 'JOB_ACTIVE'
+      | 'NOT_RETRYABLE'
+      | 'NO_FILE'
+      | 'SOURCE_IN_USE'
+      | 'NOT_IN_TRASH',
     message: string,
     readonly status: 403 | 404 | 409,
   ) {
@@ -52,13 +63,28 @@ export type Requester = { userId: string | null; ip: string | null };
 export type HistoryServiceDeps = {
   repo: Pick<
     JobsRepository,
-    'get' | 'listHistory' | 'countActiveByUser' | 'listRequesters' | 'hasActiveChildren'
+    | 'get'
+    | 'listHistory'
+    | 'countActiveByUser'
+    | 'listRequesters'
+    | 'hasActiveChildren'
+    | 'listTrash'
+    | 'listTrashedBefore'
   >;
-  queue: Pick<JobQueue, 'toApi' | 'expire' | 'remove' | 'rename' | 'enqueue'>;
+  queue: Pick<JobQueue, 'toApi' | 'expire' | 'rename' | 'enqueue' | 'trash' | 'restore' | 'purge'>;
   storageDir: string;
   filesDir: string;
+  /** Papelera (D-115): STORAGE_DIR\trash. */
+  trashDir: string;
+  /** Días que se guarda lo borrado (TRASH_DAYS). */
+  trashDays: number;
   removeFile: (filePath: string) => Promise<void>;
-  logger: { info: (obj: object, msg: string) => void };
+  moveFile: (from: string, to: string) => Promise<void>;
+  now?: () => Date;
+  logger: {
+    info: (obj: object, msg: string) => void;
+    warn: (obj: object, msg: string) => void;
+  };
   /** Nombre de cada cuenta (columna Usuario del historial). */
   userNames: (ids: readonly string[]) => Map<string, string>;
   /** true si el archivo existe (inyectable para tests). */
@@ -89,10 +115,18 @@ export type HistoryService = {
   ) => Promise<HistoryResponse>;
   /** Valores del filtro "Usuario". */
   requesters: () => HistoryRequestersResponse;
-  /** Borra el trabajo y su archivo. */
+  /** Manda el trabajo y su archivo a la papelera (D-115): deja de verse en el historial. */
   remove: (id: string, requester: Requester) => Promise<void>;
-  /** Borra solo el archivo: el trabajo queda como `expired` (D-113). */
+  /** Manda solo el archivo a la papelera: el trabajo queda `expired` (D-113, D-115). */
   removeFile: (id: string, requester: Requester) => Promise<Job>;
+  /** La papelera de quien pide (D-115). */
+  trash: (requester: Requester) => TrashResponse;
+  restoreMany: (ids: readonly string[], requester: Requester) => Promise<HistoryBulkDeleteResponse>;
+  /** Borrar para siempre desde la papelera. */
+  purgeMany: (ids: readonly string[], requester: Requester) => Promise<HistoryBulkDeleteResponse>;
+  emptyTrash: (requester: Requester) => Promise<TrashEmptyResponse>;
+  /** Lo que lleva más de TRASH_DAYS en la papelera se borra para siempre (retención). */
+  purgeExpiredTrash: () => Promise<number>;
   /** Varios de una vez; los que no se pueden quedan en `failed` con el motivo (D-113). */
   removeMany: (
     ids: readonly string[],
@@ -116,6 +150,8 @@ export type HistoryService = {
 export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
   const fileExists = deps.fileExists ?? defaultFileExists;
   const filesRoot = path.resolve(deps.filesDir) + path.sep;
+  const trashRoot = path.resolve(deps.trashDir) + path.sep;
+  const now = deps.now ?? (() => new Date());
 
   /** Ruta absoluta del archivo de un job, solo si queda dentro de STORAGE_DIR/files. */
   const absoluteFile = (record: JobRecord): string | null => {
@@ -160,7 +196,7 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
 
   const getOrThrow = (id: string): JobRecord => {
     const record = deps.repo.get(id);
-    if (!record || !HISTORY_TYPES.includes(record.type)) {
+    if (!record || !HISTORY_TYPES.includes(record.type) || record.trashKind === 'job') {
       throw new HistoryError('JOB_NOT_FOUND', 'No existe ese trabajo.', 404);
     }
     return record;
@@ -190,46 +226,150 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
     return record;
   };
 
-  const remove = async (id: string, requester: Requester): Promise<void> => {
+  /**
+   * Manda un trabajo a la papelera (D-115). Su archivo pasa de files/ a trash/
+   * (no se borra) y el trabajo queda `expired` hasta que se restaure. Con
+   * 'job' además deja de verse en el historial.
+   */
+  const moveToTrash = async (
+    id: string,
+    kind: TrashKind,
+    requester: Requester,
+  ): Promise<JobRecord> => {
     const record = deletable(id, requester);
-    const file = absoluteFile(record);
-    if (file !== null) await deps.removeFile(file);
-    deps.queue.remove(id);
+    const file = record.status === 'done' ? absoluteFile(record) : null;
+    const hasFile = file !== null && (await fileExists(file));
+    if (kind === 'file' && !hasFile) {
+      // done sin archivo en disco: lo borró alguien a mano. Queda expirado, como al mirarlo.
+      if (record.status === 'done') deps.queue.expire(id);
+      throw new HistoryError('NO_FILE', 'Este trabajo ya no tiene un archivo para borrar.', 409);
+    }
+    let trashPath: string | null = null;
+    if (file !== null && hasFile) {
+      const saved = path.join(deps.trashDir, path.basename(file));
+      // Primero el archivo: si no se puede mover, el trabajo sigue como estaba.
+      await deps.moveFile(file, saved);
+      trashPath = path.relative(deps.storageDir, saved);
+    }
+    if (!deps.queue.trash(id, { kind, at: now().toISOString(), trashPath })) {
+      // Empezó a correr entre la consulta y ahora (reintento): el archivo vuelve.
+      if (file !== null && trashPath !== null) {
+        await deps.moveFile(path.resolve(deps.storageDir, trashPath), file);
+      }
+      throw new HistoryError(
+        'JOB_ACTIVE',
+        'El trabajo está en curso: cancelalo antes de borrarlo.',
+        409,
+      );
+    }
     // SPEC §8: los borrados quedan en el log con la IP.
     deps.logger.info(
       {
         jobId: id,
         type: record.type,
         title: record.title,
+        what: kind,
         deletedByUser: requester.userId,
         deletedByIp: requester.ip,
         createdByUser: record.userId,
         createdByIp: record.clientIp,
       },
-      'Trabajo borrado del historial',
+      kind === 'job' ? 'Trabajo movido a la papelera' : 'Archivo movido a la papelera',
+    );
+    return deps.repo.get(id) ?? record;
+  };
+
+  const remove = async (id: string, requester: Requester): Promise<void> => {
+    await moveToTrash(id, 'job', requester);
+  };
+
+  const removeFile = async (id: string, requester: Requester): Promise<Job> =>
+    deps.queue.toApi(await moveToTrash(id, 'file', requester));
+
+  /** Un trabajo propio que está en la papelera. */
+  const trashedOrThrow = (id: string, requester: Requester): JobRecord => {
+    const record = deps.repo.get(id);
+    if (!record || record.trashKind === null) {
+      throw new HistoryError('NOT_IN_TRASH', 'Ese trabajo no está en la papelera.', 404);
+    }
+    if (!isOwn(record, requester)) {
+      throw new HistoryError('NOT_OWNER', 'Solo podés tocar tu papelera.', 403);
+    }
+    return record;
+  };
+
+  /** Archivo guardado en la papelera, solo si queda dentro de STORAGE_DIR/trash. */
+  const trashFile = (record: JobRecord): string | null => {
+    if (record.trashPath === null) return null;
+    const absolute = path.resolve(deps.storageDir, record.trashPath);
+    return absolute.startsWith(trashRoot) ? absolute : null;
+  };
+
+  /** Borra para siempre: el archivo guardado y, si era 'job', la fila. Devuelve lo liberado. */
+  const purgeRecord = async (record: JobRecord): Promise<number> => {
+    const file = trashFile(record);
+    const freed = file !== null && (await fileExists(file)) ? (record.sizeBytes ?? 0) : 0;
+    if (file !== null) await deps.removeFile(file);
+    deps.queue.purge(record.id);
+    return freed;
+  };
+
+  const purge = async (id: string, requester: Requester): Promise<void> => {
+    const record = trashedOrThrow(id, requester);
+    await purgeRecord(record);
+    deps.logger.info(
+      { jobId: id, title: record.title, purgedByUser: requester.userId, purgedByIp: requester.ip },
+      'Borrado para siempre desde la papelera',
     );
   };
 
-  const removeFile = async (id: string, requester: Requester): Promise<Job> => {
-    const record = deletable(id, requester);
-    const file = absoluteFile(record);
-    if (record.status !== 'done' || file === null) {
-      throw new HistoryError('NO_FILE', 'Este trabajo ya no tiene un archivo para borrar.', 409);
+  const restore = async (id: string, requester: Requester): Promise<void> => {
+    const record = trashedOrThrow(id, requester);
+    const saved = trashFile(record);
+    const target = absoluteFile(record);
+    let fileBack = false;
+    if (saved !== null && target !== null && (await fileExists(saved))) {
+      await deps.moveFile(saved, target);
+      fileBack = true;
     }
-    // Primero el archivo: si falla, el trabajo sigue en done y se puede reintentar.
-    await deps.removeFile(file);
-    deps.queue.expire(id);
+    deps.queue.restore(id, { at: now().toISOString(), fileBack });
     deps.logger.info(
-      {
-        jobId: id,
-        type: record.type,
-        title: record.title,
-        deletedByUser: requester.userId,
-        deletedByIp: requester.ip,
-      },
-      'Archivo borrado desde el historial',
+      { jobId: id, title: record.title, fileBack, restoredByUser: requester.userId },
+      'Restaurado de la papelera',
     );
-    return deps.queue.toApi(deps.repo.get(id) ?? { ...record, status: 'expired' });
+  };
+
+  /** De a uno: cada uno revisa sus reglas, y uno que no se puede no frena al resto. */
+  const forEach = async (
+    ids: readonly string[],
+    action: (id: string) => Promise<unknown>,
+  ): Promise<HistoryBulkDeleteResponse> => {
+    const result: HistoryBulkDeleteResponse = { done: [], failed: [] };
+    for (const id of new Set(ids)) {
+      try {
+        await action(id);
+        result.done.push(id);
+      } catch (error) {
+        if (!(error instanceof HistoryError)) throw error;
+        result.failed.push({ id, message: error.message });
+      }
+    }
+    return result;
+  };
+
+  const toTrashItem = (
+    record: JobRecord,
+    requester: Requester,
+    names: Map<string, string>,
+  ): TrashItem => {
+    const trashedAt = record.trashedAt ?? now().toISOString();
+    return {
+      ...toItem(record, requester, names),
+      trashKind: record.trashKind ?? 'job',
+      trashedAt,
+      purgeAt: new Date(new Date(trashedAt).getTime() + deps.trashDays * DAY_MS).toISOString(),
+      trashBytes: record.trashPath === null ? null : (record.sizeBytes ?? 0),
+    };
   };
 
   return {
@@ -260,20 +400,64 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
     remove,
     removeFile,
 
-    async removeMany(ids, what, requester) {
-      const result: HistoryBulkDeleteResponse = { done: [], failed: [] };
-      // De a uno: cada borrado revisa sus reglas, y uno que no se puede no frena al resto.
-      for (const id of new Set(ids)) {
+    removeMany(ids, what, requester) {
+      return forEach(ids, (id) => moveToTrash(id, what, requester));
+    },
+
+    trash(requester) {
+      const records = requester.userId === null ? [] : deps.repo.listTrash(requester.userId);
+      const names = deps.userNames(requester.userId === null ? [] : [requester.userId]);
+      const items = records.map((record) => toTrashItem(record, requester, names));
+      return {
+        items,
+        totalBytes: items.reduce((total, item) => total + (item.trashBytes ?? 0), 0),
+        trashDays: deps.trashDays,
+      };
+    },
+
+    restoreMany(ids, requester) {
+      return forEach(ids, (id) => restore(id, requester));
+    },
+
+    purgeMany(ids, requester) {
+      return forEach(ids, (id) => purge(id, requester));
+    },
+
+    async emptyTrash(requester) {
+      if (requester.userId === null) return { purged: 0, freedBytes: 0 };
+      let freedBytes = 0;
+      const records = deps.repo.listTrash(requester.userId);
+      for (const record of records) freedBytes += await purgeRecord(record);
+      if (records.length > 0) {
+        deps.logger.info(
+          {
+            purged: records.length,
+            freedBytes,
+            purgedByUser: requester.userId,
+            purgedByIp: requester.ip,
+          },
+          'Papelera vaciada',
+        );
+      }
+      return { purged: records.length, freedBytes };
+    },
+
+    async purgeExpiredTrash() {
+      const cutoff = new Date(now().getTime() - deps.trashDays * DAY_MS).toISOString();
+      let purged = 0;
+      for (const record of deps.repo.listTrashedBefore(cutoff)) {
+        // Si no se pudo borrar (archivo abierto), se reintenta en la próxima pasada.
         try {
-          if (what === 'file') await removeFile(id, requester);
-          else await remove(id, requester);
-          result.done.push(id);
+          await purgeRecord(record);
+          purged++;
         } catch (error) {
-          if (!(error instanceof HistoryError)) throw error;
-          result.failed.push({ id, message: error.message });
+          deps.logger.warn(
+            { err: error, jobId: record.id },
+            'Papelera: no se pudo borrar un trabajo vencido',
+          );
         }
       }
-      return result;
+      return purged;
     },
 
     rename(id, title, requester) {

@@ -31,12 +31,18 @@ export async function listFiles(dir: string): Promise<DirEntry[]> {
 export type RetentionDeps = {
   /** 0 = nunca se borra nada. */
   retentionDays: number;
-  repo: Pick<JobsRepository, 'listExpirable' | 'listLiveFilePaths'>;
+  repo: Pick<JobsRepository, 'listExpirable' | 'listLiveFilePaths' | 'listTrashPaths'>;
   /** done → expired y publica el cambio (queue.expire). */
   expire: (jobId: string) => boolean;
   storageDir: string;
   filesDir: string;
   recordingsDir: string;
+  /**
+   * Papelera del historial (D-115): lo que lleva más de `days` se borra para
+   * siempre (`purgeExpired`), y los archivos sueltos de `dir` que ningún job
+   * guarda, también. Corre aunque RETENTION_DAYS sea 0: lo borrado no se queda.
+   */
+  trash?: { days: number; dir: string; purgeExpired: () => Promise<number> };
   listFiles?: (dir: string) => Promise<DirEntry[]>;
   /** Lanza si no pudo (p. ej. archivo abierto). Si no existe, no es error. */
   removeFile?: (file: string) => Promise<void>;
@@ -47,7 +53,13 @@ export type RetentionDeps = {
   };
 };
 
-export type RetentionSummary = { expired: number; orphans: number; recordings: number };
+export type RetentionSummary = {
+  expired: number;
+  orphans: number;
+  recordings: number;
+  /** Borrados para siempre de la papelera (solo si hay papelera). */
+  trash?: number;
+};
 
 /**
  * Retención automática (SPEC §8): borra los archivos con más de
@@ -78,8 +90,21 @@ export function createRetentionService(deps: RetentionDeps) {
     }
   };
 
+  /** 0. La papelera: lo vencido y los archivos que ya no guarda ningún job. */
+  async function sweepTrash(trash: NonNullable<RetentionDeps['trash']>): Promise<number> {
+    const purged = await trash.purgeExpired();
+    const cutoffMs = now().getTime() - trash.days * DAY_MS;
+    const kept = new Set(deps.repo.listTrashPaths().map((p) => path.basename(p).toLowerCase()));
+    for (const entry of await list(trash.dir)) {
+      if (entry.modifiedMs >= cutoffMs || kept.has(entry.name.toLowerCase())) continue;
+      await tryRemove(path.join(trash.dir, entry.name));
+    }
+    return purged;
+  }
+
   async function sweep(): Promise<RetentionSummary> {
     const summary: RetentionSummary = { expired: 0, orphans: 0, recordings: 0 };
+    if (deps.trash) summary.trash = await sweepTrash(deps.trash);
     if (deps.retentionDays === 0) return summary;
     const cutoffMs = now().getTime() - deps.retentionDays * DAY_MS;
 
@@ -103,7 +128,7 @@ export function createRetentionService(deps: RetentionDeps) {
       if (await tryRemove(path.join(deps.recordingsDir, entry.name))) summary.recordings++;
     }
 
-    if (summary.expired + summary.orphans + summary.recordings > 0) {
+    if (summary.expired + summary.orphans + summary.recordings + (summary.trash ?? 0) > 0) {
       deps.logger.info({ ...summary, retentionDays: deps.retentionDays }, 'Retención aplicada');
     }
     return summary;

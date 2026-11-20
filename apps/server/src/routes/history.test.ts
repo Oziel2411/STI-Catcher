@@ -9,6 +9,8 @@ import {
   historyResponseSchema,
   jobEventSchema,
   jobResponseSchema,
+  trashEmptyResponseSchema,
+  trashResponseSchema,
 } from '@sti-catcher/shared';
 import type { JobEvent } from '@sti-catcher/shared';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -164,7 +166,7 @@ describe('GET /api/history', () => {
 });
 
 describe('DELETE /api/jobs/:id', () => {
-  it('borra un trabajo propio y su archivo, lo publica y lo registra con la IP', async () => {
+  it('manda un trabajo propio y su archivo a la papelera, lo publica y lo registra con la IP', async () => {
     const testApp = await app();
     const jobId = createJob(testApp, 'Mío', testApp.ana.user.id);
     forceDone(testApp, jobId);
@@ -174,9 +176,11 @@ describe('DELETE /api/jobs/:id', () => {
       headers: testApp.ana.headers,
     });
     expect(response.statusCode).toBe(204);
-    expect(testApp.repo.get(jobId)).toBeNull();
+    // D-115: la fila queda (en la papelera) y el archivo pasa a trash/.
+    expect(testApp.repo.get(jobId)).toMatchObject({ trashKind: 'job', status: 'expired' });
     const { existsSync } = await import('node:fs');
     expect(existsSync(path.join(testApp.filesDir, `${jobId}.mp4`))).toBe(false);
+    expect(existsSync(path.join(testApp.trashDir, `${jobId}.mp4`))).toBe(true);
     expect(testApp.events).toContainEqual({ type: 'job.deleted', jobId });
     expect(testApp.historyLogger.info).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -185,8 +189,28 @@ describe('DELETE /api/jobs/:id', () => {
         deletedByIp: '127.0.0.1',
         createdByIp: '10.0.0.7',
       }),
-      'Trabajo borrado del historial',
+      'Trabajo movido a la papelera',
     );
+    // Ya no se ve en el historial, ni se puede volver a borrar.
+    const own = historyResponseSchema.parse(
+      (
+        await testApp.app.inject({
+          method: 'GET',
+          url: '/api/history',
+          headers: testApp.ana.headers,
+        })
+      ).json(),
+    );
+    expect(own.items).toEqual([]);
+    expect(
+      (
+        await testApp.app.inject({
+          method: 'DELETE',
+          url: `/api/jobs/${jobId}`,
+          headers: testApp.ana.headers,
+        })
+      ).statusCode,
+    ).toBe(404);
   });
 
   it('403 si el trabajo es de otra persona, o de antes del login', async () => {
@@ -287,13 +311,25 @@ describe('borrar un archivo que usa otro trabajo (D-113)', () => {
       headers: testApp.ana.headers,
     });
     expect(row.statusCode).toBe(204);
+    expect(testApp.repo.get(conversion)).toMatchObject({ status: 'done', parentJobId: download });
+    expect(existsSync(path.join(testApp.filesDir, `${conversion}.mp4`))).toBe(true);
+
+    // Borrado para siempre: la conversión sigue, solo pierde el origen (ON DELETE SET NULL).
+    const purge = await testApp.app.inject({
+      method: 'POST',
+      url: '/api/trash/purge',
+      headers: testApp.ana.headers,
+      payload: { ids: [download] },
+    });
+    expect(historyBulkDeleteResponseSchema.parse(purge.json()).done).toEqual([download]);
+    expect(testApp.repo.get(download)).toBeNull();
     expect(testApp.repo.get(conversion)).toMatchObject({ status: 'done', parentJobId: null });
     expect(existsSync(path.join(testApp.filesDir, `${conversion}.mp4`))).toBe(true);
   });
 });
 
 describe('DELETE /api/jobs/:id/file', () => {
-  it('borra solo el archivo: el trabajo queda expirado, se publica y se registra', async () => {
+  it('manda solo el archivo a la papelera: el trabajo queda expirado, se publica y se registra', async () => {
     const testApp = await app();
     const jobId = createJob(testApp, 'Mío', testApp.ana.user.id);
     forceDone(testApp, jobId);
@@ -307,14 +343,19 @@ describe('DELETE /api/jobs/:id/file', () => {
     expect(testApp.repo.get(jobId)?.status).toBe('expired');
     const { existsSync } = await import('node:fs');
     expect(existsSync(path.join(testApp.filesDir, `${jobId}.mp4`))).toBe(false);
+    expect(existsSync(path.join(testApp.trashDir, `${jobId}.mp4`))).toBe(true);
     expect(
       testApp.events.some(
-        (e) => e.type === 'job.updated' && e.job.id === jobId && e.job.status === 'expired',
+        (e) =>
+          e.type === 'job.updated' &&
+          e.job.id === jobId &&
+          e.job.status === 'expired' &&
+          e.job.inTrash === true,
       ),
     ).toBe(true);
     expect(testApp.historyLogger.info).toHaveBeenCalledWith(
       expect.objectContaining({ jobId, deletedByUser: testApp.ana.user.id }),
-      'Archivo borrado desde el historial',
+      'Archivo movido a la papelera',
     );
   });
 
@@ -370,8 +411,8 @@ describe('POST /api/history/delete', () => {
       payload: { ids: [a, b], what: 'job' },
     });
     expect(historyBulkDeleteResponseSchema.parse(rows.json()).done).toEqual([a, b]);
-    expect(testApp.repo.get(a)).toBeNull();
-    expect(testApp.repo.get(b)).toBeNull();
+    expect(testApp.repo.get(a)).toMatchObject({ trashKind: 'job' });
+    expect(testApp.repo.get(b)).toMatchObject({ trashKind: 'job' });
   });
 
   it('400 sin ids o con un modo que no existe', async () => {
@@ -388,6 +429,156 @@ describe('POST /api/history/delete', () => {
       });
       expect(response.statusCode).toBe(400);
     }
+  });
+});
+
+describe('papelera (D-115)', () => {
+  const del = (testApp: Awaited<ReturnType<typeof app>>, url: string) =>
+    testApp.app.inject({ method: 'DELETE', url, headers: testApp.ana.headers });
+  const post = (testApp: Awaited<ReturnType<typeof app>>, url: string, payload?: object) =>
+    testApp.app.inject({
+      method: 'POST',
+      url,
+      headers: testApp.ana.headers,
+      ...(payload ? { payload } : {}),
+    });
+  const trash = async (testApp: Awaited<ReturnType<typeof app>>, headers = testApp.ana.headers) =>
+    trashResponseSchema.parse(
+      (await testApp.app.inject({ method: 'GET', url: '/api/trash', headers })).json(),
+    );
+
+  it('lista lo propio con qué se borró, cuándo se borra solo y cuánto ocupa', async () => {
+    const testApp = await app();
+    const fileOnly = createJob(testApp, 'Solo archivo', testApp.ana.user.id);
+    const whole = createJob(testApp, 'Entero', testApp.ana.user.id);
+    for (const id of [fileOnly, whole]) forceDone(testApp, id);
+    testApp.db.prepare('UPDATE jobs SET size_bytes = 1000').run();
+    await del(testApp, `/api/jobs/${fileOnly}/file`);
+    await del(testApp, `/api/jobs/${whole}`);
+
+    const result = await trash(testApp);
+    expect(result.trashDays).toBe(7);
+    expect(result.totalBytes).toBe(2000);
+    expect(result.items.map((i) => [i.id, i.trashKind])).toEqual(
+      expect.arrayContaining([
+        [fileOnly, 'file'],
+        [whole, 'job'],
+      ]),
+    );
+    const item = result.items.find((i) => i.id === whole);
+    expect(item?.trashedAt).toBe(testApp.clock.now.toISOString());
+    expect(item?.purgeAt).toBe('2026-11-05T12:00:00.000Z');
+    // Nadie más la ve.
+    expect((await trash(testApp, testApp.beto.headers)).items).toEqual([]);
+  });
+
+  it('restaurar devuelve el archivo y la fila; la retención vuelve a contar desde ahí', async () => {
+    const testApp = await app();
+    const jobId = createJob(testApp, 'Volvé', testApp.ana.user.id);
+    forceDone(testApp, jobId);
+    // Terminado hace mucho: sin restored_at la retención lo vencería en la próxima pasada.
+    testApp.db
+      .prepare("UPDATE jobs SET finished_at = '2020-01-01T00:00:00.000Z' WHERE id = ?")
+      .run(jobId);
+    await del(testApp, `/api/jobs/${jobId}`);
+
+    const response = await post(testApp, '/api/trash/restore', { ids: [jobId] });
+    expect(historyBulkDeleteResponseSchema.parse(response.json()).done).toEqual([jobId]);
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(path.join(testApp.filesDir, `${jobId}.mp4`))).toBe(true);
+    expect(existsSync(path.join(testApp.trashDir, `${jobId}.mp4`))).toBe(false);
+    expect(testApp.repo.get(jobId)).toMatchObject({
+      status: 'done',
+      trashKind: null,
+      trashPath: null,
+      restoredAt: testApp.clock.now.toISOString(),
+    });
+    expect(testApp.repo.listExpirable('2026-10-01T00:00:00.000Z')).toEqual([]);
+    expect(testApp.repo.listExpirable('2026-11-01T00:00:00.000Z').map((j) => j.id)).toEqual([
+      jobId,
+    ]);
+    expect(
+      testApp.events.some(
+        (e) => e.type === 'job.updated' && e.job.id === jobId && e.job.status === 'done',
+      ),
+    ).toBe(true);
+    // Vuelve a verse en el historial, con su archivo.
+    const own = historyResponseSchema.parse(
+      (
+        await testApp.app.inject({
+          method: 'GET',
+          url: '/api/history',
+          headers: testApp.ana.headers,
+        })
+      ).json(),
+    );
+    expect(own.items.map((i) => [i.id, i.status, i.inTrash])).toEqual([[jobId, 'done', undefined]]);
+  });
+
+  it('borrar para siempre y vaciar: el archivo se va y la fila «entera» también', async () => {
+    const testApp = await app();
+    const fileOnly = createJob(testApp, 'Solo archivo', testApp.ana.user.id);
+    const whole = createJob(testApp, 'Entero', testApp.ana.user.id);
+    const other = createJob(testApp, 'De otro', testApp.ana.user.id);
+    for (const id of [fileOnly, whole, other]) forceDone(testApp, id);
+    testApp.db.prepare('UPDATE jobs SET size_bytes = 1000').run();
+    await del(testApp, `/api/jobs/${fileOnly}/file`);
+    await del(testApp, `/api/jobs/${whole}`);
+    await del(testApp, `/api/jobs/${other}`);
+
+    const purge = await post(testApp, '/api/trash/purge', { ids: [fileOnly] });
+    expect(historyBulkDeleteResponseSchema.parse(purge.json()).done).toEqual([fileOnly]);
+    // Solo el archivo: la fila queda en el historial como expirada, sin papelera.
+    expect(testApp.repo.get(fileOnly)).toMatchObject({ status: 'expired', trashKind: null });
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(path.join(testApp.trashDir, `${fileOnly}.mp4`))).toBe(false);
+
+    const empty = await post(testApp, '/api/trash/empty');
+    expect(trashEmptyResponseSchema.parse(empty.json())).toEqual({ purged: 2, freedBytes: 2000 });
+    expect(testApp.repo.get(whole)).toBeNull();
+    expect(testApp.repo.get(other)).toBeNull();
+    expect((await trash(testApp)).items).toEqual([]);
+  });
+
+  it('lo ajeno o lo que no está en la papelera no se toca', async () => {
+    const testApp = await app();
+    const betos = createJob(testApp, 'De Beto', testApp.beto.user.id);
+    forceDone(testApp, betos);
+    await testApp.app.inject({
+      method: 'DELETE',
+      url: `/api/jobs/${betos}`,
+      headers: testApp.beto.headers,
+    });
+    const mine = createJob(testApp, 'Mío', testApp.ana.user.id);
+    forceDone(testApp, mine);
+
+    for (const url of ['/api/trash/restore', '/api/trash/purge']) {
+      const result = historyBulkDeleteResponseSchema.parse(
+        (await post(testApp, url, { ids: [betos, mine] })).json(),
+      );
+      expect(result.done).toEqual([]);
+      expect(result.failed.map((f) => f.id)).toEqual([betos, mine]);
+    }
+    expect(testApp.repo.get(betos)).toMatchObject({ trashKind: 'job' });
+    expect(testApp.repo.get(mine)).toMatchObject({ status: 'done', trashKind: null });
+  });
+
+  it('a los 7 días se borra para siempre solo', async () => {
+    const testApp = await app();
+    const old = createJob(testApp, 'Viejo', testApp.ana.user.id);
+    const recent = createJob(testApp, 'Reciente', testApp.ana.user.id);
+    for (const id of [old, recent]) forceDone(testApp, id);
+    await del(testApp, `/api/jobs/${old}`);
+    testApp.clock.now = new Date('2026-11-04T12:00:00.000Z');
+    await del(testApp, `/api/jobs/${recent}/file`);
+
+    testApp.clock.now = new Date('2026-11-05T12:00:01.000Z');
+    expect(await testApp.history.purgeExpiredTrash()).toBe(1);
+    expect(testApp.repo.get(old)).toBeNull();
+    expect(testApp.repo.get(recent)).toMatchObject({ trashKind: 'file' });
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(path.join(testApp.trashDir, `${old}.mp4`))).toBe(false);
+    expect(existsSync(path.join(testApp.trashDir, `${recent}.mp4`))).toBe(true);
   });
 });
 

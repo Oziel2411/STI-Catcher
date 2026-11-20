@@ -203,13 +203,20 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     filesDir,
     onMissing: (id) => queue.expire(id),
   });
-  const historyLogger = { info: vi.fn() };
+  const historyLogger = { info: vi.fn(), warn: vi.fn() };
+  // Papelera (D-115): carpeta real, como en el server.
+  const trashDir = path.join(storageDir, 'trash');
+  mkdirSync(trashDir, { recursive: true });
   const history = createHistoryService({
     repo,
     queue,
     storageDir,
     filesDir,
+    trashDir,
+    trashDays: 7,
     removeFile: (file) => rm(file, { force: true }),
+    moveFile: fileOps.moveFile,
+    now: () => clock.now,
     logger: historyLogger,
     userNames: (ids) => users.namesByIds(ids),
   });
@@ -407,6 +414,9 @@ export async function makeTestApp(options: TestAppOptions = {}) {
     ffprobe,
     storageDir,
     filesDir,
+    trashDir,
+    history,
+    db,
     historyLogger,
     recordings,
     recordingsRepo,

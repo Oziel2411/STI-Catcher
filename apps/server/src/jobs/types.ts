@@ -35,7 +35,17 @@ export type JobRecord = {
   followUpJobId: string | null;
   /** Pedido de varios trabajos que avisa con un solo mail (D-105). */
   noticeBatchId: string | null;
+  /** Papelera (D-115): cuándo se borró; null si no está en la papelera. */
+  trashedAt: string | null;
+  /** 'file': se borró solo el archivo (la fila se ve); 'job': el trabajo entero (no se ve). */
+  trashKind: TrashKind | null;
+  /** El archivo guardado en la papelera, relativo a STORAGE_DIR; null si no tenía. */
+  trashPath: string | null;
+  /** Cuándo se restauró de la papelera: la retención cuenta desde ahí. */
+  restoredAt: string | null;
 };
+
+export type TrashKind = 'file' | 'job';
 
 export type NewJob = Pick<JobRecord, 'id' | 'type' | 'params' | 'createdAt'> &
   Partial<
@@ -115,6 +125,25 @@ export type JobsRepository = {
   rename(id: string, title: string): boolean;
   /** true si alguna conversión o compresión en cola o en curso lee el archivo de este job. */
   hasActiveChildren(id: string): boolean;
+  /**
+   * Pasa un job terminado a la papelera (D-115). Si tenía archivo (`trashPath`),
+   * queda `expired`. Uno que ya estaba con kind 'file' conserva su archivo
+   * guardado. false si no existe o está activo.
+   */
+  moveToTrash(
+    id: string,
+    change: { kind: TrashKind; at: string; trashPath: string | null },
+  ): boolean;
+  /** Saca de la papelera: vuelve a `done` si `fileBack`. false si no estaba en la papelera. */
+  restoreFromTrash(id: string, change: { at: string; fileBack: boolean }): boolean;
+  /** Olvida lo guardado en la papelera de un job que sigue en el historial (kind 'file'). */
+  clearTrash(id: string): boolean;
+  /** La papelera de una cuenta, lo último borrado primero. */
+  listTrash(userId: string): JobRecord[];
+  /** Lo que entró a la papelera antes de `beforeIso` (se borra para siempre). */
+  listTrashedBefore(beforeIso: string): JobRecord[];
+  /** Archivos guardados en la papelera (relativos a STORAGE_DIR). */
+  listTrashPaths(): string[];
   listHistory(filter: HistoryFilter): { records: JobRecord[]; total: number };
   /**
    * Jobs `done` con archivo que terminaron antes de `beforeIso` (retención).

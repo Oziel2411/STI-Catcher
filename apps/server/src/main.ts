@@ -71,6 +71,8 @@ async function main(): Promise<void> {
     // Crudos de grabaciones en curso. No van en tmp: tmp se vacía al arrancar, y
     // una grabación tiene que sobrevivir a un reinicio (se procesa lo que llegó).
     recordingsDir: path.join(config.paths.storage, 'recordings'),
+    // Papelera del historial (D-115). Aparte de files/: la retención limpia ahí lo que no usa ningún job.
+    trashDir: path.join(config.paths.storage, 'trash'),
   };
   // Cachés de yt-dlp y Deno dentro de DATA_DIR: la cuenta del servicio no tiene perfil normal (D-012).
   const caches = {
@@ -268,7 +270,10 @@ async function main(): Promise<void> {
     queue,
     storageDir: config.paths.storage,
     filesDir: storage.filesDir,
+    trashDir: storage.trashDir,
+    trashDays: config.limits.trashDays,
     removeFile: fileOps.removeFile,
+    moveFile: fileOps.moveFile,
     logger,
     userNames: (ids) => users.namesByIds(ids),
   });
@@ -389,6 +394,11 @@ async function main(): Promise<void> {
     storageDir: config.paths.storage,
     filesDir: storage.filesDir,
     recordingsDir: storage.recordingsDir,
+    trash: {
+      days: config.limits.trashDays,
+      dir: storage.trashDir,
+      purgeExpired: () => history.purgeExpiredTrash(),
+    },
     logger,
   });
 

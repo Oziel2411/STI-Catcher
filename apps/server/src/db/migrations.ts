@@ -265,6 +265,21 @@ export const migrations: readonly Migration[] = [
     },
     foreignKeysOff: true,
   },
+  {
+    version: 13,
+    name: 'add-trash',
+    // Papelera del historial (D-115): lo borrado se guarda unos días antes de irse.
+    // trash_kind: 'file' (solo el archivo; la fila se ve) o 'job' (la fila no se ve).
+    // trash_path: el archivo movido a STORAGE_DIR\trash (relativo a STORAGE_DIR).
+    // restored_at: la retención vuelve a contar desde que se restauró.
+    sql: `
+      ALTER TABLE jobs ADD COLUMN trashed_at TEXT;
+      ALTER TABLE jobs ADD COLUMN trash_kind TEXT CHECK (trash_kind IN ('file', 'job'));
+      ALTER TABLE jobs ADD COLUMN trash_path TEXT;
+      ALTER TABLE jobs ADD COLUMN restored_at TEXT;
+      CREATE INDEX idx_jobs_trashed ON jobs (trashed_at) WHERE trashed_at IS NOT NULL;
+    `,
+  },
 ];
 
 /**
