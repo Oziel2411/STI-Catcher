@@ -38,7 +38,7 @@ export type HistoryActions = {
   convert: boolean;
   /** Achicar un video (D-108): no para audio ni GIF. */
   compress: boolean;
-  /** Recortar o dividir (D-112): los mismos que se pueden comprimir. */
+  /** Recortar o dividir (D-114): los mismos que se pueden comprimir. */
   edit: boolean;
   openOriginal: boolean;
   retry: boolean;

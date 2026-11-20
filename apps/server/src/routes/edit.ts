@@ -17,7 +17,7 @@ export type EditRoutesOptions = {
 const toHttpError = (error: unknown): unknown =>
   error instanceof EditError ? new HttpError(error.status, error.code, error.message) : error;
 
-/** Recortar y dividir (D-112). */
+/** Recortar y dividir (D-114). */
 export function registerEditRoutes(app: FastifyInstance, options: EditRoutesOptions): void {
   app.get('/api/edit/sources/:id', async (request) => {
     const { id } = parseInput(jobIdParamsSchema, request.params);

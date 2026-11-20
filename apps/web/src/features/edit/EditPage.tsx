@@ -5,7 +5,7 @@ import { parseOrigin } from '../../lib/convert-batch.ts';
 import { VideoEditor } from './VideoEditor.tsx';
 
 /**
- * Recortar y dividir cualquier video del historial (D-112): `/editar?origen=<id>`.
+ * Recortar y dividir cualquier video del historial (D-114): `/editar?origen=<id>`.
  * No está en la barra de secciones: se llega desde el historial o desde una
  * grabación terminada.
  */

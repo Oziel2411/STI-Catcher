@@ -588,7 +588,7 @@ function SourcePreview({
 }
 
 function RecordingDone({ job }: { job: Job }) {
-  // Recortar y dividir sobre la misma grabación (D-112).
+  // Recortar y dividir sobre la misma grabación (D-114).
   const [editing, setEditing] = useState(false);
   if (editing) {
     return (

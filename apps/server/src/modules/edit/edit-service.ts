@@ -68,7 +68,7 @@ export const editTitle = (title: string | null, part: number | null, parts: numb
     : `${title ?? 'Video'} (parte ${String(part)} de ${String(parts)})`;
 
 /**
- * Recortar y dividir (D-112): análisis del origen y creación de los jobs.
+ * Recortar y dividir (D-114): análisis del origen y creación de los jobs.
  * Unir = un job con todos los tramos; dividir = un job por tramo, con un
  * solo aviso por mail para todos (D-105).
  */

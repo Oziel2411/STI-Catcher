@@ -2,7 +2,7 @@ import { EDIT_MAX_SEGMENTS, EDIT_MIN_SEGMENT_SECONDS } from '@sti-catcher/shared
 import type { EditOutput, EditSegment } from '@sti-catcher/shared';
 
 /**
- * Recortar y dividir (D-112). El video se parte en tramos con cortes; cada
+ * Recortar y dividir (D-114). El video se parte en tramos con cortes; cada
  * tramo queda o se saca. Todo puro: la página solo guarda la lista.
  */
 export type Piece = { start: number; end: number; keep: boolean };

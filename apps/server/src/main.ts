@@ -219,7 +219,7 @@ async function main(): Promise<void> {
     paths: storage,
     maxConcurrent: config.limits.maxConcurrentJobs,
     // Una compresión a la vez (D-108): es lo que más CPU usa, y la PC es compartida.
-    // Recortar recodifica igual: también de a uno (D-112).
+    // Recortar recodifica igual: también de a uno (D-114).
     maxConcurrentByType: { compression: 1, edit: 1 },
     minFreeDiskBytes: config.limits.minFreeDiskBytes,
     readFreeDiskBytes: async () => (await readDiskSpace(config.paths.storage)).freeBytes,

@@ -5,7 +5,7 @@ import { noticeBatchIdSchema } from './mail.ts';
 import { notifyUserIdsSchema } from './users.ts';
 
 /**
- * Recortar y dividir (D-112). La persona marca cortes sobre el video; cada
+ * Recortar y dividir (D-114). La persona marca cortes sobre el video; cada
  * tramo que queda se manda como `{ start, end }` en segundos del original.
  */
 

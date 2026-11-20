@@ -36,7 +36,7 @@ const EVEN_SIZE = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
 const MP4_OUT = ['-movflags', '+faststart'];
 
 /**
- * Recortar y dividir (D-112): deja los tramos pedidos, unidos en un MP4.
+ * Recortar y dividir (D-114): deja los tramos pedidos, unidos en un MP4.
  * Al dividir, cada parte es un job con un solo tramo.
  *
  * Exacto (recodifica, por defecto):

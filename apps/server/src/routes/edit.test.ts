@@ -34,7 +34,7 @@ async function uploadedJobId(testApp: TestApp) {
 const edit = (testApp: TestApp, payload: object) =>
   testApp.app.inject({ method: 'POST', url: '/api/jobs/edit', payload });
 
-describe('recortar y dividir (D-112)', () => {
+describe('recortar y dividir (D-114)', () => {
   it('GET /api/edit/sources/:id: duración y cuadros por segundo del original', async () => {
     const testApp = await app();
     const jobId = await uploadedJobId(testApp);

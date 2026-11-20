@@ -500,7 +500,7 @@ Sin dominio de Windows (sin GPO) ni consola de ESET PROTECT, instalar la CA en c
 
 **Verificado:** con tests de las rutas y del script, y corriendo el `.cmd` en modo prueba (sin `certutil -addstore`): el certificado que escribe es idéntico al original. Falta probar la instalación real en una PC cliente.
 
-### D-112 — Recortar y dividir videos · Vigente
+### D-114 — Recortar y dividir videos · Vigente
 
 Lo que más se hace con una grabación es sacar el principio y el final, sacar un tramo del medio o partirla en varias. Nada de edición compleja (sin transiciones, textos ni varias pistas).
 

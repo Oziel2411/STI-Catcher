@@ -48,7 +48,7 @@ type Props = {
 const pct = (t: number, duration: number) => `${String((t / duration) * 100)}%`;
 
 /**
- * Recortar y dividir (D-112): línea de tiempo con cortes sobre el video.
+ * Recortar y dividir (D-114): línea de tiempo con cortes sobre el video.
  * Cada tramo queda o se saca; el resultado es uno o varios trabajos nuevos
  * (el original no se toca).
  */
@@ -514,9 +514,10 @@ function Editor({ source, onClose }: { source: EditSourceResponse; onClose?: () 
 
         {error !== null && <p className="small text-error">{error}</p>}
         <div className="row">
+          {/* Uno solo relleno por pantalla (D-112): con videos creados, el paso es descargarlos. */}
           <button
             type="button"
-            className="button"
+            className={created.length > 0 ? 'button button-secondary' : 'button'}
             disabled={problem !== null || submitting}
             onClick={() => void submit()}
           >
@@ -589,7 +590,11 @@ function CreatedJobs({ jobIds }: { jobIds: string[] }) {
             connected={connected}
             doneContent={
               <div className="row">
-                <a className="button" href={`/api/jobs/${job.id}/file`} download>
+                <a
+                  className={jobIds.length === 1 ? 'button' : 'button button-secondary'}
+                  href={`/api/jobs/${job.id}/file`}
+                  download
+                >
                   Descargar MP4
                 </a>
                 <Link className="button button-secondary" to="/historial">

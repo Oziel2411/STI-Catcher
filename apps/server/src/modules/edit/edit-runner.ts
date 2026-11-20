@@ -9,7 +9,7 @@ import type { JobRecord, JobRunner } from '../../jobs/types.ts';
 import { resolveJobFile } from '../files/job-files.ts';
 import { buildEditArgs } from './edit-args.ts';
 
-/** Al dividir, cada job tiene un solo tramo; al unir, todos los que quedan (D-112). */
+/** Al dividir, cada job tiene un solo tramo; al unir, todos los que quedan (D-114). */
 export const editParamsSchema = z.object({
   sourceJobId: z.uuid(),
   segments: editSegmentsSchema,
@@ -28,7 +28,7 @@ export type EditRunnerDeps = {
 };
 
 /**
- * Recorta o divide el archivo de un job terminado (D-112). El resultado es
+ * Recorta o divide el archivo de un job terminado (D-114). El resultado es
  * un MP4 nuevo vinculado al origen por `parent_job_id`: el original no se toca.
  */
 export function createEditRunner(deps: EditRunnerDeps): JobRunner {
