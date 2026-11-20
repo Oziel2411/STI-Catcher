@@ -1,4 +1,9 @@
-import { historyQuerySchema, jobIdParamsSchema } from '@sti-catcher/shared';
+import {
+  historyBulkDeleteBodySchema,
+  historyQuerySchema,
+  jobIdParamsSchema,
+  renameJobBodySchema,
+} from '@sti-catcher/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { HttpError, parseInput } from '../http/validation.ts';
 import { requireUser } from '../http/session.ts';
@@ -24,7 +29,7 @@ export function registerHistoryRoutes(app: FastifyInstance, history: HistoryServ
 
   app.get('/api/active-jobs', (request) => history.activeCounts(requesterOf(request)));
 
-  // Solo los trabajos propios (mismo navegador). Borra el registro y el archivo.
+  // Solo los trabajos propios (D-104). Borra el registro y el archivo.
   app.delete('/api/jobs/:id', async (request, reply) => {
     const { id } = parseInput(jobIdParamsSchema, request.params);
     try {
@@ -33,6 +38,32 @@ export function registerHistoryRoutes(app: FastifyInstance, history: HistoryServ
       throw toHttpError(error);
     }
     return reply.status(204).send();
+  });
+
+  // Solo el archivo, para liberar disco: el trabajo queda como expirado (D-113).
+  app.delete('/api/jobs/:id/file', async (request) => {
+    const { id } = parseInput(jobIdParamsSchema, request.params);
+    try {
+      return { job: await history.removeFile(id, requesterOf(request)) };
+    } catch (error) {
+      throw toHttpError(error);
+    }
+  });
+
+  // Varios a la vez (selección múltiple del historial, D-113).
+  app.post('/api/history/delete', async (request) => {
+    const { ids, what } = parseInput(historyBulkDeleteBodySchema, request.body);
+    return history.removeMany(ids, what, requesterOf(request));
+  });
+
+  app.patch('/api/jobs/:id', (request) => {
+    const { id } = parseInput(jobIdParamsSchema, request.params);
+    const { title } = parseInput(renameJobBodySchema, request.body);
+    try {
+      return { job: history.rename(id, title, requesterOf(request)) };
+    } catch (error) {
+      throw toHttpError(error);
+    }
   });
 
   // Crea un trabajo nuevo con los mismos parámetros; el original no cambia.

@@ -4,9 +4,11 @@ import {
   apiErrorSchema,
   createJobResponseSchema,
   activeJobsResponseSchema,
+  historyBulkDeleteResponseSchema,
   historyRequestersResponseSchema,
   historyResponseSchema,
   jobEventSchema,
+  jobResponseSchema,
 } from '@sti-catcher/shared';
 import type { JobEvent } from '@sti-catcher/shared';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -224,6 +226,225 @@ describe('DELETE /api/jobs/:id', () => {
         })
       ).statusCode,
     ).toBe(404);
+  });
+});
+
+/** Una conversión en cola que lee el archivo de `parentJobId`. */
+function createChild(testApp: Awaited<ReturnType<typeof app>>, parentJobId: string) {
+  return testApp.repo.insert({
+    id: crypto.randomUUID(),
+    type: 'conversion',
+    params: { sourceJobId: parentJobId, preset: 'mp4-h264' },
+    title: 'Conversión',
+    sourceUrl: null,
+    parentJobId,
+    userId: testApp.ana.user.id,
+    clientIp: '10.0.0.7',
+    createdAt: new Date().toISOString(),
+  }).id;
+}
+
+describe('borrar un archivo que usa otro trabajo (D-113)', () => {
+  it('409 SOURCE_IN_USE si una conversión en cola lee el archivo; el archivo queda', async () => {
+    const testApp = await app();
+    const jobId = createJob(testApp, 'Origen', testApp.ana.user.id);
+    forceDone(testApp, jobId);
+    createChild(testApp, jobId);
+    for (const url of [`/api/jobs/${jobId}`, `/api/jobs/${jobId}/file`]) {
+      const response = await testApp.app.inject({
+        method: 'DELETE',
+        url,
+        headers: testApp.ana.headers,
+      });
+      expect(response.statusCode).toBe(409);
+      expect(apiErrorSchema.parse(response.json()).error.code).toBe('SOURCE_IN_USE');
+    }
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(path.join(testApp.filesDir, `${jobId}.mp4`))).toBe(true);
+    expect(testApp.repo.get(jobId)?.status).toBe('done');
+  });
+
+  it('con la conversión encadenada ya terminada: se borra el origen y la conversión queda intacta', async () => {
+    const testApp = await app();
+    const download = createJob(testApp, 'Descarga', testApp.ana.user.id);
+    forceDone(testApp, download);
+    const conversion = createChild(testApp, download);
+    forceDone(testApp, conversion);
+    expect(testApp.repo.setFollowUp(download, conversion)).toBe(true);
+    const { existsSync } = await import('node:fs');
+
+    const fileOnly = await testApp.app.inject({
+      method: 'DELETE',
+      url: `/api/jobs/${download}/file`,
+      headers: testApp.ana.headers,
+    });
+    expect(fileOnly.statusCode).toBe(200);
+    expect(testApp.repo.get(download)?.followUpJobId).toBe(conversion);
+
+    const row = await testApp.app.inject({
+      method: 'DELETE',
+      url: `/api/jobs/${download}`,
+      headers: testApp.ana.headers,
+    });
+    expect(row.statusCode).toBe(204);
+    expect(testApp.repo.get(conversion)).toMatchObject({ status: 'done', parentJobId: null });
+    expect(existsSync(path.join(testApp.filesDir, `${conversion}.mp4`))).toBe(true);
+  });
+});
+
+describe('DELETE /api/jobs/:id/file', () => {
+  it('borra solo el archivo: el trabajo queda expirado, se publica y se registra', async () => {
+    const testApp = await app();
+    const jobId = createJob(testApp, 'Mío', testApp.ana.user.id);
+    forceDone(testApp, jobId);
+    const response = await testApp.app.inject({
+      method: 'DELETE',
+      url: `/api/jobs/${jobId}/file`,
+      headers: testApp.ana.headers,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(jobResponseSchema.parse(response.json()).job.status).toBe('expired');
+    expect(testApp.repo.get(jobId)?.status).toBe('expired');
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(path.join(testApp.filesDir, `${jobId}.mp4`))).toBe(false);
+    expect(
+      testApp.events.some(
+        (e) => e.type === 'job.updated' && e.job.id === jobId && e.job.status === 'expired',
+      ),
+    ).toBe(true);
+    expect(testApp.historyLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId, deletedByUser: testApp.ana.user.id }),
+      'Archivo borrado desde el historial',
+    );
+  });
+
+  it('403 si es de otra persona; 409 si está en curso o ya no tiene archivo', async () => {
+    const testApp = await app();
+    const other = createJob(testApp, 'De otro', testApp.beto.user.id);
+    forceDone(testApp, other);
+    const queued = createJob(testApp, 'En cola', testApp.ana.user.id);
+    const failed = createJob(testApp, 'Falló', testApp.ana.user.id);
+    testApp.repo.markRunning(failed, now());
+    testApp.repo.finish(failed, { status: 'failed', finishedAt: now(), error: 'x' });
+
+    const status = async (id: string) => {
+      const response = await testApp.app.inject({
+        method: 'DELETE',
+        url: `/api/jobs/${id}/file`,
+        headers: testApp.ana.headers,
+      });
+      return [response.statusCode, apiErrorSchema.parse(response.json()).error.code];
+    };
+    expect(await status(other)).toEqual([403, 'NOT_OWNER']);
+    expect(await status(queued)).toEqual([409, 'JOB_ACTIVE']);
+    expect(await status(failed)).toEqual([409, 'NO_FILE']);
+    expect(testApp.repo.get(other)?.status).toBe('done');
+  });
+});
+
+describe('POST /api/history/delete', () => {
+  it('borra varios a la vez y devuelve los que no se pudieron, con el motivo', async () => {
+    const testApp = await app();
+    const a = createJob(testApp, 'A', testApp.ana.user.id);
+    const b = createJob(testApp, 'B', testApp.ana.user.id);
+    const other = createJob(testApp, 'De otro', testApp.beto.user.id);
+    for (const id of [a, b, other]) forceDone(testApp, id);
+
+    const response = await testApp.app.inject({
+      method: 'POST',
+      url: '/api/history/delete',
+      headers: testApp.ana.headers,
+      payload: { ids: [a, b, other], what: 'file' },
+    });
+    expect(response.statusCode).toBe(200);
+    const result = historyBulkDeleteResponseSchema.parse(response.json());
+    expect(result.done).toEqual([a, b]);
+    expect(result.failed).toEqual([{ id: other, message: expect.any(String) as string }]);
+    expect(testApp.repo.get(a)?.status).toBe('expired');
+    expect(testApp.repo.get(other)?.status).toBe('done');
+
+    const rows = await testApp.app.inject({
+      method: 'POST',
+      url: '/api/history/delete',
+      headers: testApp.ana.headers,
+      payload: { ids: [a, b], what: 'job' },
+    });
+    expect(historyBulkDeleteResponseSchema.parse(rows.json()).done).toEqual([a, b]);
+    expect(testApp.repo.get(a)).toBeNull();
+    expect(testApp.repo.get(b)).toBeNull();
+  });
+
+  it('400 sin ids o con un modo que no existe', async () => {
+    const testApp = await app();
+    for (const payload of [
+      { ids: [], what: 'file' },
+      { ids: ['00000000-0000-4000-8000-999999999999'], what: 'todo' },
+    ]) {
+      const response = await testApp.app.inject({
+        method: 'POST',
+        url: '/api/history/delete',
+        headers: testApp.ana.headers,
+        payload,
+      });
+      expect(response.statusCode).toBe(400);
+    }
+  });
+});
+
+describe('PATCH /api/jobs/:id', () => {
+  it('cambia el título de un trabajo propio, se busca por el nuevo y se publica', async () => {
+    const testApp = await app();
+    const jobId = createJob(testApp, 'Viejo', testApp.ana.user.id);
+    forceDone(testApp, jobId);
+    const response = await testApp.app.inject({
+      method: 'PATCH',
+      url: `/api/jobs/${jobId}`,
+      headers: testApp.ana.headers,
+      payload: { title: '  Reunión de equipo  ' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(jobResponseSchema.parse(response.json()).job.title).toBe('Reunión de equipo');
+    expect(
+      testApp.events.some(
+        (e) =>
+          e.type === 'job.updated' && e.job.id === jobId && e.job.title === 'Reunión de equipo',
+      ),
+    ).toBe(true);
+
+    const found = historyResponseSchema.parse(
+      (
+        await testApp.app.inject({
+          method: 'GET',
+          url: '/api/history?q=reunion',
+          headers: testApp.ana.headers,
+        })
+      ).json(),
+    );
+    expect(found.items.map((i) => i.id)).toEqual([jobId]);
+  });
+
+  it('400 vacío; 403 de otra persona; 409 en curso', async () => {
+    const testApp = await app();
+    const mine = createJob(testApp, 'Mío', testApp.ana.user.id);
+    forceDone(testApp, mine);
+    const other = createJob(testApp, 'De otro', testApp.beto.user.id);
+    forceDone(testApp, other);
+    const queued = createJob(testApp, 'En cola', testApp.ana.user.id);
+
+    const patch = async (id: string, title: string) =>
+      (
+        await testApp.app.inject({
+          method: 'PATCH',
+          url: `/api/jobs/${id}`,
+          headers: testApp.ana.headers,
+          payload: { title },
+        })
+      ).statusCode;
+    expect(await patch(mine, '   ')).toBe(400);
+    expect(await patch(other, 'Nuevo')).toBe(403);
+    expect(await patch(queued, 'Nuevo')).toBe(409);
+    expect(testApp.repo.get(other)?.title).toBe('De otro');
+    expect(testApp.repo.get(queued)?.title).toBe('En cola');
   });
 });
 

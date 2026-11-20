@@ -1987,9 +1987,9 @@ input[type='radio'] {
   margin: 0;
 }
 
-/* Columnas fijas (53,5 rem) + al menos 18 rem para «Trabajo». */
+/* Columnas fijas (56 rem) + al menos 18 rem para «Trabajo». */
 .history-table {
-  min-width: 72rem;
+  min-width: 74rem;
   table-layout: fixed;
 }
 
@@ -2020,6 +2020,49 @@ input[type='radio'] {
 .history-table .col-actions {
   width: 9.5rem;
   text-align: right;
+}
+
+/* Casilla para borrar de a varios (D-113). */
+.history-table .col-check {
+  width: 2.5rem;
+  padding-right: 0;
+  text-align: center;
+}
+
+.history-table .col-check input {
+  margin: 0;
+  vertical-align: middle;
+}
+
+.bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+}
+
+.bulk-count {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.title-editor {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.title-editor input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
 }
 
 /* En el celular la tabla se desplaza: las acciones no se ocultan como en otras tablas. */

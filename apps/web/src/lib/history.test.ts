@@ -6,6 +6,8 @@ import {
   isAudioOnly,
   isImage,
   isNewJobEvent,
+  pruneSelection,
+  selectionSummary,
   siteName,
 } from './history.ts';
 
@@ -67,6 +69,25 @@ describe('historyActions', () => {
       retry: false,
       cancel: false,
       remove: true,
+      removeFile: true,
+      rename: true,
+    });
+  });
+
+  it('borrar solo el archivo: propio y con archivo; título: propio y no en curso', () => {
+    expect(historyActions({ ...item, status: 'expired' })).toMatchObject({
+      remove: true,
+      removeFile: false,
+      rename: true,
+    });
+    expect(historyActions({ ...item, isMine: false })).toMatchObject({
+      remove: false,
+      removeFile: false,
+      rename: false,
+    });
+    expect(historyActions({ ...item, status: 'queued' })).toMatchObject({
+      removeFile: false,
+      rename: false,
     });
   });
 
@@ -89,6 +110,36 @@ describe('historyActions', () => {
     expect(historyActions({ ...item, status: 'failed' }).retry).toBe(true);
     expect(historyActions({ ...item, status: 'cancelled', type: 'conversion' }).retry).toBe(true);
     expect(historyActions({ ...item, status: 'failed', type: 'recording' }).retry).toBe(false);
+  });
+});
+
+describe('selección para borrar de a varios (D-113)', () => {
+  const expired = {
+    ...item,
+    id: '00000000-0000-4000-8000-0000000000e1',
+    status: 'expired' as const,
+  };
+  const running = {
+    ...item,
+    id: '00000000-0000-4000-8000-0000000000e2',
+    status: 'running' as const,
+  };
+  const other = { ...item, id: '00000000-0000-4000-8000-0000000000e3', isMine: false };
+  const items = [item, expired, running, other];
+
+  it('cuenta solo lo que se puede borrar; el tamaño, solo lo que tiene archivo', () => {
+    const all = new Set(items.map((i) => i.id));
+    expect(selectionSummary(items, all)).toEqual({
+      ids: [item.id, expired.id],
+      withFile: [item.id],
+      bytes: 744_000,
+    });
+  });
+
+  it('pruneSelection saca lo que ya no está o no se puede borrar, y no cambia si no hace falta', () => {
+    const kept = new Set([item.id]);
+    expect(pruneSelection(kept, items)).toBe(kept);
+    expect([...pruneSelection(new Set([item.id, running.id, 'gone']), items)]).toEqual([item.id]);
   });
 });
 

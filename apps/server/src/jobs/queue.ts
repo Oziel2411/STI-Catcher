@@ -98,6 +98,8 @@ export type JobQueue = {
   toApi(record: JobRecord): Job;
   /** done → expired y lo publica. false si el job no estaba en done. */
   expire(id: string): boolean;
+  /** Cambia el título de un job terminado y lo publica. null si no existe o está activo. */
+  rename(id: string, title: string): Job | null;
   /** Borra un job terminado y publica `job.deleted`. false si no existe o está activo. */
   remove(id: string): boolean;
   /**
@@ -463,6 +465,13 @@ export function createJobQueue(deps: JobQueueDeps): JobQueue {
       publishUpdated(id);
       logger.info({ jobId: id }, 'Archivo de un trabajo ya no disponible: marcado como expirado');
       return true;
+    },
+
+    rename(id, title) {
+      if (!repo.rename(id, title)) return null;
+      publishUpdated(id);
+      const record = repo.get(id);
+      return record ? toApi(record) : null;
     },
 
     remove(id) {

@@ -183,6 +183,12 @@ export function createJobsRepository(db: Db): JobsRepository {
   const deleteStmt = db.prepare<[string]>(
     "DELETE FROM jobs WHERE id = ? AND status NOT IN ('queued', 'running')",
   );
+  const renameStmt = db.prepare<[string, string, string]>(
+    "UPDATE jobs SET title = ?, title_search = ? WHERE id = ? AND status NOT IN ('queued', 'running')",
+  );
+  const activeChildStmt = db.prepare<[string], { found: number }>(
+    "SELECT 1 AS found FROM jobs WHERE parent_job_id = ? AND status IN ('queued', 'running') LIMIT 1",
+  );
   // Retención: no se borra el origen de una conversión que todavía lo va a leer.
   const expirableStmt = db.prepare<[string], { id: string; file_path: string }>(`
     SELECT j.id, j.file_path FROM jobs j
@@ -340,6 +346,14 @@ export function createJobsRepository(db: Db): JobsRepository {
 
     delete(id) {
       return deleteStmt.run(id).changes === 1;
+    },
+
+    rename(id, title) {
+      return renameStmt.run(title, normalizeSearchText(title), id).changes === 1;
+    },
+
+    hasActiveChildren(id) {
+      return activeChildStmt.get(id) !== undefined;
     },
 
     listHistory(filter) {

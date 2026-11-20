@@ -3,6 +3,7 @@ import path from 'node:path';
 import { HISTORY_JOB_TYPES, isActiveStatus } from '@sti-catcher/shared';
 import type {
   ActiveJobsResponse,
+  HistoryBulkDeleteResponse,
   HistoryItem,
   HistoryRequestersResponse,
   HistoryResponse,
@@ -33,7 +34,8 @@ const RETRYABLE_TYPES: readonly JobType[] = [
 export class HistoryError extends Error {
   override name = 'HistoryError';
   constructor(
-    readonly code: 'JOB_NOT_FOUND' | 'NOT_OWNER' | 'JOB_ACTIVE' | 'NOT_RETRYABLE',
+    readonly code:
+      'JOB_NOT_FOUND' | 'NOT_OWNER' | 'JOB_ACTIVE' | 'NOT_RETRYABLE' | 'NO_FILE' | 'SOURCE_IN_USE',
     message: string,
     readonly status: 403 | 404 | 409,
   ) {
@@ -48,8 +50,11 @@ export class HistoryError extends Error {
 export type Requester = { userId: string | null; ip: string | null };
 
 export type HistoryServiceDeps = {
-  repo: Pick<JobsRepository, 'get' | 'listHistory' | 'countActiveByUser' | 'listRequesters'>;
-  queue: Pick<JobQueue, 'toApi' | 'expire' | 'remove' | 'enqueue'>;
+  repo: Pick<
+    JobsRepository,
+    'get' | 'listHistory' | 'countActiveByUser' | 'listRequesters' | 'hasActiveChildren'
+  >;
+  queue: Pick<JobQueue, 'toApi' | 'expire' | 'remove' | 'rename' | 'enqueue'>;
   storageDir: string;
   filesDir: string;
   removeFile: (filePath: string) => Promise<void>;
@@ -84,7 +89,18 @@ export type HistoryService = {
   ) => Promise<HistoryResponse>;
   /** Valores del filtro "Usuario". */
   requesters: () => HistoryRequestersResponse;
+  /** Borra el trabajo y su archivo. */
   remove: (id: string, requester: Requester) => Promise<void>;
+  /** Borra solo el archivo: el trabajo queda como `expired` (D-113). */
+  removeFile: (id: string, requester: Requester) => Promise<Job>;
+  /** Varios de una vez; los que no se pueden quedan en `failed` con el motivo (D-113). */
+  removeMany: (
+    ids: readonly string[],
+    what: 'file' | 'job',
+    requester: Requester,
+  ) => Promise<HistoryBulkDeleteResponse>;
+  /** Cambia el título de un trabajo propio que no está en curso (D-113). */
+  rename: (id: string, title: string, requester: Requester) => Job;
   retry: (id: string, requester: Requester) => Promise<Job>;
   /** Contadores de la barra lateral: lo que este navegador tiene en cola o en curso. */
   activeCounts: (requester: Requester) => ActiveJobsResponse;
@@ -150,6 +166,72 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
     return record;
   };
 
+  /** Un trabajo propio, terminado, cuyo archivo no está leyendo otro trabajo en curso. */
+  const deletable = (id: string, requester: Requester): JobRecord => {
+    const record = getOrThrow(id);
+    if (!isOwn(record, requester)) {
+      throw new HistoryError('NOT_OWNER', 'Solo podés borrar los trabajos que creaste vos.', 403);
+    }
+    if (isActiveStatus(record.status)) {
+      throw new HistoryError(
+        'JOB_ACTIVE',
+        'El trabajo está en curso: cancelalo antes de borrarlo.',
+        409,
+      );
+    }
+    // Una conversión o compresión en cola lee este archivo: borrarlo la haría fallar.
+    if (deps.repo.hasActiveChildren(id)) {
+      throw new HistoryError(
+        'SOURCE_IN_USE',
+        'Una conversión o compresión en curso usa este archivo: esperá a que termine.',
+        409,
+      );
+    }
+    return record;
+  };
+
+  const remove = async (id: string, requester: Requester): Promise<void> => {
+    const record = deletable(id, requester);
+    const file = absoluteFile(record);
+    if (file !== null) await deps.removeFile(file);
+    deps.queue.remove(id);
+    // SPEC §8: los borrados quedan en el log con la IP.
+    deps.logger.info(
+      {
+        jobId: id,
+        type: record.type,
+        title: record.title,
+        deletedByUser: requester.userId,
+        deletedByIp: requester.ip,
+        createdByUser: record.userId,
+        createdByIp: record.clientIp,
+      },
+      'Trabajo borrado del historial',
+    );
+  };
+
+  const removeFile = async (id: string, requester: Requester): Promise<Job> => {
+    const record = deletable(id, requester);
+    const file = absoluteFile(record);
+    if (record.status !== 'done' || file === null) {
+      throw new HistoryError('NO_FILE', 'Este trabajo ya no tiene un archivo para borrar.', 409);
+    }
+    // Primero el archivo: si falla, el trabajo sigue en done y se puede reintentar.
+    await deps.removeFile(file);
+    deps.queue.expire(id);
+    deps.logger.info(
+      {
+        jobId: id,
+        type: record.type,
+        title: record.title,
+        deletedByUser: requester.userId,
+        deletedByIp: requester.ip,
+      },
+      'Archivo borrado desde el historial',
+    );
+    return deps.queue.toApi(deps.repo.get(id) ?? { ...record, status: 'expired' });
+  };
+
   return {
     async list({ scope, q, from, to, type, user, page, pageSize }, requester) {
       const { records, total } = deps.repo.listHistory({
@@ -175,34 +257,43 @@ export function createHistoryService(deps: HistoryServiceDeps): HistoryService {
       };
     },
 
-    async remove(id, requester) {
+    remove,
+    removeFile,
+
+    async removeMany(ids, what, requester) {
+      const result: HistoryBulkDeleteResponse = { done: [], failed: [] };
+      // De a uno: cada borrado revisa sus reglas, y uno que no se puede no frena al resto.
+      for (const id of new Set(ids)) {
+        try {
+          if (what === 'file') await removeFile(id, requester);
+          else await remove(id, requester);
+          result.done.push(id);
+        } catch (error) {
+          if (!(error instanceof HistoryError)) throw error;
+          result.failed.push({ id, message: error.message });
+        }
+      }
+      return result;
+    },
+
+    rename(id, title, requester) {
       const record = getOrThrow(id);
       if (!isOwn(record, requester)) {
-        throw new HistoryError('NOT_OWNER', 'Solo podés borrar los trabajos que creaste vos.', 403);
+        throw new HistoryError(
+          'NOT_OWNER',
+          'Solo podés cambiar el título de los trabajos que creaste vos.',
+          403,
+        );
       }
-      if (isActiveStatus(record.status)) {
+      const job = isActiveStatus(record.status) ? null : deps.queue.rename(id, title);
+      if (job === null) {
         throw new HistoryError(
           'JOB_ACTIVE',
-          'El trabajo está en curso: cancelalo antes de borrarlo.',
+          'El trabajo está en curso: esperá a que termine para cambiarle el título.',
           409,
         );
       }
-      const file = absoluteFile(record);
-      if (file !== null) await deps.removeFile(file);
-      deps.queue.remove(id);
-      // SPEC §8: los borrados quedan en el log con la IP.
-      deps.logger.info(
-        {
-          jobId: id,
-          type: record.type,
-          title: record.title,
-          deletedByUser: requester.userId,
-          deletedByIp: requester.ip,
-          createdByUser: record.userId,
-          createdByIp: record.clientIp,
-        },
-        'Trabajo borrado del historial',
-      );
+      return job;
     },
 
     requesters() {

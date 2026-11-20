@@ -111,6 +111,10 @@ export type JobsRepository = {
   markExpired(id: string): boolean;
   /** Borra un job terminado. false si no existe o todavía está activo. */
   delete(id: string): boolean;
+  /** Cambia el título de un job terminado (D-113). false si no existe o está activo. */
+  rename(id: string, title: string): boolean;
+  /** true si alguna conversión o compresión en cola o en curso lee el archivo de este job. */
+  hasActiveChildren(id: string): boolean;
   listHistory(filter: HistoryFilter): { records: JobRecord[]; total: number };
   /**
    * Jobs `done` con archivo que terminaron antes de `beforeIso` (retención).

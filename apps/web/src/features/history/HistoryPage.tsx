@@ -5,9 +5,11 @@ import {
   ArrowsInSimpleIcon,
   ArrowsLeftRightIcon,
   DownloadSimpleIcon,
+  FileXIcon,
   FunnelSimpleIcon,
   MagnifyingGlassIcon,
   MusicNotesIcon,
+  PencilSimpleIcon,
   PlayIcon,
   RecordIcon,
   ScissorsIcon,
@@ -19,6 +21,7 @@ import {
 } from '@phosphor-icons/react';
 import {
   createJobResponseSchema,
+  historyBulkDeleteResponseSchema,
   historyRequestersResponseSchema,
   historyResponseSchema,
   jobResponseSchema,
@@ -31,7 +34,7 @@ import type {
 } from '@sti-catcher/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { apiDelete, apiGet, apiPost } from '../../api/client.ts';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../../api/client.ts';
 import { subscribeToAllEvents, subscribeToJobsEvents } from '../../api/events.ts';
 import { RowMenu } from '../../components/RowMenu.tsx';
 import { PageTitle } from '../../components/PageTitle.tsx';
@@ -44,6 +47,8 @@ import {
   isAudioOnly,
   isImage,
   isNewJobEvent,
+  pruneSelection,
+  selectionSummary,
   siteName,
 } from '../../lib/history.ts';
 import { applyEventToList, PHASE_LABELS, STATUS_LABELS, TYPE_LABELS } from '../../lib/jobs.ts';
@@ -85,6 +90,10 @@ export function HistoryPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
+  // Selección para borrar de a varios y fila con el título en edición (D-113).
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [editing, setEditing] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const updateParams = useCallback(
     (changes: Record<string, string | null>) => {
@@ -126,6 +135,7 @@ export function HistoryPage() {
     apiGet(`/api/history?${query.toString()}`, historyResponseSchema, controller.signal)
       .then((data) => {
         setState({ kind: 'ready', data });
+        setSelected((current) => pruneSelection(current, data.items));
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setState({ kind: 'error', message: errorMessage(error) });
@@ -155,6 +165,14 @@ export function HistoryPage() {
   }, []);
 
   const items = state.kind === 'ready' ? state.data.items : null;
+
+  // La selección cuenta solo las filas visibles que se pueden borrar: un borrado o
+  // un trabajo que vuelve a correr salen solos; al cambiar de página se poda.
+  const selection = useMemo(() => selectionSummary(items ?? [], selected), [items, selected]);
+  const selectable = useMemo(
+    () => (items ?? []).filter((item) => historyActions(item).remove).map((item) => item.id),
+    [items],
+  );
 
   // Cambios en vivo de los trabajos visibles: progreso, terminados, expirados, borrados.
   // Se vuelve a suscribir cada vez que cambia la lista, y al conectarse el server
@@ -214,9 +232,100 @@ export function HistoryPage() {
 
   const remove = (item: HistoryItem) => {
     const name = item.title ?? 'este trabajo';
-    if (!window.confirm(`¿Borrar «${name}»? También se borra el archivo del servidor.`)) return;
+    if (
+      !window.confirm(`¿Borrar «${name}» del historial? También se borra el archivo del servidor.`)
+    )
+      return;
     // La lista se actualiza sola con el evento job.deleted.
     runAction(apiDelete(`/api/jobs/${item.id}`));
+  };
+
+  const removeFile = (item: HistoryItem) => {
+    const name = item.title ?? 'este trabajo';
+    const size = item.sizeBytes !== null ? ` (${formatBytes(item.sizeBytes)})` : '';
+    if (
+      !window.confirm(
+        `¿Borrar el archivo de «${name}»${size}? El trabajo queda en el historial, sin archivo.`,
+      )
+    )
+      return;
+    // La fila pasa a «archivo borrado» con el evento job.updated.
+    runAction(apiDelete(`/api/jobs/${item.id}/file`));
+  };
+
+  const removeSelected = (what: 'file' | 'job') => {
+    const ids = what === 'file' ? selection.withFile : selection.ids;
+    if (ids.length === 0) return;
+    const count = ids.length === 1 ? '1 trabajo' : `${String(ids.length)} trabajos`;
+    const question =
+      what === 'file'
+        ? `¿Borrar los archivos de ${count} (${formatBytes(selection.bytes)})? Los trabajos quedan en el historial, sin archivo.`
+        : `¿Borrar ${count} del historial? También se borran sus archivos del servidor.`;
+    if (!window.confirm(question)) return;
+    setActionError(null);
+    setBulkBusy(true);
+    apiPost('/api/history/delete', historyBulkDeleteResponseSchema, { ids, what })
+      .then(({ done, failed }) => {
+        // Las filas borradas se sacan acá: cada borrado cambia la lista y vuelve a
+        // abrir el stream de eventos, y un `job.deleted` que llega en ese momento
+        // se pierde (al reconectar, el server no tiene nada que mandar de esa fila).
+        // Los archivos borrados sí llegan bien: al reconectar se manda el estado actual.
+        if (what === 'job') {
+          const gone = new Set(done);
+          setState((current) => {
+            if (current.kind !== 'ready') return current;
+            const nextItems = current.data.items.filter((item) => !gone.has(item.id));
+            const removed = current.data.items.length - nextItems.length;
+            if (removed === 0) return current;
+            return {
+              kind: 'ready',
+              data: { ...current.data, items: nextItems, total: current.data.total - removed },
+            };
+          });
+        }
+        // Lo que no se pudo queda elegido, con el motivo.
+        setSelected(new Set(failed.map((entry) => entry.id)));
+        if (failed.length > 0) {
+          const reasons = [...new Set(failed.map((entry) => entry.message))].join(' ');
+          const head =
+            failed.length === 1
+              ? 'Uno no se pudo borrar'
+              : `${String(failed.length)} no se pudieron borrar`;
+          setActionError(`${head}: ${reasons}`);
+        }
+      })
+      .catch((error: unknown) => {
+        setActionError(errorMessage(error));
+      })
+      .finally(() => {
+        setBulkBusy(false);
+      });
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  };
+
+  const allSelected = selectable.length > 0 && selection.ids.length === selectable.length;
+  const toggleAll = () => {
+    setSelected(allSelected ? new Set() : new Set(selectable));
+  };
+
+  /** Guarda el título nuevo; si falla, el error queda a la vista y sigue editando. */
+  const rename = (item: HistoryItem, title: string) => {
+    setActionError(null);
+    apiPatch(`/api/jobs/${item.id}`, jobResponseSchema, { title })
+      .then(() => {
+        // El título nuevo llega con el evento job.updated.
+        setEditing(null);
+      })
+      .catch((error: unknown) => {
+        setActionError(errorMessage(error));
+      });
   };
 
   const retry = (item: HistoryItem) => {
@@ -404,10 +513,72 @@ export function HistoryPage() {
       ) : (
         state.kind !== 'error' && (
           <>
+            {selection.ids.length > 0 && (
+              <div className="card bulk-bar" role="region" aria-label="Trabajos elegidos">
+                <span className="bulk-count" aria-live="polite">
+                  {selection.ids.length === 1
+                    ? '1 elegido'
+                    : `${String(selection.ids.length)} elegidos`}
+                  {selection.withFile.length > 0 && ` · ${formatBytes(selection.bytes)}`}
+                </span>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  disabled={bulkBusy || selection.withFile.length === 0}
+                  title={
+                    selection.withFile.length === 0
+                      ? 'Ninguno de los elegidos tiene archivo'
+                      : 'Libera el disco; los trabajos quedan en el historial'
+                  }
+                  onClick={() => {
+                    removeSelected('file');
+                  }}
+                >
+                  <FileXIcon size={15} aria-hidden="true" />
+                  Borrar archivos
+                </button>
+                <button
+                  type="button"
+                  className="button button-danger"
+                  disabled={bulkBusy}
+                  onClick={() => {
+                    removeSelected('job');
+                  }}
+                >
+                  <TrashIcon size={15} aria-hidden="true" />
+                  Borrar del historial
+                </button>
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  disabled={bulkBusy}
+                  onClick={() => {
+                    setSelected(new Set());
+                  }}
+                >
+                  Quitar la selección
+                </button>
+              </div>
+            )}
             <div className="table-wrap">
               <table className="table history-table" aria-busy={state.kind === 'loading'}>
                 <thead>
                   <tr>
+                    <th className="col-check">
+                      <input
+                        type="checkbox"
+                        aria-label="Elegir todos los trabajos propios de esta página"
+                        title="Elegir todos los propios de esta página"
+                        disabled={selectable.length === 0}
+                        checked={allSelected}
+                        ref={(input) => {
+                          if (input) {
+                            input.indeterminate = selection.ids.length > 0 && !allSelected;
+                          }
+                        }}
+                        onChange={toggleAll}
+                      />
+                    </th>
                     <th>Trabajo</th>
                     <th className="col-date">Fecha</th>
                     {showRequester && <th className="col-user">Usuario</th>}
@@ -421,13 +592,30 @@ export function HistoryPage() {
                 </thead>
                 <tbody>
                   {state.kind === 'loading' ? (
-                    <SkeletonRows columns={showRequester ? 7 : 6} />
+                    <SkeletonRows columns={showRequester ? 8 : 7} />
                   ) : (
                     state.data.items.map((item) => (
                       <HistoryRow
                         key={item.id}
                         item={item}
                         showRequester={showRequester}
+                        selected={selected.has(item.id)}
+                        onToggleSelected={() => {
+                          toggleSelected(item.id);
+                        }}
+                        editing={editing === item.id}
+                        onStartEdit={() => {
+                          setEditing(item.id);
+                        }}
+                        onCancelEdit={() => {
+                          setEditing(null);
+                        }}
+                        onRename={(title) => {
+                          rename(item, title);
+                        }}
+                        onDeleteFile={() => {
+                          removeFile(item);
+                        }}
                         playing={playing === item.id}
                         onTogglePlay={() => {
                           setPlaying((current) => (current === item.id ? null : item.id));
@@ -476,13 +664,14 @@ export function HistoryPage() {
 function SkeletonRows({ columns }: { columns: number }) {
   return [0, 1, 2].map((row) => (
     <tr key={row} aria-hidden="true">
+      <td />
       <td>
         <div className="video-cell">
           <span className="video-thumb" />
           <span className="skeleton" />
         </div>
       </td>
-      {Array.from({ length: columns - 1 }, (_, column) => (
+      {Array.from({ length: columns - 2 }, (_, column) => (
         <td key={column} />
       ))}
     </tr>
@@ -492,6 +681,13 @@ function SkeletonRows({ columns }: { columns: number }) {
 type RowProps = {
   item: HistoryItem;
   showRequester: boolean;
+  selected: boolean;
+  onToggleSelected: () => void;
+  editing: boolean;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onRename: (title: string) => void;
+  onDeleteFile: () => void;
   playing: boolean;
   onTogglePlay: () => void;
   onConvert: () => void;
@@ -515,6 +711,13 @@ const TYPE_ICONS = {
 function HistoryRow({
   item,
   showRequester,
+  selected,
+  onToggleSelected,
+  editing,
+  onStartEdit,
+  onCancelEdit,
+  onRename,
+  onDeleteFile,
   playing,
   onTogglePlay,
   onConvert,
@@ -576,11 +779,32 @@ function HistoryRow({
           },
         ]
       : []),
+    ...(actions.rename
+      ? [
+          {
+            key: 'rename',
+            label: 'Cambiar el título',
+            icon: <PencilSimpleIcon size={15} />,
+            onSelect: onStartEdit,
+          },
+        ]
+      : []),
+    ...(actions.removeFile
+      ? [
+          {
+            key: 'remove-file',
+            label: 'Borrar solo el archivo',
+            icon: <FileXIcon size={15} />,
+            danger: true,
+            onSelect: onDeleteFile,
+          },
+        ]
+      : []),
     ...(actions.remove
       ? [
           {
             key: 'remove',
-            label: 'Borrar',
+            label: 'Borrar del historial',
             icon: <TrashIcon size={15} />,
             danger: true,
             onSelect: onDelete,
@@ -592,6 +816,16 @@ function HistoryRow({
   return (
     <>
       <tr className={playing ? 'link-row-open' : undefined}>
+        <td className="col-check">
+          {actions.remove && (
+            <input
+              type="checkbox"
+              aria-label={`Elegir «${title}»`}
+              checked={selected}
+              onChange={onToggleSelected}
+            />
+          )}
+        </td>
         <td>
           <div className="video-cell">
             <span
@@ -601,16 +835,20 @@ function HistoryRow({
               {failed ? <WarningIcon size={16} /> : <TypeIcon size={16} />}
             </span>
             <div className="video-text">
-              <span className="video-title" title={title}>
-                {title}
-              </span>
+              {editing ? (
+                <TitleEditor initial={item.title ?? ''} onSave={onRename} onCancel={onCancelEdit} />
+              ) : (
+                <span className="video-title" title={title}>
+                  {title}
+                </span>
+              )}
               <span className="video-meta">
                 {TYPE_LABELS[item.type]}
                 {origin !== null && ` · ${origin}`}
               </span>
               {failed && item.error && <span className="video-error">{item.error}</span>}
               {item.status === 'expired' && (
-                <span className="video-meta">El archivo ya no está en el servidor.</span>
+                <span className="video-meta">Archivo borrado: ya no está en el servidor.</span>
               )}
             </div>
           </div>
@@ -699,7 +937,7 @@ function HistoryRow({
       </tr>
       {playing && actions.play && (
         <tr className="link-subrow">
-          <td colSpan={showRequester ? 7 : 6}>
+          <td colSpan={showRequester ? 8 : 7}>
             <div className="player history-player">
               {isImage(item) ? (
                 <img src={`${fileUrl}?inline=1`} alt={title} />
@@ -713,6 +951,56 @@ function HistoryRow({
         </tr>
       )}
     </>
+  );
+}
+
+/** Título editable en la fila: Enter guarda, Escape cancela (D-113). */
+function TitleEditor({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  onSave: (title: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    // El menú «…» devuelve el foco a su botón al elegir: el editor lo toma después.
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+  const trimmed = value.trim();
+  return (
+    <form
+      className="title-editor"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (trimmed === '') return;
+        if (trimmed === initial.trim()) onCancel();
+        else onSave(trimmed);
+      }}
+    >
+      <input
+        ref={inputRef}
+        aria-label="Título nuevo"
+        maxLength={200}
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onCancel();
+        }}
+      />
+      <button type="submit" className="button button-secondary" disabled={trimmed === ''}>
+        Guardar
+      </button>
+      <button type="button" className="button button-ghost" onClick={onCancel}>
+        Cancelar
+      </button>
+    </form>
   );
 }
 

@@ -291,7 +291,7 @@ La migración 2 completa los registros que ya existían. Para eso, las migracion
 
 Al listar el historial (una página: hasta 20 `stat`) y al pedir un archivo, si un job `done` ya no tiene su archivo, pasa a `expired` y se publica por SSE. Así un borrado manual o la retención (Fase 7, que también lo marca directamente) nunca dejan un link roto. Es la única transición desde un estado final.
 
-### D-062 — Borrar: solo lo propio, registro y archivo · Fase 4 · Vigente (con D-100: propio = de la misma cuenta)
+### D-062 — Borrar: solo lo propio, registro y archivo · Fase 4 · Vigente (con D-100: propio = de la misma cuenta; con D-113: solo el archivo, de a varios)
 
 - Solo el navegador que lo creó (cookie), si no **403**. No es seguridad, es prevención de accidentes (SPEC §8).
 - Un trabajo en curso no se borra (**409**): primero hay que cancelarlo.
@@ -308,6 +308,19 @@ Un trabajo `failed` o `cancelled` se reintenta con los mismos parámetros, como 
 - La página se suscribe a `/api/events?jobIds=<los visibles>`: progreso de los que están corriendo, terminados, expirados y borrados, sin recargar. Los eventos no traen `isMine` (depende de quién mira): la lista lo conserva.
 - Filtro, búsqueda y página viven en la URL (`?scope=all&q=…&page=2`).
 - El selftest no aparece en el historial (D-030).
+
+### D-113 — Borrar solo el archivo, de a varios, y cambiar el título · Vigente
+
+Borrar un trabajo (D-062) ya liberaba el disco, pero también se llevaba la fila: no quedaba registro de qué se había descargado o grabado. Además había que borrar los trabajos de a uno.
+
+- **Borrar solo el archivo** (`DELETE /api/jobs/:id/file`): borra el archivo y el trabajo pasa a `expired`, la misma transición que usan la retención y D-061. Se publica `job.updated` y la fila queda como «Archivo borrado». Primero se borra el archivo y después se cambia el estado: si el borrado falla, el trabajo sigue `done` y se puede volver a intentar. Solo para trabajos `done` (si no, **409 `NO_FILE`**). Log: «Archivo borrado desde el historial».
+- **De a varios** (`POST /api/history/delete { ids, what: 'file' | 'job' }`, hasta 100, una página): se procesan de a uno con las mismas reglas que el borrado individual. Uno que no se puede borrar no frena al resto y vuelve en `failed` con el motivo. En la web, cada fila propia que no está en curso tiene una casilla, y el encabezado elige todas las de la página. Arriba de la tabla aparece una barra con cuántos se eligieron y cuánto ocupan sus archivos, y los botones «Borrar archivos» (las filas quedan), «Borrar del historial» y «Quitar la selección». Lo que no se pudo borrar sigue elegido, con el motivo en el aviso de error. La selección es de la página: al cambiar de página o de filtros se saca lo que ya no se ve.
+- **Nada de archivos huérfanos ni conversiones rotas:** si una conversión o compresión en cola o en curso lee el archivo (`parent_job_id`), borrarlo da **409 `SOURCE_IN_USE`**. Vale para los dos borrados; la retención ya lo respetaba (`listExpirable`). `follow_up_job_id` y `parent_job_id` son `ON DELETE SET NULL`: borrar la fila de un origen no rompe la de su conversión, que conserva su archivo.
+- **Cambiar el título** (`PATCH /api/jobs/:id { title }`, hasta 200 caracteres): solo lo propio (**403**) y que no esté en curso (**409**), porque el runner puede pisar el título al terminar (D-060). Se actualiza también `title_search`, así que la búsqueda encuentra el título nuevo, y el archivo se baja con ese nombre (`Content-Disposition`). En la web es «Cambiar el título» en el menú «…»: el título se edita en la misma fila, Enter guarda y Escape cancela.
+- En el menú «…», «Borrar» pasa a llamarse «Borrar del historial», para distinguirlo de «Borrar solo el archivo».
+- **Las filas borradas de a varios se sacan con la respuesta, no con el evento.** Cada borrado cambia la lista y la página vuelve a abrir el stream de `/api/events` (D-064). Un `job.deleted` que llega justo en ese momento se pierde, porque al reconectar el server ya no tiene nada que mandar de esa fila. Pasó con el server real: de tres borrados, la última fila quedó en la tabla. Los archivos borrados no tienen el problema: al reconectar se manda el estado actual (`expired`).
+
+Verificado con el server real (build de producción, tres subidas): «Borrar archivos» con dos elegidos (la barra decía «2 elegidos · 63,6 KB»), y las filas pasaron a «Archivo borrado» sin recargar y sin sus archivos en disco. «Cambiar el título» desde el menú: el campo abre con el foco y el texto elegido, y Enter guarda. Con «elegir todos» y «Borrar del historial», la tabla quedó vacía.
 
 ## Conversión
 
