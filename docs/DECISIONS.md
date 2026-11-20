@@ -526,7 +526,7 @@ Lo que más se hace con una grabación es sacar el principio y el final, sacar u
 
 ## Interfaz
 
-### D-090 — Rediseño Nocturne por etapas · Etapa 1 · Vigente
+### D-090 — Rediseño Nocturne por etapas · Etapa 1 · Vigente (con D-112: el primario va relleno)
 
 Los mockups están en `docs/design/nocturne/` (README con las medidas, `tokens.css`, el HTML de referencia). Se aplican en 5 etapas, cada una con su commit: 1) tokens, barra lateral y componentes globales; 2) grabar con vista previa de la fuente; 3) convertir varios archivos; 4) conversión encadenada a la descarga (server); 5) descargar varios links.
 
@@ -694,7 +694,7 @@ El historial era una tarjeta por trabajo con hasta cinco botones (Reproducir, De
 
 Verificado con el server real: descargas MP4 y MP3, una descarga con GIF encadenado, tres conversiones de audio y una descarga cancelada. Todas aparecieron y terminaron sin recargar, y el menú anduvo con mouse y teclado. El GIF se vio, y en 390 px la tabla se desplaza sin ensanchar la página.
 
-### D-102 — Logo propio, acento azul y más vida visual · Vigente
+### D-102 — Logo propio, acento azul y más vida visual · Vigente (con D-112: el primario va relleno)
 
 - **Logo nuevo** (`docs/design/logo/sti-catcher-logo.jpg`: timón con una flecha de descarga). En la barra lateral y la pestaña va solo el emblema, recortado en cuadrado (`emblem-512.png` → `public/logo-128.png` y `logo-64.png`), porque el texto no se lee a 34 px. Al lado va el nombre, con «STI» en el color de acento como en el logo. El `alt` del logo queda vacío porque el nombre ya está escrito. Reemplaza al escudo del Centro.
 - **El acento pasa de violeta a azul**, el de la flecha (`#2563d6` en claro, `#5b91f0` en oscuro, con contraste AA sobre los fondos). El modo oscuro toma el azul marino del fondo del logo (`--bg: #0f1624`). La estructura de Nocturne (D-090) no cambia: botones de contorno, Inter 400/500, mismos radios y espacios.
@@ -751,6 +751,33 @@ Verificado con el server de prueba aislado, midiendo con el CSS final:
 - El bloque queda centrado a 1366 y a 2560 px (en el mismo centro que el contenido).
 - Con siete secciones (dos agregadas a mano en la página) entra a 1366 y a 1024 px. A 760 px se desliza y arranca desde el borde.
 - En 390 px la sección activa queda a la vista.
+
+### D-112 — Botón primario relleno, uno solo por pantalla · Vigente
+
+Reemplaza la parte de D-090 y D-102 que decía «botones de contorno». Al usuario le costó más de una vez encontrar el botón que ejecuta la acción: el primario de contorno azul se confundía con las opciones elegidas (formato, cuadros por segundo, resolución, sección activa), que tienen el mismo borde azul.
+
+- **`.button` es solo el primario y va relleno** con el acento. El texto es blanco en claro (5,5:1) y azul marino `--bg` en oscuro (5,8:1), porque el blanco sobre el azul del oscuro (`#5b91f0`) no llega a 4,5:1. Tokens nuevos: `--on-accent`, `--accent-hover` y `--accent-active` (más oscuro en claro, más claro en oscuro). Lleva una sombra chica. El relleno de todos los botones (variantes incluidas) pasa de 5,6 × 10 a 6,6 × 12 px. La letra sigue en Inter 500.
+- **Las demás acciones llevan siempre una variante**, y cada una define su fondo, color y estados, así no heredan el relleno: `button-secondary` (contorno neutro `--border`), `button-ghost` (solo texto azul) y `button-danger` (contorno rojo, como «Detener grabación» y «Cancelar»). Un `.button` sin variante es un primario.
+- **Deshabilitado:** el primario pasa a gris sólido (`--surface-2`) con el texto en `--muted` (5,1:1), en vez de la opacidad de 0,45, que sobre un relleno dejaba un azul lavado e ilegible. Así un primario deshabilitado no compite con el que sí se puede tocar. Las variantes quedan de contorno con el texto en `--faint`.
+- **Uno solo habilitado por pantalla: el del paso actual.**
+  - Descargar: «Analizar» mientras no haya links listos; con alguno listo, el principal pasa a «Descargar N listos» y «Analizar» va de contorno.
+  - Convertir y Comprimir: «Convertir N» / «Comprimir N» arriba a la derecha. Mientras ese tenga algo, las acciones de un archivo (Descargar, Reintentar, Volver a intentar) van de contorno; cuando no queda nada por convertir, pasan a ser el principal.
+  - Grabar: «Elegir pantalla…» hasta elegir la fuente; después «Empezar a grabar» (o «Programar grabación», «Empezar ahora»); al terminar, «Descargar MP4» (lo demás queda deshabilitado).
+  - Usuarios: «Crear cuenta». Guardar un nombre en la tabla va de contorno.
+  - Mi cuenta: «Cambiar contraseña». «Guardar nombre» va de contorno.
+  - Estado e Historial no tienen acción principal: «Iniciar prueba» va de contorno. Las acciones del historial son de fila (ghost o menú); un botón para varias filas tiene que llevar variante (`button-danger` si borra).
+- **Ubicación:** el primario va al final de su grupo, a la derecha (encabezado, barra de herramientas o pie del formulario); en Grabar, abajo en la tarjeta de opciones y a todo el ancho. No se movió nada de lugar: ya estaban así.
+- El punto rojo de «Empezar a grabar» lleva un aro del color del texto para leerse sobre el azul.
+- `docs/design/nocturne/` no se toca: es el handoff original.
+
+Verificado en el navegador (`npm run dev`, cuenta de prueba, un MP4 subido) a 1366 y 390 px, en claro y oscuro, contando los `.button` sin variante habilitados y visibles (como mucho uno en cada caso):
+
+- Descargar: con un link pegado («Analizar»); analizado «Me at the zoo» y pegado otro link («Descargar 1 listo», «Analizar» de contorno).
+- Convertir: listo («Convertir 1»), en curso (ninguno: solo «Cancelar») y terminado («Descargar»; «Convertir 0» en gris). Comprimir, listo.
+- Grabar, con una fuente simulada (un canvas en lugar de `getDisplayMedia`): sin fuente («Elegir pantalla…»), con vista previa («Empezar a grabar», punto rojo con aro), grabando (ninguno: «Detener grabación») y terminada («Descargar MP4»).
+- Mi cuenta (ninguno hasta escribir), Usuarios («Crear cuenta»), Estado e Historial (ninguno).
+
+El foco se ve como un aro azul separado del relleno.
 
 ## Usuarios y login
 

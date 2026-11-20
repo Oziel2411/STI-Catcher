@@ -298,6 +298,9 @@ function sourceDetails(item: CompressItem): string {
 }
 
 function ItemDetail({ item, batch }: { item: CompressItem; batch: CompressBatch }) {
+  // Uno solo relleno por pantalla (D-112): mientras «Comprimir N» tenga algo,
+  // ese es el principal y las acciones de un video van de contorno.
+  const itemAction = batch.compressibleCount === 0 ? 'button' : 'button button-secondary';
   const header = (
     <div>
       <h2 className="detail-title">{item.name}</h2>
@@ -373,7 +376,7 @@ function ItemDetail({ item, batch }: { item: CompressItem; batch: CompressBatch 
           {item.sourceJobId && (
             <button
               type="button"
-              className="button"
+              className={itemAction}
               onClick={() => {
                 batch.reanalyze(item);
               }}
@@ -405,7 +408,9 @@ function ItemDetail({ item, batch }: { item: CompressItem; batch: CompressBatch 
           <JobProgress
             job={job}
             connected
-            doneContent={<CompressDone job={job} originalBytes={item.sizeBytes} />}
+            doneContent={
+              <CompressDone job={job} originalBytes={item.sizeBytes} className={itemAction} />
+            }
           />
         ) : (
           <p className="muted small">Conectando…</p>
@@ -430,7 +435,7 @@ function ItemDetail({ item, batch }: { item: CompressItem; batch: CompressBatch 
           {job && (job.status === 'failed' || job.status === 'cancelled') && (
             <button
               type="button"
-              className="button"
+              className={itemAction}
               onClick={() => {
                 batch.retry(item);
               }}
@@ -679,7 +684,15 @@ function ReadyDetail({
   );
 }
 
-function CompressDone({ job, originalBytes }: { job: Job; originalBytes: number | null }) {
+function CompressDone({
+  job,
+  originalBytes,
+  className,
+}: {
+  job: Job;
+  originalBytes: number | null;
+  className: string;
+}) {
   const saving = savingText(originalBytes, job.sizeBytes);
   const grew = originalBytes !== null && job.sizeBytes !== null && job.sizeBytes >= originalBytes;
   const details = [
@@ -689,7 +702,7 @@ function CompressDone({ job, originalBytes }: { job: Job; originalBytes: number 
   return (
     <>
       <div className="row">
-        <a className="button" href={`/api/jobs/${job.id}/file`} download>
+        <a className={className} href={`/api/jobs/${job.id}/file`} download>
           Descargar
         </a>
         <Link className="button button-secondary" to="/historial">

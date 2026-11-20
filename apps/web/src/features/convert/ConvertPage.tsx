@@ -328,6 +328,9 @@ function ItemDetail({
   batch: ConvertBatch;
   limits: GifLimits;
 }) {
+  // Uno solo relleno por pantalla (D-112): mientras «Convertir N» tenga algo,
+  // ese es el principal y las acciones de un archivo van de contorno.
+  const itemAction = batch.convertibleCount === 0 ? 'button' : 'button button-secondary';
   const header = (
     <div>
       <h2 className="detail-title">{item.name}</h2>
@@ -403,7 +406,7 @@ function ItemDetail({
           {item.sourceJobId && (
             <button
               type="button"
-              className="button"
+              className={itemAction}
               onClick={() => {
                 batch.reanalyze(item);
               }}
@@ -428,7 +431,11 @@ function ItemDetail({
           <span className="badge badge-accent">{formatTag(item.preset, item.maxHeight)}</span>
         </p>
         {job ? (
-          <JobProgress job={job} connected doneContent={<ConvertDone job={job} />} />
+          <JobProgress
+            job={job}
+            connected
+            doneContent={<ConvertDone job={job} className={itemAction} />}
+          />
         ) : (
           <p className="muted small">Conectando…</p>
         )}
@@ -452,7 +459,7 @@ function ItemDetail({
           {job && (job.status === 'failed' || job.status === 'cancelled') && (
             <button
               type="button"
-              className="button"
+              className={itemAction}
               onClick={() => {
                 batch.retry(item);
               }}
@@ -706,7 +713,7 @@ function ReadyDetail({
   );
 }
 
-function ConvertDone({ job }: { job: Job }) {
+function ConvertDone({ job, className }: { job: Job; className: string }) {
   const details = [
     job.resolution,
     [job.videoCodec, job.audioCodec].filter(Boolean).join(' + ') || null,
@@ -714,7 +721,7 @@ function ConvertDone({ job }: { job: Job }) {
   ].filter((part): part is string => part !== null && part !== '');
   return (
     <div className="row">
-      <a className="button" href={`/api/jobs/${job.id}/file`} download>
+      <a className={className} href={`/api/jobs/${job.id}/file`} download>
         Descargar
       </a>
       <Link className="button button-secondary" to="/historial">
