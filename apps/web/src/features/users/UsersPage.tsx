@@ -302,12 +302,12 @@ function UserRow({
                 setRenaming(event.target.value);
               }}
             />
-            <button type="submit" className="button">
+            <button type="submit" className="button button-secondary">
               Guardar
             </button>
             <button
               type="button"
-              className="button button-secondary"
+              className="button button-ghost"
               onClick={() => {
                 setRenaming(null);
               }}
